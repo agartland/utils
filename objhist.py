@@ -125,9 +125,9 @@ class countdict(dict):
         Object is updated in-place."""
         for k in newIter:
             try:
-                self[k]+=1
+                self[k] += 1
             except KeyError:
-                self[k]=1
+                self[k] = 1
     def subset(self,newkeys):
         """Returns a copy of the countdict with only a subset of the keys remaining."""
         return countdict({k:self[k] for k in newkeys})
