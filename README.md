@@ -1,6 +1,27 @@
 #utils
-General Python utilities.
-=====
+#General Python utilities.
+A repository of code that I hope will be more generally useful to people. I work almost entirely in an interactive IPython --pylab environment. Although I have tried to make all imports explicit in this code, it may be dependent on imports made by the --pylab option (similar to %pylab magic):
+```
+    import numpy
+    import matplotlib
+    from matplotlib import pylab, mlab, pyplot
+    np = numpy
+    plt = pyplot
+
+    from IPython.display import display
+    from IPython.core.pylabtools import figsize, getfigs
+
+    from pylab import *
+    from numpy import *
+```
+In addition I may assume the following imports (but again, I try not to):
+```
+from __future__ import division
+import pandas as pd
+from scipy import stats
+```
+All comments, suggestions and pull requests are welcome!
+
 ##License
 
 **The MIT License (MIT)**
