@@ -76,7 +76,6 @@ def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=False, sRange=(15
         for val1,val2 in itertools.product(df[col1].unique(),df[col2].unique()):
             w = ((df[col1]==val1) & (df[col2]==val2)).sum()
             if w>0:
-                print w
                 dat = dict(weight = w/df.shape[0])
                 if testSig:
                     tab = [[((df[col1]!=val1) & (df[col2]!=val2)).sum(), ((df[col1]==val1) & (df[col2]!=val2)).sum()],
