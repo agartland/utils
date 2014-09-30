@@ -9,11 +9,11 @@ import pandas as pd
 
 from myfisher import *
 from objhist import *
+from custom_legends import *
 
 __all__ = ['catcorr',
            'layouts',
-           'generateTestData',
-           'colorLegend']
+           'generateTestData']
 
 layouts = ['twopi', 'fdp','circo', 'neato', 'dot', 'sfdp']
 
@@ -171,12 +171,6 @@ def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=False, sRange=(15
 
         fig = Figure(data=data, layout=layout)
         plot_url = py.plot(fig, filename='catcorr_'+mode)
-
-def colorLegend(colors,labels,alphas=None,edgecolor='black',loc='best',title=None):
-    """Custom matplotlib legend with colors and labels etc."""
-    if alphas is None:
-        alphas = ones(len(colors))
-    legend((Circle((0,0),fc=c,ec=edgecolor,alpha=a) for c,a in zip(colors,alphas)),labels,loc,title=title)
 
 def generateTestData(nrows=100):
     """Generate a pd.DataFrame() with correlations that can be visualized by catcorr()"""
