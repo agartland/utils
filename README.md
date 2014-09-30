@@ -1,5 +1,5 @@
 #utils
-#General Python utilities.
+#Python utilities from a computational biologist
 A repository of code that I hope will be generally useful to data scientists. All comments, suggestions and pull requests are welcome!
 
 I work almost entirely in an interactive IPython --pylab environment. Although I have tried to make all imports explicit in this code, it may be dependent on imports made by the --pylab option (similar to %pylab magic):
