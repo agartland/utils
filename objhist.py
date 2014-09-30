@@ -7,7 +7,7 @@ from scipy import stats
 __all__ = ['objhist',
            'countdict']
 
-def objhist(x,keys=None):
+def objhist(x=[], keys=None):
     """Count unique objects in x and return a dict of counts
     with added functionality (see countdict)
 
@@ -47,9 +47,7 @@ def objhist(x,keys=None):
     out = countdict()
     if not keys is None:
         out.update({k:0 for k in keys})
-
-    for k in x:
-        out.add(k)
+    out.add(x)
     return out
 
 class countdict(dict):
@@ -74,7 +72,7 @@ class countdict(dict):
         """Compute the relative entropy between the frequencies
         in this countdict object and those in referenceFreq.
 
-        The Kullback–Leibler divergence is the negative sum of these values.
+        The Kullback-Leibler divergence is the negative sum of these values.
 
         Parameters
         ----------
@@ -125,9 +123,9 @@ class countdict(dict):
         Object is updated in-place."""
         for k in newIter:
             try:
-                self[k]+=1
+                self[k] += 1
             except KeyError:
-                self[k]=1
+                self[k] = 1
     def subset(self,newkeys):
         """Returns a copy of the countdict with only a subset of the keys remaining."""
         return countdict({k:self[k] for k in newkeys})
@@ -180,7 +178,7 @@ class countdict(dict):
         if useFreqs:
             freqDict = self.freq()
             """Ensure that it sums to 1 for stats.rv_discrete()"""
-            freqArr = np.round(np.array([freqDict[k] for k keys]), decimals=7)
+            freqArr = np.round(np.array([freqDict[k] for k in keys]), decimals=7)
             freqArr = freqArr/freqArr.sum()
 
             gridint = np.arange(len(keys))

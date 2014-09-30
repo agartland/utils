@@ -1,7 +1,31 @@
 #utils
-General Python utilities.
-=====
+#General Python utilities.
+A repository of code that I hope will be generally useful to data scientists. All comments, suggestions and pull requests are welcome!
+
+I work almost entirely in an interactive IPython --pylab environment. Although I have tried to make all imports explicit in this code, it may be dependent on imports made by the --pylab option (similar to %pylab magic):
+```
+import numpy
+import matplotlib
+from matplotlib import pylab, mlab, pyplot
+np = numpy
+plt = pyplot
+
+from IPython.display import display
+from IPython.core.pylabtools import figsize, getfigs
+
+from pylab import *
+from numpy import *
+```
+In addition I may assume the following imports (but again, I try not to):
+```
+from __future__ import division
+import pandas as pd
+from scipy import stats
+```
+
 ##License
+
+All source code in this repository is freely available under an MIT license, unless otherwise noted within a file.
 
 **The MIT License (MIT)**
 
