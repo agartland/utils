@@ -1,3 +1,10 @@
+"""
+Package that first attempts to load a cython version of the Fisher's exact test:
+    Fast Fisher's Exact Test (haibao tang, brent pedersen)
+    https://pypi.python.org/pypi/fisher/
+But falls back to the scipy test if it cannot be found
+"""
+
 from __future__ import division
 
 __all__ = ['fisherTest']
