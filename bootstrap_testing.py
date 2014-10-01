@@ -51,7 +51,7 @@ def bootstrapTwoSampTest(vec1,vec2,statFunc=None,nPerms=10000):
     assert L==(L1+L2)
 
     if statFunc is None:
-        """Use studentized statistic instead for more accuracy
+        """Use studentized statistic with pooled variance instead for more accuracy
         (but assumes equal variances)"""
         statFunc = lambda v1,v2: (mean(v1)-mean(v2)) / (sqrt((sum((v1-mean(v1))**2) + sum((v2-mean(v2))**2))/(L1+L2-2)) * sqrt(1/L1+1/L2))
         #statFunc = lambda v1,v2: mean(v1)-mean(v2)
@@ -139,3 +139,7 @@ def bootstrapCI(data,statFunc=np.mean,alpha=0.05,nPerms=10000,output='lowhigh'):
     except IndexError:
         out = [np.nan,np.nan]
     return out
+
+
+
+
