@@ -3,7 +3,7 @@ import networkx as nx
 import itertools
 import brewer2mpl
 import plotly.plotly as py
-from plotly.graph_objs import *
+import plotly.graph_objs as pygo
 from pylab import *
 import pandas as pd
 
@@ -13,17 +13,18 @@ from custom_legends import *
 
 __all__ = ['catcorr',
            'layouts',
-           'generateTestData']
+           'generateTestData',
+           'testEdge']
 
 layouts = ['twopi', 'fdp','circo', 'neato', 'dot', 'sfdp']
 
 color2str = lambda col: 'rgb'+str(tuple((array(col)*256).round().astype(int)))
 
-def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=False, sRange=(15,70), wRange=(0.5,15)):
+def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=0, sRange=(15,70), wRange=(0.5,15)):
     """Make a network plot showing the correlations among the
     categorical variables in the columns of df.
 
-    Each node is a unique value in one of the columns.
+    Each node is a unique value in one of the columns (Node is specified as a tuple (column, value))
     Node size is proportional to the value's frequency.
 
     Each edge is a unique pair of values in two columns.
@@ -42,10 +43,11 @@ def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=False, sRange=(15
         (user needs to be logged in previously).
     titleStr : str
         Printed at the top of the plot.
-    testSig : bool
+    testSig : float
+        If non-zero then testSig is used as the significance cutoff for plotting a highlighted edge.
         For each edge, tests the statistical hypothesis that number of observed pairings
         between values in two columns is significantly different than what one would expect
-        based on their marginal frequencies.
+        based on their marginal frequencies. Note: there is no adjustment for multiple comparisons.
     sRange,wRange : tuples of length 2
         Contains the min and max node sizes or edge widths in points, for scaling
 
@@ -62,28 +64,23 @@ def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=False, sRange=(15
     [Posts a catcorr plot to plot.ly]
 
     """
-
-    SPLITCHAR = '@'
     g = nx.Graph()
     """Add a node for each unique value in each column with name: col_value"""
     for col in df.columns:
         for val in df[col].unique():
             freq = (df[col]==val).sum()/df.shape[0]
-            g.add_node('%s%s%s' % (col,SPLITCHAR,val),freq=freq)
+            g.add_node((col,val),freq=freq)
     """Add edges for each unique pair of values
     with edgewidth proportional to frequency of pairing"""
     for col1,col2 in itertools.combinations(df.columns,2):
         for val1,val2 in itertools.product(df[col1].unique(),df[col2].unique()):
             w = ((df[col1]==val1) & (df[col2]==val2)).sum()
             if w>0:
-                print w
                 dat = dict(weight = w/df.shape[0])
                 if testSig:
-                    tab = [[((df[col1]!=val1) & (df[col2]!=val2)).sum(), ((df[col1]==val1) & (df[col2]!=val2)).sum()],
-                           [((df[col1]!=val1) & (df[col2]==val2)).sum(),((df[col1]==val1) & (df[col2]==val2)).sum()]]
-                    OR,pvalue = fisherTest(tab)
+                    OR,pvalue = testEdge(df,(col1,val1),(col2,val2))
                     dat['pvalue'] = pvalue
-                g.add_edge('%s%s%s' % (col1,SPLITCHAR,val1),'%s%s%s' % (col2,SPLITCHAR,val2),**dat)
+                g.add_edge((col1,val1),(col2,val2),**dat)
 
     """Compute attributes of edges and nodes"""
     edgewidth = array([d['weight'] for n1,n2,d in g.edges(data=True)])
@@ -92,7 +89,7 @@ def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=False, sRange=(15
     nColors = min(max(len(df.columns),3),9)
     colors = brewer2mpl.get_map('Set1','Qualitative',nColors).mpl_colors
     cmap = {c:color for c,color in zip(df.columns, itertools.cycle(colors))}
-    nodecolors = [cmap[n.split(SPLITCHAR)[0]] for n in g.nodes()]
+    nodecolors = [cmap[n[0]] for n in g.nodes()]
     if layout == 'twopi':
         """If using this layout specify the most common node as the root"""
         freq = {n:d['freq'] for n,d in g.nodes(data=True)}
@@ -127,7 +124,7 @@ def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=False, sRange=(15
                 c=nodecolors,
                 alpha=1,zorder=2)
         for n in g.nodes():
-            annotate(n.split(SPLITCHAR)[1],
+            annotate(n[1],
                     xy=pos[n],
                     fontname='Consolas',
                     size='medium',
@@ -138,6 +135,7 @@ def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=False, sRange=(15
         colorLegend(labels=df.columns,colors = [c for x,c in zip(df.columns,colors)],loc=0)
         title(titleStr)
     else:
+        """Send the plot to plot.ly"""
         data = []
         for es,e in zip(sznorm(edgewidth,mn=wRange[0],mx=wRange[1]),g.edges_iter()):
             x1,y1=pos[e[0]]
@@ -146,30 +144,30 @@ def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=False, sRange=(15
             if testSig and g[e[0]][e[1]]['pvalue'] < testSig:
                 props['color']='orange'
                 props['opacity']=0.8
-            tmp = Scatter(x=[x1,x2],
+            tmp = pygo.Scatter(x=[x1,x2],
                           y=[y1,y2],
                           mode='lines',
-                          line=Line(width=es,**props),
+                          line=pygo.Line(width=es,**props),
                           showlegend=False)
             data.append(tmp)
         nodesize = sznorm(nodesize,mn=sRange[0],mx=sRange[1])
         for col in cmap.keys():
-            ind = [nodei for nodei,node in enumerate(g.nodes()) if node.split(SPLITCHAR)[0]==col]
-            tmp = Scatter(x=[pos[s][0] for nodei,s in enumerate(g.nodes()) if nodei in ind],
+            ind = [nodei for nodei,node in enumerate(g.nodes()) if node[0]==col]
+            tmp = pygo.Scatter(x=[pos[s][0] for nodei,s in enumerate(g.nodes()) if nodei in ind],
                     y=[pos[s][1] for nodei,s in enumerate(g.nodes()) if nodei in ind],
                     mode='markers',
                     name=col,
-                    text=[node.split(SPLITCHAR)[1] for nodei,node in enumerate(g.nodes()) if nodei in ind],
+                    text=[node[1] for nodei,node in enumerate(g.nodes()) if nodei in ind],
                     textposition='middle center',
-                    marker=Marker(size=nodesize[ind],
+                    marker=pygo.Marker(size=nodesize[ind],
                                   color=[color2str(nc) for nodei,nc in enumerate(nodecolors) if nodei in ind]))
             data.append(tmp)
-        layout = Layout(title=titleStr,
+        layout = pygo.Layout(title=titleStr,
                         showlegend=True,
-                        xaxis=XAxis(showgrid=False, zeroline=False),
-                        yaxis=YAxis(showgrid=False, zeroline=False))
+                        xaxis=pygo.XAxis(showgrid=False, zeroline=False),
+                        yaxis=pygo.YAxis(showgrid=False, zeroline=False))
 
-        fig = Figure(data=data, layout=layout)
+        fig = pygo.Figure(data=data, layout=layout)
         plot_url = py.plot(fig, filename='catcorr_'+mode)
 
 def generateTestData(nrows=100):
@@ -197,3 +195,44 @@ def sznorm(vec,mx=1,mn=0):
     vec[isnan(vec)] = mn
     vec[vec<mn] = mn
     return vec
+
+def testEdge(df,node1,node2,verbose=False):
+    """Test if the occurence of nodeA paired with nodeB is more/less common than expected.
+
+    Parameters
+    ----------
+    nodeX : tuple (column, value)
+        Specify the node by its column name and the value.
+
+    Returns
+    -------
+    OR : float
+        Odds-ratio associated with the 2x2 contingency table
+    pvalue : float
+        P-value associated with the Fisher's exact test that H0: OR = 1"""
+    col1,val1 = node1
+    col2,val2 = node2
+    
+    tab = zeros((2,2))
+    tab[0,0] = ((df[col1]!=val1) & (df[col2]!=val2)).sum()
+    tab[0,1] = ((df[col1]!=val1) & (df[col2]==val2)).sum()
+    tab[1,0] = ((df[col1]==val1) & (df[col2]!=val2)).sum()
+    tab[1,1] = ((df[col1]==val1) & (df[col2]==val2)).sum()
+
+    if any(tab==0):
+        """Add 1 to cells with zero"""
+        ind = tab==0
+        tab[ind] = 1
+        if verbose:
+            print 'Added one to %d cells with zero counts.' % (ind.sum())
+            print
+
+    OR,pvalue = fisherTest(tab)
+
+    if verbose:
+        print 'Node1: %s, %s' % node1
+        print 'Node2: %s, %s' % node2
+        print
+        print pd.DataFrame(tab,index=['Node1(-)','Node1(+)'],columns = ['Node2(-)','Node2(+)'])
+        print '\nOR: %1.2f\nP-value: %1.3f' % (OR,pvalue)
+    return OR,pvalue
