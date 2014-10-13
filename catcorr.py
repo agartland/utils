@@ -16,11 +16,11 @@ __all__ = ['catcorr',
            'generateTestData',
            'testEdge']
 
-layouts = ['twopi', 'fdp','circo', 'neato', 'dot', 'sfdp']
+layouts = ['twopi', 'fdp','circo', 'neato', 'dot']
 
 color2str = lambda col: 'rgb'+str(tuple((array(col)*256).round().astype(int)))
 
-def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=0, sRange=(15,70), wRange=(0.5,15)):
+def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=0, sRange=(100,inf), wRange=(0.5,inf)):
     """Make a network plot showing the correlations among the
     categorical variables in the columns of df.
 
@@ -35,7 +35,7 @@ def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=0, sRange=(15,70)
     df : pandas.DataFrame
         Nodes will be created for each unique value within each column of this object
     layout : str
-        Choose one of ['twopi', 'fdp','circo', 'neato', 'dot', 'sfdp']
+        Choose one of ['twopi', 'fdp','circo', 'neato', 'dot']
         to change the layout of the nodes. See Graphviz for details about each layout.
     mode : str
         Specifies whether the resulting plot will be a matplotlib figure (default: 'mpl')
@@ -107,7 +107,7 @@ def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=0, sRange=(15,70)
 
         #nx.draw_networkx_edges(g,pos,alpha=0.5,width=sznorm(edgewidth,mn=0.5,mx=10), edge_color='k')
         #nx.draw_networkx_nodes(g,pos,node_size=sznorm(nodesize,mn=500,mx=5000),node_color=nodecolors,alpha=1)
-        ew = sznorm(edgewidth,mn=wRange[0],mx=wRange[1])
+        ew = szscale(edgewidth,mn=wRange[0],mx=wRange[1])
 
         for es,e in zip(ew,g.edges_iter()):
             x1,y1=pos[e[0]]
@@ -120,7 +120,7 @@ def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=0, sRange=(15,70)
 
         scatter(x=[pos[s][0] for s in g.nodes()],
                 y=[pos[s][1] for s in g.nodes()],
-                s=sznorm(nodesize,mn=sRange[0],mx=sRange[1])**2, #Units for scatter is (size in points)**2
+                s=szscale(nodesize,mn=sRange[0],mx=sRange[1]), #Units for scatter is (size in points)**2
                 c=nodecolors,
                 alpha=1,zorder=2)
         for n in g.nodes():
@@ -137,7 +137,7 @@ def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=0, sRange=(15,70)
     else:
         """Send the plot to plot.ly"""
         data = []
-        for es,e in zip(sznorm(edgewidth,mn=wRange[0],mx=wRange[1]),g.edges_iter()):
+        for es,e in zip(szscale(edgewidth,mn=wRange[0],mx=wRange[1]),g.edges_iter()):
             x1,y1=pos[e[0]]
             x2,y2=pos[e[1]]
             props = dict(color='black',opacity=0.4)
@@ -150,7 +150,8 @@ def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=0, sRange=(15,70)
                           line=pygo.Line(width=es,**props),
                           showlegend=False)
             data.append(tmp)
-        nodesize = sznorm(nodesize,mn=sRange[0],mx=sRange[1])
+        """May need to add sqrt() to match mpl plots"""
+        nodesize = szscale(nodesize,mn=sRange[0],mx=sRange[1]) #Units for plotly.Scatter is (size in points)
         for col in cmap.keys():
             ind = [nodei for nodei,node in enumerate(g.nodes()) if node[0]==col]
             tmp = pygo.Scatter(x=[pos[s][0] for nodei,s in enumerate(g.nodes()) if nodei in ind],
@@ -195,6 +196,15 @@ def sznorm(vec,mx=1,mn=0):
     vec[isnan(vec)] = mn
     vec[vec<mn] = mn
     return vec
+
+def szscale(vec,mx=inf,mn=1):
+    """Normalize values of vec to [mn, mx] interval
+    such that sz ratios remain representative."""
+    factor = mn/nanmin(vec)
+    vec = vec*factor
+    vec[vec>mx] = mx
+    vec[isnan(vec)] = mn
+    return vec    
 
 def testEdge(df,node1,node2,verbose=False):
     """Test if the occurence of nodeA paired with nodeB is more/less common than expected.

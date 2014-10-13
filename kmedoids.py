@@ -4,54 +4,54 @@ from utilHelpers import unique_rows
 
 __all__ = ['kmedoids']
 
-def kmedoids(dmat, k=3, weights = None, nPasses = 1, maxIter=1000,verbose=False):
+def kmedoids(dmat, k=3, weights = None, nPasses = 1, maxIter=1000,initInds=None,verbose=False):
     """Identify the k points that minimize all intra-cluster distances.
     Uses Lloyd's algorithm for EM.
+
+    The algorithm completes nPasses of the algorithm with random restarts.
+    Each pass consists of iteratively assigning/improving the medoids.
     
     Parameters
     ----------
-    dmat: array-like of floats, shape (n_samples, n_samples)
+    dmat : array-like of floats, shape (n_samples, n_samples)
         The pairwise distance matrix of observations to cluster.
-
-    weights: array-like of floats, shape (n_samples)
+    weights : array-like of floats, shape (n_samples)
         Relative weights for each observation in inertia computation.
-
     k: int
         The number of clusters to form as well as the number of
         medoids to generate.
-
-    maxIter: int, optional, default None (inf)
+    maxIter : int, optional, default None (inf)
         Maximum number of iterations of the k-medoids algorithm to run.
-
-    verbose: boolean, optional
+    initInds : ndarray of shape [>=k]
+        Indices used to initiate medoids in each pass.
+        If None, choose from all indices.
+    verbose : boolean, optional
         Verbosity mode
-
 
     Returns
     -------
     medoids: float ndarray with shape (k)
         Indices into dmat that indicate medoids found at the last iteration of k-medoids.
-
     labels: integer ndarray with shape (n_samples,)
         label[i] is the code or index of the medoid the
         i'th observation is closest to.
-
     inertia: float
         The final value of the inertia criterion (sum of squared distances to
         the closest medoid for all observations).
-
     nIter: int
-        Number of iterations run.
-
+        Number of iterations in best pass.
     nFound: int
         Number of unique solutions found (out of nPasses)
-
     
     To apply to points in euclidean space pass dmat using:
     dmat = sklearn.neighbors.DistanceMetric.get_metric('euclidean').pairwise(points_array)"""
 
     """Number of points"""
     N = dmat.shape[0]
+
+    """Choose starting medoids from any of the points"""
+    if initInds is None:
+        initInds = arange(N)
 
     """Default weights are ones"""
     if weights is None:
@@ -69,11 +69,13 @@ def kmedoids(dmat, k=3, weights = None, nPasses = 1, maxIter=1000,verbose=False)
     allMedoids = zeros((nPasses,k))
     for passi in range(nPasses):
         """Pick k random medoids"""
-        currMedoids = permutation(N)[:k]
+        currMedoids = permutation(initInds)[:k]
         newMedoids = zeros(k,dtype=int32)
         for i in range(maxIter):
             """Assign each point to the closest cluster"""
             labels = currMedoids[argmin(dmat[:,currMedoids], axis=1)]
+
+            """ISSUE: If len(unique(labels)) < k there is an error"""
 
             """Choose new medoids for each cluster, minimizing intra-cluster distance"""
             totInertia = 0
@@ -105,7 +107,7 @@ def kmedoids(dmat, k=3, weights = None, nPasses = 1, maxIter=1000,verbose=False)
             bestLabels = labels.copy()
             bestNIter = i
     
-    """nfound in the number of unique solutions (each row is a solution)"""
+    """nfound is the number of unique solutions (each row is a solution)"""
     nfound = len(unique_rows(allMedoids)[:])
     """Return the results from the best pass"""
     return bestMedoids, bestLabels, bestInertia, bestNIter, nfound
