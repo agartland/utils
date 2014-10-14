@@ -26,13 +26,13 @@ class SeparateData(object):
                 out[attr] = self.__getattribute__(attr)
         return out
     def from_dict(self,d,special={},kwargs={}):
+        for k in kwargs.keys():
+            self.__setattr__(k,kwargs[k])
         for k in d.keys():
             if not k in special.keys():
                 self.__setattr__(k,d[k])
             else:
                 self.__setattr__(k,special[k](d[k]))
-        for k in kwargs.keys():
-            self.__setattr__(k,kwargs[k])
     def saveFile(self,filename):
         with open(filename,'wb') as filehandle:
             pickle.dump(self.to_dict(),filehandle)
