@@ -88,7 +88,7 @@ def kmedoids(dmat, k=3, weights = None, nPasses = 1, maxIter=1000,initInds=None)
             """Choose new medoids for each cluster, minimizing intra-cluster distance"""
             totInertia = 0
             for medi,med in enumerate(currMedoids):
-                clusterInd = find(labels==med)
+                clusterInd = where(labels==med)[0]
                 """Inertia is the sum of the squared distances (vec is shape (len(clusterInd))"""
                 inertiaVec = (wdmat2[clusterInd,:][:,clusterInd]).sum(axis=1)
                 mnInd = argmin(inertiaVec)
@@ -220,7 +220,7 @@ def computeInertia(wdmat2,labels,currMedoids):
     
     totInertia = 0
     for medi,med in enumerate(currMedoids):
-        clusterInd = find(labels==med)
+        clusterInd = where(labels==med)[0]
         """Inertia is the sum of the squared distances"""
         totInertia += wdmat2[med,clusterInd].sum()
     return totInertia
