@@ -40,6 +40,8 @@ class SeparateData(object):
         with open(filename,'rb') as filehandle:
             obj = pickle.load(filehandle)
         self.from_dict(obj,kwargs=kwargs)
+    def fromOldInstance(self,old):
+        self.from_dict(old.to_dict(skip=[]))
 
 def test_SD():
     """Used for testing the SeparateData class.
