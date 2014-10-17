@@ -7,7 +7,7 @@ __all__ = ['kmedoids',
            'reassignClusters',
            'computeInertia']
 
-def kmedoids(dmat, k=3, weights = None, nPasses = 1, maxIter=1000,initInds=None):
+def kmedoids(dmat, k=3, weights = None, nPasses = 1, maxIter=1000,initInds=None,potentialMedoidInds=None):
     """Identify the k points that minimize all intra-cluster distances.
 
     The algorithm completes nPasses of the algorithm with random restarts.
@@ -33,6 +33,8 @@ def kmedoids(dmat, k=3, weights = None, nPasses = 1, maxIter=1000,initInds=None)
         Maximum number of iterations of the k-medoids algorithm to run.
     initInds : ndarray
         Medoid indices used for random initialization and restarts for each pass.
+    potentialMedoidInds : array of indices
+        If specified then medoids are constrained to be chosen from this array.
 
     Returns
     -------
@@ -58,6 +60,12 @@ def kmedoids(dmat, k=3, weights = None, nPasses = 1, maxIter=1000,initInds=None)
 
     wdmat2 = precomputeWeightedSqDmat(dmat,weights)
 
+    if not potentialMedoidInds is None:
+        potentialMedoidSet = set(potentialMedoidInds)
+        initInds = array([i for i in potentialMedoidSet.intersection(set(initInds))],dtype=int)
+    else:
+        potentialMedoidSet = arange(N)
+
     bestInertia = None
     allMedoids = zeros((nPasses,k))
     for passi in range(nPasses):
@@ -72,7 +80,7 @@ def kmedoids(dmat, k=3, weights = None, nPasses = 1, maxIter=1000,initInds=None)
             
             """If clusters are lost during (re)assignment step, pick random points
             as new medoids and reassign until we have k clusters again"""
-            uLabels = unique(labels)
+            uLabels = unique(labels[potentialMedoidInds])
             while uLabels.shape[0]<k:
                 for medi,med in enumerate(currMedoids):
                     if not med in uLabels:
@@ -80,7 +88,7 @@ def kmedoids(dmat, k=3, weights = None, nPasses = 1, maxIter=1000,initInds=None)
                         currMedoids[medi] = choices[randint(len(choices))]
                         
                         labels = reassignClusters(dmat,currMedoids,oldLabels=labels)
-                        uLabels = unique(labels)
+                        uLabels = unique(labels[potentialMedoidInds])
                         break
 
             """ISSUE: If len(unique(labels)) < k there is an error"""
@@ -89,10 +97,12 @@ def kmedoids(dmat, k=3, weights = None, nPasses = 1, maxIter=1000,initInds=None)
             totInertia = 0
             for medi,med in enumerate(currMedoids):
                 clusterInd = where(labels==med)[0]
+                """Limit medoids to those specified by indexing axis=0 with the intersection of potential medoids and all points in the cluster"""
+                potentialInds = array([i for i in potentialMedoidSet.intersection(set(clusterInd))])
                 """Inertia is the sum of the squared distances (vec is shape (len(clusterInd))"""
-                inertiaVec = (wdmat2[clusterInd,:][:,clusterInd]).sum(axis=1)
+                inertiaVec = (wdmat2[potentialInds,:][:,clusterInd]).sum(axis=1)
                 mnInd = argmin(inertiaVec)
-                newMedoids[medi] = clusterInd[mnInd]
+                newMedoids[medi] = potentialInds[mnInd]
                 """Add inertia of this new medoid to the running total"""
                 totInertia += inertiaVec[mnInd]
 
