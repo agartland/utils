@@ -6,6 +6,7 @@ import plotly.plotly as py
 import plotly.graph_objs as pygo
 from pylab import *
 import pandas as pd
+import statsmodels.api as sm
 
 from myfisher import *
 from objhist import *
@@ -14,13 +15,14 @@ from custom_legends import *
 __all__ = ['catcorr',
            'layouts',
            'generateTestData',
-           'testEdge']
+           'testEdge',
+           'cull_rows']
 
 layouts = ['twopi', 'fdp','circo', 'neato', 'dot']
 
 color2str = lambda col: 'rgb'+str(tuple((array(col)*256).round().astype(int)))
 
-def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=0, sRange=(100,inf), wRange=(0.5,inf)):
+def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=0.2, sRange=(50,inf), wRange=(0.1,inf)):
     """Make a network plot showing the correlations among the
     categorical variables in the columns of df.
 
@@ -64,6 +66,26 @@ def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=0, sRange=(100,in
     [Posts a catcorr plot to plot.ly]
 
     """
+
+    """Compute odds-ratios, p-values and FDR-adjusted q-values for each edge"""
+    edgeKeys = []
+    pvalueArr = []
+    tested = []
+    for col1,col2 in itertools.combinations(df.columns,2):
+        for val1,val2 in itertools.product(df[col1].unique(),df[col2].unique()):
+            w = ((df[col1]==val1) & (df[col2]==val2)).sum()
+            pvalue = 1
+            if w>0 and testSig:
+                OR,pvalue = testEdge(df,(col1,val1),(col2,val2))
+                tested.append(True)
+            else:
+                tested.append(False)
+            edgeKeys.append(((col1,val1),(col2,val2)))
+            pvalueArr.append(pvalue)
+    pvalueArr,tested = array(pvalueArr), array(tested)
+    qvalueArr = ones(pvalueArr.shape)
+    qvalueArr[tested] = sm.stats.multipletests(pvalueArr[tested],method='fdr_bh')[1]
+
     g = nx.Graph()
     """Add a node for each unique value in each column with name: col_value"""
     for col in df.columns:
@@ -77,10 +99,10 @@ def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=0, sRange=(100,in
             w = ((df[col1]==val1) & (df[col2]==val2)).sum()
             if w>0:
                 dat = dict(weight = w/df.shape[0])
-                if testSig:
-                    OR,pvalue = testEdge(df,(col1,val1),(col2,val2))
-                    dat['pvalue'] = pvalue
+                dat['pvalue'] = pvalueArr[edgeKeys.index(((col1,val1),(col2,val2)))]
+                dat['qvalue'] = qvalueArr[edgeKeys.index(((col1,val1),(col2,val2)))]
                 g.add_edge((col1,val1),(col2,val2),**dat)
+
 
     """Compute attributes of edges and nodes"""
     edgewidth = array([d['weight'] for n1,n2,d in g.edges(data=True)])
@@ -113,7 +135,7 @@ def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=0, sRange=(100,in
             x1,y1=pos[e[0]]
             x2,y2=pos[e[1]]
             props = dict(color='black',alpha=0.4,zorder=1)
-            if testSig and g[e[0]][e[1]]['pvalue'] < testSig:
+            if testSig and g[e[0]][e[1]]['qvalue'] < testSig:
                 props['color']='orange'
                 props['alpha']=0.8
             plot([x1,x2],[y1,y2],'-',lw=es,**props)
@@ -141,7 +163,7 @@ def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=0, sRange=(100,in
             x1,y1=pos[e[0]]
             x2,y2=pos[e[1]]
             props = dict(color='black',opacity=0.4)
-            if testSig and g[e[0]][e[1]]['pvalue'] < testSig:
+            if testSig and g[e[0]][e[1]]['qvalue'] < testSig:
                 props['color']='orange'
                 props['opacity']=0.8
             tmp = pygo.Scatter(x=[x1,x2],
@@ -206,6 +228,35 @@ def szscale(vec,mx=inf,mn=1):
     vec[isnan(vec)] = mn
     return vec    
 
+def cull_rows(df,cols,freq):
+    """Remove all rows from df that contain any column
+    with a value that is less frequent than freq.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+    cols : list
+        List of column indices in df
+    freq : float
+        Frequency threshold for row removal.
+
+    Returns
+    -------
+    outDf : pandas.DataFrame
+        A copy of df with rows removed."""
+        
+    outDf = df.copy()
+    keepers = {}
+
+    for c in cols:
+        oh = objhist(df[c]).freq()
+        keepers[c] = [v for v in oh.keys() if oh[v]>freq]
+        
+    """Keep rows that have a value in keepers for each column"""
+    for c in cols:
+        outDf = outDf.loc[outDf[c].map(lambda v: v in keepers[c])]
+    return outDf
+
 def testEdge(df,node1,node2,verbose=False):
     """Test if the occurence of nodeA paired with nodeB is more/less common than expected.
 
@@ -229,13 +280,12 @@ def testEdge(df,node1,node2,verbose=False):
     tab[1,0] = ((df[col1]==val1) & (df[col2]!=val2)).sum()
     tab[1,1] = ((df[col1]==val1) & (df[col2]==val2)).sum()
 
+    """Add 1 to cells with zero"""
     if any(tab==0):
-        """Add 1 to cells with zero"""
-        ind = tab==0
-        tab[ind] = 1
         if verbose:
-            print 'Added one to %d cells with zero counts.' % (ind.sum())
+            print 'Adding one to %d cells with zero counts.' % (ind.sum())
             print
+    tab[tab==0] = 1
 
     OR,pvalue = fisherTest(tab)
 

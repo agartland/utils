@@ -8,6 +8,10 @@ http://wiki.scipy.org/Cookbook/Matplotlib/Interactive_Plotting
 import math
 import pylab
 
+__all__ = ['AnnotationPicker',
+           'linkPickers',
+           'AnnoteFinder']
+
 class AnnotationPicker:
     """
     Callback for matplotlib to display an annotation when points are clicked on.

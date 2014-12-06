@@ -12,6 +12,7 @@ The confidence interval computations is simply a wrapper around the scikits_boot
 from __future__ import division
 import numpy as np
 from scikits_bootstrap import ci
+from numpy.random import randint
 
 __all__ = ['permTwoSampTest',
            'bootstrapTwoSampTest',
