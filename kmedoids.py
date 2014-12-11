@@ -66,6 +66,10 @@ def kmedoids(dmat, k=3, weights = None, nPasses = 1, maxIter=1000,initInds=None,
     else:
         potentialMedoidSet = arange(N)
 
+    if len(initInds)==0:
+        print 'No possible initInds provided.'
+        return
+
     bestInertia = None
     allMedoids = zeros((nPasses,k))
     for passi in range(nPasses):
