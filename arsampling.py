@@ -21,16 +21,19 @@ def rejectionSampling(envPDF, envRV, targetPDF, n):
     Returns
     -------
     arr : array
-        Array of samples distributed proportionately to target PDF"""
+        Array of samples distributed proportionately to target PDF
+    acceptanceProbability : float
+        Estimate for diagnosing the envelope distribution."""
     
     i = 0
-    arr = np.zeros(n)
+    arr = zeros(n)
     acceptanceProbability = 1
+    allDraws = None
     while i < n:
         """Draw as many samples as we expect to need,
         based on the acceptance probability (initially 1)"""
         neededN = n-i
-        drawingN = int(np.ceil(neededN * (1/acceptanceProbability)))
+        drawingN = int(ceil(neededN * (1/acceptanceProbability)))
         
         samples = envRV(drawingN)
         envPr = envPDF(samples)
@@ -47,10 +50,15 @@ def rejectionSampling(envPDF, envRV, targetPDF, n):
             """Fill the rest of the arr with as many samples as needed"""
             arr[i:] = samples[keepInds][:neededN]
         
-        if i == 0:
-            """Estimate the acceptance probability the first time through"""
-            acceptanceProbability = (targetPr/envPr).mean()
+        """Keep track of all draws to compute acceptanceProbability"""
+        if allDraws is None:
+            allDraws = targetPr/envPr
+        else:
+            allDraws = concatenate((allDraws,targetPr/envPr))
         
-        i += actualN
+        """Estimate the acceptance probability"""
+        acceptanceProbability = allDraws.mean()
+        
+        i+=actualN
     
-    return arr
+    return arr,acceptanceProbability
