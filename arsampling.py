@@ -26,19 +26,19 @@ def rejectionSampling(envPDF, envRV, targetPDF, n):
         Estimate for diagnosing the envelope distribution."""
     
     i = 0
-    arr = zeros(n)
+    arr = np.zeros(n)
     acceptanceProbability = 1
     allDraws = None
     while i < n:
         """Draw as many samples as we expect to need,
         based on the acceptance probability (initially 1)"""
         neededN = n-i
-        drawingN = int(ceil(neededN * (1/acceptanceProbability)))
+        drawingN = int(np.ceil(neededN * (1/acceptanceProbability)))
         
         samples = envRV(drawingN)
         envPr = envPDF(samples)
         targetPr = targetPDF(samples)
-        unifRVs = rand(drawingN)
+        unifRVs = np.random.rand(drawingN)
         
         """Keep the samples that meet the acceptance criteria"""
         keepInds = unifRVs < (targetPr/envPr)
@@ -54,11 +54,11 @@ def rejectionSampling(envPDF, envRV, targetPDF, n):
         if allDraws is None:
             allDraws = targetPr/envPr
         else:
-            allDraws = concatenate((allDraws,targetPr/envPr))
+            allDraws = np.concatenate((allDraws,targetPr/envPr))
         
         """Estimate the acceptance probability"""
         acceptanceProbability = allDraws.mean()
         
-        i+=actualN
+        i += actualN
     
     return arr,acceptanceProbability
