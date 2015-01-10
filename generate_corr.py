@@ -1,14 +1,16 @@
 from numpy.linalg import cholesky, inv, eigh
-from numpy.random import random
+from numpy.random import rand
 import numpy as np
 from scipy import special
 from scipy import stats
 from copy import deepcopy
 
-__all__ = ['']
+__all__ = ['generateNormalCorr',
+           'induceRankCorr',
+           'generateBinVars']
 
 def generateNormalCorr(N,k,C,method = 'cholesky'):
-    """Induces correlation specified by correlation matrix Cstar
+    """Induces correlation specified by covariance matrix Cstar
 
     From SciPy cookbook:
     http://wiki.scipy.org/Cookbook/CorrelatedRandomSamples
@@ -20,7 +22,7 @@ def generateNormalCorr(N,k,C,method = 'cholesky'):
     k : int
         Number of variables.
     C : ndarray [k x k]
-        Positive, symetric correlation matrix.
+        Positive, symetric covariance matrix.
 
     Returns
     -------
@@ -96,9 +98,9 @@ def induceRankCorr(R,Cstar):
 
 def generateBinVars(p,N):
     """Generate random binary variables with specified correlation
-    
+
     "A simple method for generating correlated binary variates."
-    Park C, Park T, Shin D. 1996. Am. Stat. 50:306–310.
+    Park C, Park T, Shin D. 1996. Am. Stat. 50:306:310.
 
     Parameters
     ----------
