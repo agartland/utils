@@ -290,6 +290,7 @@ def heatmap(df,rowVars,colVars,adjust=[],alpha=0.1,annotation='pvalue',method='s
                 qvalue[i,j] = 0.
 
     clf()
+    fh = gcf()
     
     pvalueTxtProp = dict(family='monospace',size='large',weight='bold',color='white',ha='center',va='center')
 
@@ -334,7 +335,7 @@ def heatmap(df,rowVars,colVars,adjust=[],alpha=0.1,annotation='pvalue',method='s
 
     colorbar(fraction=0.05)
     method = method[0].upper() + method[1:]
-    annotate('%s correlation' % method,[0.98,0.5],textcoords='figure fraction',ha='right',va='center',rotation='vertical')
+    annotate('%s correlation' % method,[0.98,0.5],xycoords='figure fraction',ha='right',va='center',rotation='vertical')
 
     return pvalue, qvalue, rho
 
