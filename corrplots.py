@@ -14,7 +14,15 @@ import warnings
 __all__ = ['partialcorr',
            'combocorrplot',
            'scatterfit',
-           'heatmap']
+           'heatmap',
+           'corrheatmap',
+           'validPairwiseCounts']
+
+"""Red --> Green colormap with 1024 interpolated values"""
+_cdict = {'green' : ((0, 1, 1), (0.5, 0, 0), (1, 0, 0)),
+          'red':    ((0, 0, 0), (0.5, 0, 0), (1, 1, 1)),
+          'blue' :  ((0, 0, 0), (1, 0, 0))}
+_heatCmap = matplotlib.colors.LinearSegmentedColormap('my_colormap', _cdict, 1024)
 
 def partialcorr(x, y, adjust=[], method='pearson'):
     """Finds partial correlation of x with y adjusting for variables in adjust
@@ -125,13 +133,6 @@ def combocorrplot(data,method='spearman',axLimits='variable',axTicks=False,axTic
 
     labels = data.columns
 
-    cdict = {'green' : ((0, 1, 1), (0.5, 0, 0), (1, 0, 0)),
-             'red' :   ((0, 0, 0), (0.5, 0, 0), (1, 1, 1)),
-             'blue' :  ((0, 0, 0), (1, 0, 0))}
-
-    """Generate the colormap with 1024 interpolated values"""
-    heatCmap = matplotlib.colors.LinearSegmentedColormap('my_colormap', cdict, 1024)
-
     """Use pd.DataFrame method to compute the pairwise correlations"""
     coef = data.corr(method=method)
     n = coef.shape[0]
@@ -195,7 +196,7 @@ def combocorrplot(data,method='spearman',axLimits='variable',axTicks=False,axTic
             elif r<c:
                 axh[r,c] = fh.add_subplot(gs[r,c],yticklabels=[],xticklabels=[],xticks=[],yticks=[])
                 val = coef[labels[r]][labels[c]]
-                plth[r,c] = pcolor(ones((2,2))*val,cmap=heatCmap,vmin=-1.,vmax=1.)
+                plth[r,c] = pcolor(ones((2,2))*val,cmap=_heatCmap,vmin=-1.,vmax=1.)
                 axis([0,1,0,1])
                 if valueFlag:
                     if val<0.5 and val>-0.5:
@@ -208,7 +209,7 @@ def combocorrplot(data,method='spearman',axLimits='variable',axTicks=False,axTic
     method = method[0].upper() + method[1:]
     annotate('%s correlation' % (method),[0.98,0.5],xycoords='figure fraction',ha='right',va='center',rotation='vertical')
 
-def heatmap(df,rowVars,colVars,adjust=[],alpha=0.1,annotation='pvalue',method='spearman',labelLookup={},xtickRotate=False,minN=None):
+def corrheatmap(df,rowVars,colVars,adjust=[],annotation='pvalue',cutoff='pvalue',cutoffValue=0.05,method='spearman',labelLookup={},xtickRotate=False,labelSize='medium',minN=None):
     """Compute pairwise correlations and plot as a heatmap.
 
     Parameters
@@ -219,16 +220,20 @@ def heatmap(df,rowVars,colVars,adjust=[],alpha=0.1,annotation='pvalue',method='s
         List of column names to incude on heatmap axes.
     adjust : list
         List of column names that will be adjusted for in the pairwise correlations.
-    alpha : float
-        Cutoff for squares whose color is displayed (color is proportional to rho).
     annotation : string
         Specify what is annotated in each square of the heatmap (e.g. pvalue, qvalue, rho, rho2)
+    cutoff : str
+        Specify how to apply cutoff (e.g. pvalue, qvalue, rho, rho2)
+    cutoffValue : float
+        Absolute minimum threshold for squares whose color is displayed (color is proportional to rho).
     method : string
         Specifies whether a pearson or spearman correlation is performed. (default: 'spearman')
     labelLookup : dict
         Used to translate column names into appropriate label strings.
     xtickRotate : bool
         Specify whether to rotate the labels along the x-axis
+    labelSize : str or int
+        Size of x- and y-ticklabels by string (e.g. "large") or points
     minN : int
         If a correlation has fewer than minN samples after dropping Nans
         it will be reported as rho = 0, pvalue = 1 and will not be included in the multiplicity adjustment.
@@ -242,13 +247,6 @@ def heatmap(df,rowVars,colVars,adjust=[],alpha=0.1,annotation='pvalue',method='s
     rho : ndarray [samples, variables]
         Matrix of correlation coefficients."""
     
-    cdict = {'green'  :  ((0, 1, 1), (0.5, 0, 0), (1, 0, 0)),
-             'red':  ((0, 0, 0), (0.5, 0, 0), (1, 1, 1)),
-             'blue' :  ((0, 0, 0), (1, 0, 0))}
-
-    """Generate the colormap with 1024 interpolated values"""
-    heatCmap = matplotlib.colors.LinearSegmentedColormap('my_colormap', cdict, 1024)
-
     pvalue = zeros((len(rowVars),len(colVars)))
     qvalue = nan*zeros((len(rowVars),len(colVars)))
     rho = zeros((len(rowVars),len(colVars)))
@@ -294,26 +292,33 @@ def heatmap(df,rowVars,colVars,adjust=[],alpha=0.1,annotation='pvalue',method='s
     
     pvalueTxtProp = dict(family='monospace',size='large',weight='bold',color='white',ha='center',va='center')
 
-    axh = fh.add_subplot(111,
-                        yticklabels = map(lambda key: labelLookup.get(key,key),rowVars),
-                        yticks = arange(len(rowVars))+0.5,
-                        xticklabels = map(lambda key: labelLookup.get(key,key),colVars),
-                        xticks = arange(len(colVars))+0.5)
+    axh = fh.add_subplot(111, yticks = arange(len(rowVars))+0.5,
+                              xticks = arange(len(colVars))+0.5)
     if xtickRotate:
-        dummy=axh.set_xticklabels(map(lambda key: labelLookup.get(key,key),colVars),rotation='vertical')
-    tmprho=rho
-
-    if annotation == 'qvalue':
-        criticalValue=qvalue
+        rotation = 'vertical'
     else:
-        criticalValue=pvalue
-        
-    tmprho[~(criticalValue<=alpha)]=0.
+        rotation = 'horizontal'
 
-    pcolor(tmprho,cmap=heatCmap,vmin=-1.,vmax=1.)
+    _ = axh.set_xticklabels(map(lambda key: labelLookup.get(key,key),colVars),rotation=rotation,size=labelSize)
+    _ = axh.set_yticklabels(map(lambda key: labelLookup.get(key,key),rowVars),size=labelSize)
+
+    tmprho = rho.copy()
+
+    if cutoff == 'qvalue':
+        criticalValue = qvalue
+    elif cutoff == 'pvalue':
+        criticalValue = pvalue
+    elif cutoff == 'rho':
+        criticalValue = abs(rho)
+    elif cutoff == 'rho2':
+        criticalValue = rho**2
+        
+    tmprho[~(criticalValue <= cutoffValue)] = 0.
+
+    pcolor(tmprho, cmap=_heatCmap,vmin=-1.,vmax=1.)
     for i in xrange(len(rowVars)):
         for j in xrange(len(colVars)):
-            if criticalValue[i,j]<=alpha and not rowVars[i]==colVars[j]:
+            if criticalValue[i,j]<=cutoffValue and not rowVars[i]==colVars[j]:
                 ann = ''
                 if annotation == 'pvalue':
                     if pvalue[i,j]>0.001:
@@ -465,3 +470,73 @@ def _fdrAdjust(pvalues):
         return pd.Series(qvalues,name=pvalues.name+'_q',index=pvalues.index)
     else:
         return qvalues
+
+def validPairwiseCounts(df,cols):
+    """Count the number of non-NA data points for
+    all pairs of cols in df, as would be needed for
+    generating a correlation heatmap.
+
+    Useful for determining a threshold minimum number of
+    data pairs for a valid correlation.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+    cols : list
+        Column names to consider
+
+    Returns
+    -------
+    pwCounts : pd.DataFrame
+        DataFrame with columns and index matching cols"""
+
+    n = len(cols)
+    pwCounts = pd.DataFrame(zeros((n,n)), index=cols,columns=cols)
+    for colA,colB in itertools.product(cols,cols):
+        if colA == colB:
+            pwCounts.loc[colA,colA] = df[colA].dropna().shape[0]
+        elif colA > colB:
+            n = df[[colA,colB]].dropna().shape[0]
+            pwCounts.loc[colA,colB] = n
+            pwCounts.loc[colB,colA] = n
+
+    return pwCounts
+
+def heatmap(df,colLabels=None,rowLabels=None,labelSize='medium',**kwargs):
+    """Heatmap based on values in df
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        All data in df will be included in heatmap
+    colLabels : list
+        Strings to replace df column names as x-tick labels
+    rowLabels : list
+        Strings to replace df index as y-tick labels
+    labelSize : fontsize in points or str (e.g. 'large')
+    kwargs : dict
+        Passed to pcolor()"""
+        
+    if not 'cmap' in kwargs:
+        kwargs['cmap'] = _heatCmap
+    
+    if colLabels is None:
+        colLabels = df.columns
+    if rowLabels is None:
+        rowLabels = df.index
+
+    clf()
+    axh = subplot(111)
+    nrows,ncols = df.shape
+    pcolor(df.values,**kwargs)
+    
+    axh.xaxis.tick_top()
+    xticks(arange(ncols)+0.5)
+    yticks(arange(nrows)+0.5)
+    xlabelsL = axh.set_xticklabels(colLabels,size=labelSize,rotation=90,fontname='Consolas')
+    ylabelsL = axh.set_yticklabels(rowLabels,size=labelSize,fontname='Consolas')
+    ylim((nrows,0))
+    xlim((0,ncols))
+    colorbar(fraction = 0.05)
+    
+
