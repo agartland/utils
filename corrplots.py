@@ -540,3 +540,29 @@ def heatmap(df,colLabels=None,rowLabels=None,labelSize='medium',**kwargs):
     colorbar(fraction = 0.05)
     
 
+def removeNARC(inDf,minRow=1, minCol=1, minFrac=None):
+    """Removes all columns and rows that don't have at least
+    minX non-NA values. Considers columns then rows iteratively
+    until criteria is met or all columns or rows have been removed."""
+
+    def _validCols(df,minCol):
+        return [col for col in df.columns if (df.shape[0] - df[col].isnull().sum()) >= minCol]
+    def _validRows(df,minRow):
+        return [row for row in df.index if (df.shape[1] - df.loc[row].isnull().sum()) >= minRow]
+
+    df = inDf.copy()
+
+    if not minFrac is None:
+        minRow = round(df.shape[1] * minFrac)
+        minCol = round(df.shape[0] * minFrac)
+
+    nRows = df.shape[0] + 1
+    nCols = df.shape[1] + 1
+    
+    while (nCols > df.shape[1] or nRows > df.shape[0]) and df.shape[0]>0 and df.shape[1]>0:
+        nRows, nCols = df.shape
+
+        df = df[_validCols(df,minCol)]
+        df = df.loc[_validRows(df,minRow)]
+
+    return df

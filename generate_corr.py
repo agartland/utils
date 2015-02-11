@@ -1,5 +1,5 @@
 from numpy.linalg import cholesky, inv, eigh
-from numpy.random import rand
+from numpy.random import randn
 import numpy as np
 from scipy import special
 from scipy import stats
@@ -35,7 +35,7 @@ def generateNormalCorr(N,k,C,method = 'cholesky'):
         evals, evecs = np.eigh(C)
         U = np.dot(evecs, np.diag(np.sqrt(evals)))
 
-    R = np.dot(rand(N,k),U)
+    R = np.dot(randn(N,k),U)
     return R
 
 def induceRankCorr(R,Cstar):
