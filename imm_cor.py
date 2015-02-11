@@ -11,6 +11,8 @@ __all__ = ['estTECI',
 
 def estTECI(df, treatment_col='treated', event_col='disease2'):
     """Estimates treatment efficacy using cumulative incidence/attack rate.
+
+    Ignores all censoring information. 
     
     TE = 1 - RR
     
@@ -84,3 +86,35 @@ def estTEPH(df, treatment_col='treated', duration_col='dx2', event_col='disease2
     ci = 1-exp(coxphf.confidence_intervals_[treatment_col].loc[['upper-bound','lower-bound']])
     pvalue = coxphf._compute_p_values()[0]
     return te,ci,pvalue
+
+def scoreci(x, n, conf_level=0.95):
+    """Wilson’s confidence interval for a single proportion.
+    Score CI based on inverting the asymptotic normal test
+    using the null standard error
+    
+    Wilson, E.B. (1927) Probable inference, the law of succession, and statistical inference J. Amer.
+    Stat. Assoc 22, 209–212
+
+    Parameters
+    ----------
+    x : int
+        Number of events
+    n : int
+        Number of trials/subjects
+    conf_level : float
+        Specifies coverage of the confidence interval (1 - alpha)
+
+    Returns
+    -------
+    ci : array
+        Confidence interval array [LL, UL]"""
+
+    zalpha = abs(stats.norm.ppf((1-conf_level)/2))
+    phat = x/n
+    bound = (zalpha*((phat*(1-phat)+(zalpha**2)/(4*n))/n)**(1/2))/(1+(zalpha**2)/n)
+    midpnt = (phat+(zalpha**2)/(2*n))/(1+(zalpha**2)/n)
+
+    uplim = midpnt + bound
+    lowlim = midpnt - bound
+
+    return array([lowlim, uplim])
