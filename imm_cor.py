@@ -88,12 +88,12 @@ def estTEPH(df, treatment_col='treated', duration_col='dx2', event_col='disease2
     return te,ci,pvalue
 
 def scoreci(x, n, conf_level=0.95):
-    """Wilson’s confidence interval for a single proportion.
+    """Wilson's confidence interval for a single proportion.
     Score CI based on inverting the asymptotic normal test
     using the null standard error
-    
-    Wilson, E.B. (1927) Probable inference, the law of succession, and statistical inference J. Amer.
-    Stat. Assoc 22, 209–212
+
+    Wilson, E.B. (1927) Probable inference, the law of succession, and statistical inference
+    J. Amer. Stat. Assoc 22, 209-212
 
     Parameters
     ----------
@@ -118,42 +118,3 @@ def scoreci(x, n, conf_level=0.95):
     lowlim = midpnt - bound
 
     return array([lowlim, uplim])
-
-def myriskscoreci(x1,n1,x2,n2,conf_level=0.95):
-    """Compute CI for the ratio of two binomial rates.
-    
-    Parameters
-    ----------
-    xi : int
-        Number of events in group i
-    ni : int
-        Number of trials/subjects in group i
-    conf_level : float
-        Specifies coverage of the confidence interval (1 - alpha)
-
-    Returns
-    -------
-    ci : array
-        Confidence interval array [LL, UL]"""
-
-    z =  abs(stats.norm.ppf((1-conf_level)/2))
-    if x2==0 and x1 == 0:
-        ul = inf
-        ll = 0
-    else:
-        p1hat = x1/n1
-        p2hat = x2/n2
-
-        r = p1hat/p2hat
-
-        gdot = array([1/p1hat, 1/p2hat])
-
-        covmat = array([[p1hat*(1-p1hat), 0],
-                        [0, p2hat*(1-p2hat)]])
-        
-        varg = (1/n) * dot(dot(gdot,covmat),gdot)
-
-        ul = r + z*sqrt(varg)
-        ll = r - z*sqrt(varg)
-
-    return exp(array([ll, ul]))
