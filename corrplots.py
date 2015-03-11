@@ -345,7 +345,7 @@ def corrheatmap(df,rowVars,colVars,adjust=[],annotation='pvalue',cutoff='pvalue'
     return pvalue, qvalue, rho
 
 
-def scatterfit(x,y,method='pearson',adjustVars=[],labelLookup={},plotLine=True,annotateFit=True,returnModel=False,**kwargs):
+def scatterfit(x,y,method='pearson',adjustVars=[],labelLookup={},plotLine=True,annotateFit=True,returnModel=False,lc = 'gray', **kwargs):
     """Scatter plot of x vs. y with a fitted line overlaid.
 
     Expects x and y as pd.Series but will accept arrays.
@@ -409,9 +409,9 @@ def scatterfit(x,y,method='pearson',adjustVars=[],labelLookup={},plotLine=True,a
     if method=='spearman' and plotLine:
         #unrho,unp=stats.spearmanr(tmpDf[xlab],tmpDf[ylab])
         if unrho>0:
-            plot(sorted(tmpDf[xlab]),sorted(tmpDf[ylab]),'-',color='gray')
+            plot(sorted(tmpDf[xlab]),sorted(tmpDf[ylab]),'-',color=lc)
         else:
-            plot(sorted(tmpDf[xlab]),sorted(tmpDf[ylab],reverse=True),'-',color='gray')
+            plot(sorted(tmpDf[xlab]),sorted(tmpDf[ylab],reverse=True),'-',color=lc)
     elif method=='pearson' and plotLine:
         #unrho,unp=stats.pearsonr(tmpDf[xlab],tmpDf[ylab])
         formula_like = ModelDesc([Term([LookupFactor(ylab)])],[Term([]),Term([LookupFactor(xlab)])])
@@ -420,7 +420,7 @@ def scatterfit(x,y,method='pearson',adjustVars=[],labelLookup={},plotLine=True,a
         model = sm.GLM(Y,X,family=sm.families.Gaussian())
         results = model.fit()
         mnmxi = array([tmpDf[xlab].idxmin(),tmpDf[xlab].idxmax()])
-        plot(tmpDf[xlab][mnmxi],results.fittedvalues[mnmxi],'-',color='gray')
+        plot(tmpDf[xlab][mnmxi],results.fittedvalues[mnmxi],'-',color=lc)
     
     plot(tmpDf[xlab],tmpDf[ylab],'o',**kwargs)
 
