@@ -21,10 +21,11 @@ def colorLegend(colors, labels, alphas=None, edgecolor='black',loc='best', **leg
 
     if alphas is None:
         alphas=np.ones(len(colors))
-    legend((Circle((0,0),fc=c,ec=edgecolor,alpha=a) for c,a in zip(colors,alphas)),
-           labels,
-           loc,
-           **legendKwargs)
+    lh = legend((Circle((0,0),fc=c,ec=edgecolor,alpha=a) for c,a in zip(colors,alphas)),
+               labels,
+               loc,
+               **legendKwargs)
+    return lh
 
 def symbolLegend(symbols, labels, facecolors=None, edgecolors=None, alphas=None,loc='best', **legendKwargs):
     """Custom matplotlib legend with lines, symbols and labels etc.
@@ -49,8 +50,10 @@ def symbolLegend(symbols, labels, facecolors=None, edgecolors=None, alphas=None,
     if facecolors is None:
         facecolors = ['white']*len(symbols)
 
-    legend((Line2D([0],[0],ls='',marker=s,markerfacecolor=mfc,markeredgecolor=ec,alpha=a) for s,mfc,ec,a in zip(symbols,facecolors,edgecolors,alphas)),
-            labels,
-            loc,
-            numpoints=1,
-            **legendKwargs)
+    lh = legend((Line2D([0],[0],ls='',marker=s,markerfacecolor=mfc,markeredgecolor=ec,alpha=a) for s,mfc,ec,a in zip(symbols,facecolors,edgecolors,alphas)),
+                labels,
+                loc,
+                numpoints=1,
+                **legendKwargs)
+
+    return lh

@@ -57,10 +57,7 @@ class countdict(dict):
 
     def sum(self):
         """Return the total counts over all categories"""
-        tot = 0
-        for k in self.keys():
-            tot+=self.get(k)
-        return tot
+        return np.sum(self.values())
     def freq(self):
         """Return the fraction of the total counts for each category"""
         tot = self.sum()
@@ -68,18 +65,18 @@ class countdict(dict):
     def entropy(self,logFunc=np.log2):
         """Compute the entropy of the discrete distribution"""
         return -np.array([p*logFunc(p) for p in self.freq().values()]).sum()
-    def relative_entropy(self,reference_freq,logFunc=np.log2):
+    def relative_entropy(self,reference,log_func=np.log2):
         """Compute the relative entropy between the frequencies
-        in this countdict object and those in referenceFreq.
+        in this countdict object and those in reference.
 
         The Kullback-Leibler divergence is the negative sum of these values.
 
         Parameters
         ----------
-            referenceFreq : dict
-                Keys for each key in the calling object 
+            reference : dict
+                Another objhist object with keys for each key in the calling object.
 
-            logFunc : function
+            log_func : function
                 Function for computing log(). Allows for specification of the base to use.
         Returns
         -------
@@ -89,8 +86,10 @@ class countdict(dict):
         freq = self.freq()
         p = np.array([freq[k] for k in keys])
         q = np.array([reference.freq()[k] for k in keys])
-        divergence = -p*logFunc(p/q)
+        divergence = -p*log_func(p/q)
         return {k:v for k,v in zip(keys,divergence)}
+    def uniqueness(self):
+        return len(self)/self.sum()
     def sortedKeys(self,reverse=False):
         """Returns a list of the keys sorted ascending by frequency"""
         return sorted(self.keys(), key=self.get, reverse=reverse)
