@@ -28,7 +28,14 @@ try:
             Each element should contain counts
         alternative : string
             Specfies the alternative hypothesis (similar to scipy.fisher_exact)
-            Options: 'two-sided', 'less', 'greater' """
+            Options: 'two-sided', 'less', 'greater'
+
+        Returns
+        -------
+        OR : float
+            Odds-ratio associated with the 2 x 2 table
+        p : float
+            P-value associated with the test and the alternative hypothesis"""
         
         res = fisher.pvalue(tab[0][0],tab[0][1],tab[1][0],tab[1][1])
         OR = (tab[0][0] * tab[1][1]) / (tab[0][1] * tab[1][0])
@@ -42,7 +49,7 @@ try:
 
     def fisherTestVec(a,b,c,d,alternative='two-sided'):
         """Vectorized Fisher's exact test performs n tests
-        on 4 n-dimensional numpy vectors a, b, c, and d representing
+        on 4 length n numpy vectors a, b, c, and d representing
         the 4 elements of a 2x2 contigency table.
 
         Wrapper around fisher.pvalue_npy found in:
@@ -57,7 +64,14 @@ try:
             Vector of counts (will be cast as uint8 for operation)
         alternative : string
             Specfies the alternative hypothesis (similar to scipy.fisher_exact)
-            Options: 'two-sided', 'less', 'greater' """
+            Options: 'two-sided', 'less', 'greater'
+
+        Returns
+        -------
+        OR : shape (n,) ndarray
+            Vector of odds-ratios associated with each 2 x 2 table
+        p : shape (n,) ndarray
+            Vector of p-values asspciated with each test and the alternative hypothesis"""
 
         res = fisher.pvalue_npy(a.astype(np.uint),b.astype(np.uint),c.astype(np.uint),d.astype(np.uint))
         OR = (a*d)/(b*c)
@@ -74,4 +88,31 @@ try:
 except ImportError:
     from scipy import stats
     print "Using scipy.stats Fisher's exact test (slow)"
+    
     fisherTest = stats.fisher_exact
+
+    def fisherTestVec(a,b,c,d,alternative='two-sided'):
+        """Apply Fisher's Exact test n times
+        on 4 length n numpy vectors a, b, c, and d representing
+        the 4 elements of a 2x2 contigency table.
+
+        Each test is performed individually withe scipy.stats.fisher_exact.
+
+        Parameters
+        ----------
+        a,b,c,d : shape (n,) ndarrays
+            Vector of counts (will be cast as uint8 for operation)
+        alternative : string
+            Specfies the alternative hypothesis (similar to scipy.fisher_exact)
+            Options: 'two-sided', 'less', 'greater'
+
+        Returns
+        -------
+        OR : shape (n,) ndarray
+            Vector of odds-ratios associated with each 2 x 2 table
+        p : shape (n,) ndarray
+            Vector of p-values asspciated with each test and the alternative hypothesis"""
+        
+        OR = (a*d)/(b*c)
+        p = np.asarray([fisherTest([[aa,bb],[cc,dd]],alternative=alternative)[1] for aa,bb,cc,dd in zip(a,b,c,d)])
+        return OR, p
