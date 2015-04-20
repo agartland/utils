@@ -1,15 +1,15 @@
 from __future__ import division
 from functools import *
-import pandas as pd
 import itertools
 import operator
 from Bio import SeqIO, pairwise2
 from Bio.SubsMat.MatrixInfo import blosum90, ident, blosum62
 from copy import deepcopy
-from utilHelpers import objhist
-from pylab import *
+from numpy import *
 import sys
-import numpy
+import numpy as np
+import numba as nb
+
 
 from sklearn import manifold
 from sklearn.metrics import euclidean_distances
@@ -18,8 +18,6 @@ from sklearn import cluster
 from sklearn.manifold import Isomap
 import tsne
 import pytsne
-
-from seqtools import *
 
 __all__ = ['BADAA',
            'AALPHABET',
@@ -52,11 +50,45 @@ __all__ = ['BADAA',
 
 
 BADAA = '-*BX#Z'
+FULL_AALPHABET = 'ABCDEFGHIKLMNPQRSTVWXYZ'
 AALPHABET = 'ACDEFGHIKLMNPQRSTVWY'
-AA2CODE = {aa:i for i,aa in enumerate(AALPHABET)}
-AA2CODE.update({'-':21})
-CODE2AA = {i:aa for i,aa in enumerate(AALPHABET)}
-CODE2AA.update({21:'-'})
+AA2CODE = {aa:i for i,aa in enumerate(FULL_AALPHABET)}
+AA2CODE.update({'-':23})
+CODE2AA = {i:aa for i,aa in enumerate(FULL_AALPHABET)}
+CODE2AA.update({23:'-'})
+
+def subst2mat(subst,alphabet = FULL_AALPHABET):
+    """Converts a substitution dictionary
+    (like those from Bio) into a numpy 2d substitution matrix"""
+    mat = nan * zeros((len(alphabet),len(alphabet)), dtype = float64)
+    for (aa1,aa2),v in subst.items():
+        mat[alphabet.index(aa1),alphabet.index(aa2)] = v
+    return mat
+
+"""Many different ways of handling gaps. Remember that these are SIMILARITY scores"""
+nanGapScores={('-','-'):nan,
+              ('-','X'):nan,
+              ('X','-'):nan}
+
+nanZeroGapScores={('-','-'):nan,
+                   ('-','X'):0,
+                   ('X','-'):0}
+"""Default for addGapScores()"""
+binGapScores={('-','-'):1,
+              ('-','X'):0,
+              ('X','-'):0}
+"""Arbitrary/reasonable values (extremes for blosum90 I think)"""
+blosum90GapScores={('-','-'):5,
+                   ('-','X'):-11,
+                   ('X','-'):-11}
+
+binarySubst = {(aa1,aa2):float(aa1==aa2) for aa1,aa2 in itertools.product(FULL_AALPHABET,FULL_AALPHABET)}
+
+identMat = subst2mat(ident)
+blosum90Mat = subst2mat(blosum90)
+blosum62Mat = subst2mat(blosum62)
+binaryMat = subst2mat(binarySubst)
+
 
 def isvalidpeptide(mer,badaa=None):
     """Test if the mer contains an BAD amino acids in global BADAA
@@ -76,53 +108,66 @@ def removeBadAA(mer,badaa=None):
     else:
         return mer
 
-def hamming_distance(str1, str2,**kwargs):
+def hamming_distance(str1, str2, **kwargs):
     """Hamming distance between str1 and str2.
     Only finds distance over the length of the shorter string.
     **kwargs are so this can be plugged in place of a seq_distance() metric"""
-    return sum([i for i in itertools.imap(operator.__ne__, str1, str2)])
+    if isinstance(str1,basestring):
+        str1 = string2byte(str1)
+
+    if isinstance(str2,basestring):
+        str2 = string2byte(str2)
+    return nb_hamming_distance(str1, str2)
+
+def aamismatch_distance(seq1,seq2, **kwargs):
+    if isinstance(seq1,basestring):
+        seq1 = seq2vec(seq1)
+
+    if isinstance(seq2,basestring):
+        seq2 = seq2vec(seq2)
+    dist12 = nb_seq_similarity(seq1, seq2, substMat = binaryMat, normed = False, asDistance = True)
+    return dist12
+
+def string2byte(s):
+    """Convert string to byte array since numba can't handle strings"""
+    if is_string_like(s):
+        s = array(s)
+    dtype = s.dtype
+    if dtype is numpy.dtype('byte'):
+        return s # it's already a byte array
+    shape = list(s.shape)
+    n = dtype.itemsize
+    shape.append(n)
+    return s.ravel().view(dtype='byte').reshape(shape)
+
+@nb.jit(nb.int32(nb.char[:],nb.char[:]), nopython = True)
+def nb_hamming_distance(str1,str2):
+    tot = 0
+    for s1,s2 in zip(str1,str2):
+        if s1 != s2:
+            tot += 1
+    return tot
+
 def trunc_hamming(seq1,seq2,maxDist=2,**kwargs):
     """Truncated hamming distance
     d = hamming() if d<maxDist else d = maxDist"""
     d = hamming_distance(seq1,seq2)
     return maxDist if d>=maxDist else d
+
 def dichot_hamming(seq1,seq2,mmTolerance=1,**kwargs):
     """Dichotamized hamming distance.
     hamming <= mmTolerance is 0 and all others are 1"""
     d = hamming_distance(seq1,seq2)
     return 1 if d>mmTolerance else 0
+
 def seq2vec(seq):
     """Convert AA sequence into numpy vector of integers for fast comparison"""
-    vec = zeros(len(seq),dtype=int)
+    vec = zeros(len(seq), dtype=int32)
     for aai,aa in enumerate(seq):
         vec[aai] = AA2CODE[aa]
     return vec
 
-def hamming_distance_vec(vec1, vec2,**kwargs):
-    """Hamming distance between numpy vectors vec1 and vec2.
-    Requires that sequences first be converted to vectors, but its much faster.
-    **kwargs are so this can be plugged in place of a seq_distance() metric"""
-    return (vec1!=vec2).sum()
-
-"""Many different ways of handling gaps. Remember that these are SIMILARITY scores"""
-nanGapScores={('-','-'):nan,
-              ('-','X'):nan,
-              ('X','-'):nan}
-
-nanZeroGapScores={('-','-'):nan,
-                   ('-','X'):0,
-                   ('X','-'):0}
-"""Default for addGapScores()"""
-binGapScores={('-','-'):1,
-              ('-','X'):0,
-              ('X','-'):0}
-"""Arbitrary values (extremes for blosum90 I think)"""
-blosum90GapScores={('-','-'):5,
-                   ('-','X'):-11,
-                   ('X','-'):-11}
-binarySubst={(aa1,aa2):float(aa1==aa2) for aa1,aa2 in itertools.product(unique([k[0] for k in blosum90.keys()]),unique([k[0] for k in blosum90.keys()]))}
-
-def addGapScores(subst,gapScores=None,minScorePenalty=False):
+def addGapScores(subst, gapScores = None, minScorePenalty = False, returnMat = False):
     """Add gap similarity scores for each AA (Could be done once for a set of sequences to improve speed)
     if gapScores is None then it will use defaults:
         gapScores={('-','-'):1,
@@ -134,26 +179,94 @@ def addGapScores(subst,gapScores=None,minScorePenalty=False):
                    ('X','-'):-11}
     """
     if minScorePenalty:
-        gapScores = {('-','-'):1,
-                     ('-','X'):min(subst.values()),
-                     ('X','-'):min(subst.values())}
+        gapScores = {('-','-') : 1,
+                     ('-','X') : min(subst.values()),
+                     ('X','-') : min(subst.values())}
     elif gapScores is None:
         if subst is binarySubst:
             print 'Using default binGapScores for binarySubst'
-            gapScores=binGapScores
+            gapScores = binGapScores
         elif subst is blosum90:
             print 'Using default blosum90 gap scores'
-            gapScores=blosum90GapScores
+            gapScores = blosum90GapScores
         else:
             raise Exception('Cannot determine which gap scores to use!')
-    su=deepcopy(subst)
-    uAA=unique([k[0] for k in subst.keys()])
-    su.update({('-',aa):gapScores[('-','X')] for aa in uAA})
-    su.update({(aa,'-'):gapScores[('X','-')] for aa in uAA})
-    su.update({('-','-'):gapScores[('-','-')]})
+    su = deepcopy(subst)
+    uAA = unique([k[0] for k in subst.keys()])
+    su.update({('-',aa) : gapScores[('-','X')] for aa in uAA})
+    su.update({(aa,'-') : gapScores[('X','-')] for aa in uAA})
+    su.update({('-','-') : gapScores[('-','-')]})
+
+    if returnMat:
+        return subst2mat(su)
     return su
 
-def seq_similarity(seq1,seq2,subst=None,normed=True,returnSiteN=False):
+@nb.jit(nb.float64(nb.int32[:],nb.int32[:],nb.float64[:,:],nb.boolean,nb.boolean), nopython = True)
+def nb_seq_similarity(seq1, seq2, substMat, normed, asDistance):
+    """Computes sequence similarity based on the substitution matrix."""
+    if seq1.shape[0] != seq2.shape[0]:
+        raise IndexError
+
+    if normed or asDistance:
+        sim12 = 0.
+        siteN = 0.
+        sim11 = 0.
+        sim22 = 0.
+        for i in range(seq1.shape[0]):
+            cur12 = substMat[seq1[i],seq2[i]]
+            cur11 = substMat[seq1[i],seq1[i]]
+            cur22 = substMat[seq2[i],seq2[i]]
+            if not np.isnan(cur12):
+                sim12 += cur12
+                siteN += 1.
+            if not np.isnan(cur11):
+                sim11 += cur11
+            if not np.isnan(cur22):
+                sim22 += cur22
+        sim12 = 2*sim12/((sim11/siteN) + (sim22/siteN))
+    else:
+        sim12 = 0.
+        siteN = 0.
+        for i in range(seq1.shape[0]):
+            if not np.isnan(substMat[seq1[i],seq2[i]]):
+                sim12 += substMat[seq1[i],seq2[i]]
+                siteN += 1.
+
+    if asDistance:
+        if normed:
+            sim12 = (siteN - sim12)/siteN
+        else:
+            sim12 = siteN - sim12
+    return sim12
+
+def np_seq_similarity(seq1, seq2, substMat, normed, asDistance):
+    """Computes sequence similarity based on the substitution matrix."""
+    if seq1.shape[0] != seq2.shape[0]:
+        raise IndexError, "Sequences must be the same length (%d != %d)." % (seq1.shape[0],seq2.shape[0])
+
+    """Similarity between seq1 and seq2 using the substitution matrix subst"""
+    sim12 = substMat[seq1,seq2]
+
+    if normed or asDistance:
+        siteN = (~isnan(sim12)).sum()
+        sim11 = np.nansum(substMat[seq1,seq1])/siteN
+        sim22 = np.nansum(substMat[seq1,seq1])/siteN
+        tot12 = np.nansum(2*sim12)/(sim11+sim22)
+    else:
+        tot12 = np.nansum(sim12)
+
+    if asDistance:
+        """Distance between seq1 and seq2 using the substitution matrix subst
+            because seq_similarity returns a total similarity with max of siteN (not per site), we use
+                d = siteN - sim
+            which is a total normed distance, not a per site distance"""
+        if normed:
+            tot12 = (siteN - tot12)/siteN
+        else:
+            tot12 = siteN - tot12
+    return tot12
+
+def seq_similarity(seq1, seq2, subst = None, normed = True, asDistance = False):
     """Compare two sequences and return the similarity of one and the other
     If the seqs are of different length then it raises an exception
 
@@ -167,10 +280,39 @@ def seq_similarity(seq1,seq2,subst=None,normed=True,returnSiteN=False):
         [0, total raw similarity]
 
     This returns a score [0, 1] for binary and blosum based similarities
+        otherwise its just the sum of the raw score out of the subst matrix"""
+
+    if subst is None:
+        print 'Using default binarySubst matrix with binGaps for seq_similarity'
+        subst = addGapScores(binarySubst, binGapScores)
+
+    if isinstance(subst,dict):
+        subst = subst2mat(subst)
+
+    if isinstance(seq1,basestring):
+        seq1 = seq2vec(seq1)
+
+    if isinstance(seq2,basestring):
+        seq2 = seq2vec(seq2)
+
+    result = np_seq_similarity(seq1, seq2, substMat = subst, normed = normed, asDistance = asDistance)
+    return result
+
+
+def seq_similarity_old(seq1,seq2,subst=None,normed=True):
+    """Compare two sequences and return the similarity of one and the other
+    If the seqs are of different length then it raises an exception
+    FOR HIGHLY DIVERGENT SEQUENCES THIS NORMALIZATION DOES NOT GET TO [0,1] BECAUSE OF EXCESS NEGATIVE SCORES!
+    Consider normalizing the matrix first by adding the min() so that min = 0 (but do not normalize per comparison)
+    
+    Return a nansum of site-wise similarities between two sequences based on a substitution matrix
+        [0, siteN] where siteN ignores nan similarities which may depend on gaps
+        sim12 = nansum(2*sim12/(nanmean(sim11) + nanmean(sim22))
+    Optionally specify normed = False:
+        [0, total raw similarity]
+    This returns a score [0, 1] for binary and blosum based similarities
         otherwise its just the sum of the raw score out of the subst matrix
-
-    Optionally returnSiteN the number of non-nan sites to compute a per site similarity/distance
-
+    
     For a hamming similarity when there are no gaps use subst=binarySubst
         and performance is optimized underneath using hamming_distance"""
 
@@ -181,10 +323,7 @@ def seq_similarity(seq1,seq2,subst=None,normed=True,returnSiteN=False):
         sim=len(seq1)-dist
         if normed:
             sim=sim/len(seq1)
-        if returnSiteN:
-            return sim,len(seq1)
-        else:
-            return sim
+        return sim
 
     if subst is None:
         print 'Using default binarySubst matrix with binGaps for seq_similarity'
@@ -193,21 +332,16 @@ def seq_similarity(seq1,seq2,subst=None,normed=True,returnSiteN=False):
     """Distance between seq1 and seq2 using the substitution matrix subst"""
     sim12=array([i for i in itertools.imap(lambda a,b: subst.get((a,b),subst.get((b,a))), seq1, seq2)])
 
-    if returnSiteN or normed:
-        siteN=sum(~isnan(sim12))
-
     if normed:
-        sim11=seq_similarity(seq1,seq1,subst=subst,normed=False)/siteN
-        sim22=seq_similarity(seq2,seq2,subst=subst,normed=False)/siteN
+        siteN=sum(~isnan(sim12))
+        sim11=seq_similarity_old(seq1,seq1,subst=subst,normed=False)/siteN
+        sim22=seq_similarity_old(seq2,seq2,subst=subst,normed=False)/siteN
         sim12=nansum(2*sim12/(sim11+sim22))
     else:
         sim12=nansum(sim12)
-    if returnSiteN:
-        return sim12,siteN
-    else:
-        return sim12
-
-def seq_distance(seq1,seq2,subst=None,normed=True):
+    return sim12
+    
+def seq_distance(seq1, seq2, subst = None, normed = True):
     """Compare two sequences and return the distance from one to the other
     If the seqs are of different length then it raises an exception
 
@@ -216,49 +350,9 @@ def seq_distance(seq1,seq2,subst=None,normed=True):
         [0, 1]
 
     Note that either way the distance is "normed", its either per site (True) or total normed (False):
-        [0, siteN]
+        [0, siteN]"""
+    return seq_similarity(seq1, seq2, subst = subst, normed = normed, asDistance = True)
 
-    For a hamming distance when there are no gaps use subst=binarySubst
-        and performance is optimized underneath using hamming_distance"""
-    
-    """Distance between seq1 and seq2 using the substitution matrix subst
-    because seq_similarity returns a total similarity with max of siteN (not per site), we use
-        d = siteN - sim
-    which is a total normed distance, not a per site distance"""
-
-    """Special case for hamming distance to optimize for speed"""
-    if subst is binarySubst:
-        assert len(seq1)==len(seq2), "len of seq1 (%d) and seq2 (%d) are different" % (len(seq1),len(seq2))
-        dist=hamming_distance(seq1,seq2)
-        if normed:
-            return dist/len(seq1)
-        else:
-            return dist
-    
-    sim,siteN = seq_similarity(seq1,seq2,subst=subst,normed=True,returnSiteN=True)
-    
-    if normed:
-        return (siteN - sim)/siteN
-    else:
-        return siteN - sim
-
-def seq_similarity_old(seq1,seq2,subst=None,gapScores=None,normed=True):
-    """Compare two sequences and return the similarity of one and the other
-    If the seqs are of different length then it sums the scores through the shared residues"""
-    if subst is None:
-        subst=addGapScores(blosum90,gapScores)
-    if not subst is None and not gapScores is None:
-        subst=addGapScores(subst,gapScores)
-
-    sim12=sum(array([i for i in itertools.imap(lambda a,b: subst.get((a,b),subst.get((b,a))), seq1, seq2)]))
-    if normed:
-        """Distance between seq1 and seq2 using the substitution matrix subst"""
-        sim11=sum(array([i for i in itertools.imap(lambda a,b: subst.get((a,b),subst.get((b,a))), seq1, seq1)]))
-        sim22=sum(array([i for i in itertools.imap(lambda a,b: subst.get((a,b),subst.get((b,a))), seq2, seq2)]))
-        res = 2*float64(sim12)/(sim11+sim22)
-    else:
-        res=sim12
-    return res
 
 def unalign_similarity(seq1,seq2,subst=None):
     """Compare two sequences by aligning them first with pairwise alignment
