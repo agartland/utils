@@ -5,7 +5,6 @@ import operator
 from Bio import SeqIO, pairwise2
 from Bio.SubsMat.MatrixInfo import blosum90, ident, blosum62
 from copy import deepcopy
-from numpy import *
 import sys
 import numpy as np
 import numba as nb
