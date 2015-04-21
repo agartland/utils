@@ -9,7 +9,7 @@ from numpy import *
 import sys
 import numpy as np
 import numba as nb
-
+import re
 
 from sklearn import manifold
 from sklearn.metrics import euclidean_distances
@@ -59,17 +59,17 @@ CODE2AA.update({23:'-'})
 def subst2mat(subst,alphabet = FULL_AALPHABET):
     """Converts a substitution dictionary
     (like those from Bio) into a numpy 2d substitution matrix"""
-    mat = nan * zeros((len(alphabet),len(alphabet)), dtype = float64)
+    mat = np.nan * np.zeros((len(alphabet),len(alphabet)), dtype = np.float64)
     for (aa1,aa2),v in subst.items():
         mat[alphabet.index(aa1),alphabet.index(aa2)] = v
     return mat
 
 """Many different ways of handling gaps. Remember that these are SIMILARITY scores"""
-nanGapScores={('-','-'):nan,
-              ('-','X'):nan,
-              ('X','-'):nan}
+nanGapScores={('-','-'):np.nan,
+              ('-','X'):np.nan,
+              ('X','-'):np.nan}
 
-nanZeroGapScores={('-','-'):nan,
+nanZeroGapScores={('-','-'):np.nan,
                    ('-','X'):0,
                    ('X','-'):0}
 """Default for addGapScores()"""
@@ -81,7 +81,7 @@ blosum90GapScores={('-','-'):5,
                    ('-','X'):-11,
                    ('X','-'):-11}
 
-binarySubst = {(aa1,aa2):float(aa1==aa2) for aa1,aa2 in itertools.product(FULL_AALPHABET,FULL_AALPHABET)}
+binarySubst = {(aa1,aa2):np.float64(aa1==aa2) for aa1,aa2 in itertools.product(FULL_AALPHABET,FULL_AALPHABET)}
 
 identMat = subst2mat(ident)
 blosum90Mat = subst2mat(blosum90)
@@ -93,7 +93,7 @@ def isvalidpeptide(mer,badaa=None):
     """Test if the mer contains an BAD amino acids in global BADAA
     typically -*BX#Z"""
     if badaa is None:
-        badaa=BADAA
+        badaa = BADAA
     if not mer is None:
         return not re.search('[%s]' % badaa,mer)
     else:
@@ -101,7 +101,7 @@ def isvalidpeptide(mer,badaa=None):
 def removeBadAA(mer,badaa=None):
     """Remove badaa amino acids from the mer, default badaa is -*BX#Z"""
     if badaa is None:
-        badaa=BADAA
+        badaa = BADAA
     if not mer is None:
         return re.sub('[%s]' % badaa,'',mer)
     else:
@@ -112,7 +112,7 @@ def hamming_distance(str1, str2, noConvert = False, **kwargs):
     Only finds distance over the length of the shorter string.
     **kwargs are so this can be plugged in place of a seq_distance() metric"""
     if noConvert:
-        return sum([i for i in itertools.imap(operator.__ne__, str1, str2)])
+        return np.sum([i for i in itertools.imap(operator.__ne__, str1, str2)])
 
     if isinstance(str1,basestring):
         str1 = string2byte(str1)
@@ -131,10 +131,10 @@ def aamismatch_distance(seq1,seq2, **kwargs):
 
 def string2byte(s):
     """Convert string to byte array since numba can't handle strings"""
-    if is_string_like(s):
-        s = array(s)
+    if isinstance(s,basestring):
+        s = np.array(s)
     dtype = s.dtype
-    if dtype is numpy.dtype('byte'):
+    if dtype is np.dtype('byte'):
         return s # it's already a byte array
     shape = list(s.shape)
     n = dtype.itemsize
@@ -143,7 +143,7 @@ def string2byte(s):
 
 def seq2vec(seq):
     """Convert AA sequence into numpy vector of integers for fast comparison"""
-    vec = zeros(len(seq), dtype = int8)
+    vec = np.zeros(len(seq), dtype = np.int8)
     for aai,aa in enumerate(seq):
         vec[aai] = AA2CODE[aa]
     return vec
@@ -153,7 +153,7 @@ def seqs2mat(seqs):
 
     Requires all seqs to have the same length."""
     L1 = len(seqs[0])
-    mat = zeros((len(seqs),L1), dtype = int8)
+    mat = np.zeros((len(seqs),L1), dtype = np.int8)
     for si,s in enumerate(seqs):
         assert L1 == len(s), "All sequences must have the same length: L1 = %d, but L%d = %d" % (L1,si,len(s))
         for aai,aa in enumerate(s):
@@ -173,13 +173,13 @@ def trunc_hamming(seq1,seq2,maxDist=2,**kwargs):
     """Truncated hamming distance
     d = hamming() if d<maxDist else d = maxDist"""
     d = hamming_distance(seq1,seq2)
-    return maxDist if d>=maxDist else d
+    return maxDist if d >= maxDist else d
 
 def dichot_hamming(seq1,seq2,mmTolerance=1,**kwargs):
     """Dichotamized hamming distance.
     hamming <= mmTolerance is 0 and all others are 1"""
     d = hamming_distance(seq1,seq2)
-    return 1 if d>mmTolerance else 0
+    return 1 if d > mmTolerance else 0
 
 
 def addGapScores(subst, gapScores = None, minScorePenalty = False, returnMat = False):
@@ -195,8 +195,8 @@ def addGapScores(subst, gapScores = None, minScorePenalty = False, returnMat = F
     """
     if minScorePenalty:
         gapScores = {('-','-') : 1,
-                     ('-','X') : min(subst.values()),
-                     ('X','-') : min(subst.values())}
+                     ('-','X') : np.min(subst.values()),
+                     ('X','-') : np.min(subst.values())}
     elif gapScores is None:
         if subst is binarySubst:
             print 'Using default binGapScores for binarySubst'
@@ -207,7 +207,7 @@ def addGapScores(subst, gapScores = None, minScorePenalty = False, returnMat = F
         else:
             raise Exception('Cannot determine which gap scores to use!')
     su = deepcopy(subst)
-    uAA = unique([k[0] for k in subst.keys()])
+    uAA = np.unique([k[0] for k in subst.keys()])
     su.update({('-',aa) : gapScores[('-','X')] for aa in uAA})
     su.update({(aa,'-') : gapScores[('X','-')] for aa in uAA})
     su.update({('-','-') : gapScores[('-','-')]})
@@ -264,7 +264,7 @@ def np_seq_similarity(seq1, seq2, substMat, normed, asDistance):
     sim12 = substMat[seq1,seq2]
 
     if normed or asDistance:
-        siteN = (~isnan(sim12)).sum()
+        siteN = (~np.isnan(sim12)).sum()
         sim11 = np.nansum(substMat[seq1,seq1])/siteN
         sim22 = np.nansum(substMat[seq1,seq1])/siteN
         tot12 = np.nansum(2*sim12)/(sim11+sim22)
@@ -332,29 +332,29 @@ def seq_similarity_old(seq1,seq2,subst=None,normed=True):
     For a hamming similarity when there are no gaps use subst=binarySubst
         and performance is optimized underneath using hamming_distance"""
 
-    assert len(seq1)==len(seq2), "len of seq1 (%d) and seq2 (%d) are different" % (len(seq1),len(seq2))
+    assert len(seq1) == len(seq2), "len of seq1 (%d) and seq2 (%d) are different" % (len(seq1),len(seq2))
 
     if subst is binarySubst:
-        dist=hamming_distance(seq1,seq2)
-        sim=len(seq1)-dist
+        dist = hamming_distance(seq1,seq2)
+        sim = len(seq1) - dist
         if normed:
-            sim=sim/len(seq1)
+            sim = sim / len(seq1)
         return sim
 
     if subst is None:
         print 'Using default binarySubst matrix with binGaps for seq_similarity'
-        subst=addGapScores(binarySubst,binGapScores)
+        subst = addGapScores(binarySubst,binGapScores)
 
     """Distance between seq1 and seq2 using the substitution matrix subst"""
-    sim12=array([i for i in itertools.imap(lambda a,b: subst.get((a,b),subst.get((b,a))), seq1, seq2)])
+    sim12 = np.array([i for i in itertools.imap(lambda a,b: subst.get((a,b),subst.get((b,a))), seq1, seq2)])
 
     if normed:
-        siteN=sum(~isnan(sim12))
-        sim11=seq_similarity_old(seq1,seq1,subst=subst,normed=False)/siteN
-        sim22=seq_similarity_old(seq2,seq2,subst=subst,normed=False)/siteN
-        sim12=nansum(2*sim12/(sim11+sim22))
+        siteN = np.sum(~np.isnan(sim12))
+        sim11 = seq_similarity_old(seq1,seq1,subst=subst,normed=False)/siteN
+        sim22 = seq_similarity_old(seq2,seq2,subst=subst,normed=False)/siteN
+        sim12 = np.nansum(2*sim12/(sim11+sim22))
     else:
-        sim12=nansum(sim12)
+        sim12 = np.nansum(sim12)
     return sim12
     
 def seq_distance(seq1, seq2, subst = None, normed = True):
@@ -375,9 +375,9 @@ def unalign_similarity(seq1,seq2,subst=None):
        and return the distance from one to the other"""
     
     if subst is None:
-        subst=blosum90
+        subst = blosum90
 
-    res=pairwise2.align.globaldx(seq1,seq2,subst)
+    res = pairwise2.align.globaldx(seq1,seq2,subst)
     return res[0][2]
 
 def _test_seq_similarity(subst=None,normed=True):
@@ -385,14 +385,14 @@ def _test_seq_similarity(subst=None,normed=True):
         print seq1
         print seq2
         try:
-            sim = seq_similarity_old(seq1,seq2,subst=s,normed=n)
+            sim = seq_similarity_old(seq1, seq2, subst=s, normed=n)
             print 'Similarity: %f' % sim
         except:
             print 'Similarity: %s [%s]' % (sys.exc_info()[0],sys.exc_info()[1])
         
         #dist = seq_distance(seq1,seq2,subst=s)
         try:
-            dist = seq_distance(seq1,seq2,subst=s)
+            dist = seq_distance(seq1, seq2, subst=s)
             print 'Distance: %f' % dist
         except:
             print 'Distance: %s [%s]' % (sys.exc_info()[0],sys.exc_info()[1])
@@ -447,7 +447,7 @@ def calcDistanceMatrix(seqs,normalize=False,symetric=True,metric=None,**kwargs):
     dist : ndarray of shape [len(seqs), len(seqs)]
         Contains all pairwise distances for seqs.
     """
-    return calcDistanceRectangle(seqs,seqs,normalize=normalize,symetric=symetric,metric=metric,**kwargs)
+    return calcDistanceRectangle_old(seqs,seqs,normalize=normalize,symetric=symetric,metric=metric,**kwargs)
 
 def calcDistanceRectangle_old(row_seqs,col_seqs,normalize=False,symetric=False,metric=None,convertToNP=False,**kwargs):
     """Returns a rectangular distance matrix with rows and columns of the unique sequences in row_seqs and col_seqs
@@ -487,8 +487,8 @@ def calcDistanceRectangle_old(row_seqs,col_seqs,normalize=False,symetric=False,m
         metric = seq_distance
 
     """Only compute distances on unique sequences. De-uniquify with inv_uniqi later"""
-    row_uSeqs,row_uniqi,row_inv_uniqi = unique(row_seqs,return_index=True,return_inverse=True)
-    col_uSeqs,col_uniqi,col_inv_uniqi = unique(col_seqs,return_index=True,return_inverse=True)
+    row_uSeqs,row_uniqi,row_inv_uniqi = np.unique(row_seqs,return_index=True,return_inverse=True)
+    col_uSeqs,col_uniqi,col_inv_uniqi = np.unique(col_seqs,return_index=True,return_inverse=True)
 
     if convertToNP:
         R = [seq2vec(s) for s in row_uSeqs]
@@ -497,7 +497,7 @@ def calcDistanceRectangle_old(row_seqs,col_seqs,normalize=False,symetric=False,m
         R = row_uSeqs
         C = col_uSeqs
 
-    dist = zeros((len(row_uSeqs),len(col_uSeqs)))
+    dist = np.zeros((len(row_uSeqs),len(col_uSeqs)))
     for i,j in itertools.product(range(len(row_uSeqs)),range(len(col_uSeqs))):
         if not symetric:
             """If not assumed symetric, compute all distances"""
@@ -513,7 +513,7 @@ def calcDistanceRectangle_old(row_seqs,col_seqs,normalize=False,symetric=False,m
                 dist[i,j] = metric(R[i],C[j],**kwargs)
 
     if normalize:
-        dist = dist-dist.min()
+        dist = dist - dist.min()
     """De-uniquify such that dist is now shape [len(seqs), len(seqs)]"""
     dist = dist[row_inv_uniqi,:][:,col_inv_uniqi]
     return dist
@@ -562,8 +562,8 @@ def calcDistanceRectangle(row_seqs, col_seqs, subst=None, nb_metric=None, normal
         metric = seq_distance
 
     """Only compute distances on unique sequences. De-uniquify with inv_uniqi later"""
-    row_uSeqs,row_uniqi,row_inv_uniqi = unique(row_seqs,return_index=True,return_inverse=True)
-    col_uSeqs,col_uniqi,col_inv_uniqi = unique(col_seqs,return_index=True,return_inverse=True)
+    row_uSeqs,row_uniqi,row_inv_uniqi = np.unique(row_seqs,return_index=True,return_inverse=True)
+    col_uSeqs,col_uniqi,col_inv_uniqi = np.unique(col_seqs,return_index=True,return_inverse=True)
 
     if convertToNP:
         R = [seq2vec(s) for s in row_uSeqs]
@@ -588,7 +588,7 @@ def calcDistanceRectangle(row_seqs, col_seqs, subst=None, nb_metric=None, normal
                 dist[i,j] = metric(R[i],C[j],**kwargs)
 
     if normalize:
-        dist = dist-dist.min()
+        dist = dist - dist.min()
     """De-uniquify such that dist is now shape [len(seqs), len(seqs)]"""
     dist = dist[row_inv_uniqi,:][:,col_inv_uniqi]
     return dist
@@ -626,7 +626,7 @@ def distRect(row_vecs, col_vecs, substMat, nb_metric, normalize=False, symetric=
     col_vecs = seqs2mat(col_seqs)"""
 
     nb_drect = distRect_factory(nb_metric)
-    pwdist = zeros((row_vecs.shape[0],col_vecs.shape[0]),dtype=float64)
+    pwdist = np.zeros((row_vecs.shape[0],col_vecs.shape[0]),dtype=np.float64)
     success = nb_drect(pwdist, row_vecs, col_vecs, substMat, symetric)
     assert success
 
@@ -670,8 +670,8 @@ def coverageDistance(epitope,peptide, mmTolerance = 1,**kwargs):
     if LEpitope > LPeptide:
         return 1
 
-    if is_string_like(epitope):
-        min_dist = array([sum([i for i in itertools.imap(operator.__ne__, epitope, peptide[starti:starti+LEpitope])]) for starti in range(LPeptide-LEpitope+1)]).min()
+    if isinstance(epitope, basestring):
+        min_dist = array([np.sum([i for i in itertools.imap(operator.__ne__, epitope, peptide[starti:starti+LEpitope])]) for starti in range(LPeptide-LEpitope+1)]).min()
     else:
         min_dist = array([(epitope != peptide[starti:starti+LEpitope]).sum() for starti in range(LPeptide-LEpitope+1)]).min()
     
@@ -680,25 +680,25 @@ def coverageDistance(epitope,peptide, mmTolerance = 1,**kwargs):
 
 def embedDistanceMatrix(dist,method='tsne'):
     """MDS embedding of sequence distances in dist, returning Nx2 x,y-coords: tsne, isomap, pca, mds, kpca"""
-    if method=='tsne':
-        xy=tsne.run_tsne(dist,no_dims=2)
+    if method == 'tsne':
+        xy = tsne.run_tsne(dist,no_dims=2)
         #xy=pytsne.run_tsne(adist,no_dims=2)
-    elif method=='isomap':
-        isoObj=Isomap(n_neighbors=10,n_components=2)
-        xy=isoObj.fit_transform(dist)
-    elif method=='mds':
+    elif method == 'isomap':
+        isoObj = Isomap(n_neighbors=10,n_components=2)
+        xy = isoObj.fit_transform(dist)
+    elif method == 'mds':
         mds = manifold.MDS(n_components=2, max_iter=3000, eps=1e-9, random_state=15,
                            dissimilarity="precomputed", n_jobs=1)
         xy = mds.fit(dist).embedding_
         rot = PCA(n_components=2)
         xy = rot.fit_transform(xy)
-    elif method=='pca':
+    elif method == 'pca':
         pcaObj = PCA(n_components=2)
         xy = pcaObj.fit_transform(1-dist)
-    elif method=='kpca':
+    elif method == 'kpca':
         pcaObj = KernelPCA(n_components=2,kernel='precomputed')
         xy = pcaObj.fit_transform(1-dist)
-    elif method=='lle':
+    elif method == 'lle':
         lle = manifold.LocallyLinearEmbedding(n_neighbors=30, n_components=2,method='standard')
         xy = lle.fit_transform(dist)
     return xy
