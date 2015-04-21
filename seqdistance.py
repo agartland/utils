@@ -29,7 +29,6 @@ __all__ = ['BADAA',
            'trunc_hamming',
            'dichot_hamming',
            'seq2vec',
-           'hamming_distance_vec',
            'nanGapScores',
            'nanZeroGapScores',
            'binGapScores',
@@ -50,7 +49,7 @@ __all__ = ['BADAA',
 
 
 BADAA = '-*BX#Z'
-FULL_AALPHABET = 'ABCDEFGHIKLMNPQRSTVWXYZ'
+FULL_AALPHABET = 'ABCDEFGHIKLMNPQRSTVWXYZ-'
 AALPHABET = 'ACDEFGHIKLMNPQRSTVWY'
 AA2CODE = {aa:i for i,aa in enumerate(FULL_AALPHABET)}
 AA2CODE.update({'-':23})
@@ -108,13 +107,15 @@ def removeBadAA(mer,badaa=None):
     else:
         return mer
 
-def hamming_distance(str1, str2, **kwargs):
+def hamming_distance(str1, str2, noConvert = False, **kwargs):
     """Hamming distance between str1 and str2.
     Only finds distance over the length of the shorter string.
     **kwargs are so this can be plugged in place of a seq_distance() metric"""
+    if noConvert:
+        return sum([i for i in itertools.imap(operator.__ne__, str1, str2)])
+
     if isinstance(str1,basestring):
         str1 = string2byte(str1)
-
     if isinstance(str2,basestring):
         str2 = string2byte(str2)
     return nb_hamming_distance(str1, str2)
@@ -140,7 +141,27 @@ def string2byte(s):
     shape.append(n)
     return s.ravel().view(dtype='byte').reshape(shape)
 
-@nb.jit(nb.int32(nb.char[:],nb.char[:]), nopython = True)
+def seq2vec(seq):
+    """Convert AA sequence into numpy vector of integers for fast comparison"""
+    vec = zeros(len(seq), dtype = int8)
+    for aai,aa in enumerate(seq):
+        vec[aai] = AA2CODE[aa]
+    return vec
+def seqs2mat(seqs):
+    """Convert a collection of AA sequences into a
+    numpy matrix of integers for fast comparison.
+
+    Requires all seqs to have the same length."""
+    L1 = len(seqs[0])
+    mat = zeros((len(seqs),L1), dtype = int8)
+    for si,s in enumerate(seqs):
+        assert L1 == len(s), "All sequences must have the same length: L1 = %d, but L%d = %d" % (L1,si,len(s))
+        for aai,aa in enumerate(s):
+            mat[si,aai] = AA2CODE[aa]
+    return mat
+
+
+@nb.jit(nb.int8(nb.char[:],nb.char[:]), nopython = True)
 def nb_hamming_distance(str1,str2):
     tot = 0
     for s1,s2 in zip(str1,str2):
@@ -160,12 +181,6 @@ def dichot_hamming(seq1,seq2,mmTolerance=1,**kwargs):
     d = hamming_distance(seq1,seq2)
     return 1 if d>mmTolerance else 0
 
-def seq2vec(seq):
-    """Convert AA sequence into numpy vector of integers for fast comparison"""
-    vec = zeros(len(seq), dtype=int32)
-    for aai,aa in enumerate(seq):
-        vec[aai] = AA2CODE[aa]
-    return vec
 
 def addGapScores(subst, gapScores = None, minScorePenalty = False, returnMat = False):
     """Add gap similarity scores for each AA (Could be done once for a set of sequences to improve speed)
@@ -201,7 +216,8 @@ def addGapScores(subst, gapScores = None, minScorePenalty = False, returnMat = F
         return subst2mat(su)
     return su
 
-@nb.jit(nb.float64(nb.int32[:],nb.int32[:],nb.float64[:,:],nb.boolean,nb.boolean), nopython = True)
+#@nb.jit(nb.float64(nb.int8[:],nb.int8[:],nb.float64[:,:],nb.boolean,nb.boolean), nopython = True)
+@nb.jit(nopython = True)
 def nb_seq_similarity(seq1, seq2, substMat, normed, asDistance):
     """Computes sequence similarity based on the substitution matrix."""
     if seq1.shape[0] != seq2.shape[0]:
@@ -369,7 +385,7 @@ def _test_seq_similarity(subst=None,normed=True):
         print seq1
         print seq2
         try:
-            sim = seq_similarity(seq1,seq2,subst=s,normed=n)
+            sim = seq_similarity_old(seq1,seq2,subst=s,normed=n)
             print 'Similarity: %f' % sim
         except:
             print 'Similarity: %s [%s]' % (sys.exc_info()[0],sys.exc_info()[1])
@@ -384,8 +400,8 @@ def _test_seq_similarity(subst=None,normed=True):
 
     seqs = ['AAAA',
             'AAAA',
-            'BBBB',
-            'AABA',
+            'KKKK',
+            'AAKA',
             '-AAA',
             '-A-A']
     if subst is None:
@@ -433,7 +449,7 @@ def calcDistanceMatrix(seqs,normalize=False,symetric=True,metric=None,**kwargs):
     """
     return calcDistanceRectangle(seqs,seqs,normalize=normalize,symetric=symetric,metric=metric,**kwargs)
 
-def calcDistanceRectangle(row_seqs,col_seqs,normalize=False,symetric=False,metric=None,convertToNP=False,**kwargs):
+def calcDistanceRectangle_old(row_seqs,col_seqs,normalize=False,symetric=False,metric=None,convertToNP=False,**kwargs):
     """Returns a rectangular distance matrix with rows and columns of the unique sequences in row_seqs and col_seqs
     By default will normalize by subtracting off the min() to at least get rid of negative distances
     However, I don't really think this is the best option. 
@@ -501,6 +517,166 @@ def calcDistanceRectangle(row_seqs,col_seqs,normalize=False,symetric=False,metri
     """De-uniquify such that dist is now shape [len(seqs), len(seqs)]"""
     dist = dist[row_inv_uniqi,:][:,col_inv_uniqi]
     return dist
+
+def calcDistanceRectangle(row_seqs, col_seqs, subst=None, nb_metric=None, normalize=False, symetric=False):
+    """Returns a rectangular distance matrix with rows and columns of the unique sequences in row_seqs and col_seqs
+    By default will normalize by subtracting off the min() to at least get rid of negative distances
+    However, I don't really think this is the best option. 
+    If symetric is True then only calculates dist[i,j] and assumes dist[j,i] == dist[i,j]
+
+    TODO:
+    (1) Wrap this function around dist rect functins below.
+    (2) Define a coverage nb_metric
+    (3) Come up with a back-up plan for when numba import fails...
+        (Not jit'ing is not a good option because it will be super slow!
+            There need to be numpy equivalent functions as back-up...)
+
+    
+    Additional kwargs are passed to the distanceFunc (e.g. subst, gapScores, normed)
+
+    Parameters
+    ----------
+    row_seqs : list/iterator
+        Genetic sequences to compare.
+    col_seqs : list/iterator
+        Genetic sequences to compare.
+    subst : dict or ndarray
+        Similarity matrix for use by the metric. Can be subst or substMat (i.e. dict or ndarray)
+    nb_metric : numba jit'd function with params seq_vecs1, seq_vecs2 (int8) and substMat (and others?)
+        Function will be called to compute each pairwise distance.
+    normalize : bool
+        If true (default: False), subtracts off dist.min() to eliminate negative distances
+        (Could be improved/expanded)
+    symetric : bool
+        If True (default), then it assumes dist(A,B) == dist(B,A) and speeds up computation.
+    
+
+    Returns
+    -------
+    dist : ndarray of shape [len(row_seqs), len(col_seqs)]
+        Contains all pairwise distances for seqs.
+    """
+    if not 'normed' in kwargs.keys():
+        kwargs['normed'] = False
+    if metric is None:
+        metric = seq_distance
+
+    """Only compute distances on unique sequences. De-uniquify with inv_uniqi later"""
+    row_uSeqs,row_uniqi,row_inv_uniqi = unique(row_seqs,return_index=True,return_inverse=True)
+    col_uSeqs,col_uniqi,col_inv_uniqi = unique(col_seqs,return_index=True,return_inverse=True)
+
+    if convertToNP:
+        R = [seq2vec(s) for s in row_uSeqs]
+        C = [seq2vec(s) for s in col_uSeqs]
+    else:
+        R = row_uSeqs
+        C = col_uSeqs
+
+    dist = zeros((len(row_uSeqs),len(col_uSeqs)))
+    for i,j in itertools.product(range(len(row_uSeqs)),range(len(col_uSeqs))):
+        if not symetric:
+            """If not assumed symetric, compute all distances"""
+            dist[i,j] = metric(R[i],C[j],**kwargs)
+        else:
+            if j<i:
+                tmp = metric(R[i],C[j],**kwargs)
+                dist[i,j] = tmp
+                dist[j,i] = tmp
+            elif j>i:
+                pass
+            elif j==i:
+                dist[i,j] = metric(R[i],C[j],**kwargs)
+
+    if normalize:
+        dist = dist-dist.min()
+    """De-uniquify such that dist is now shape [len(seqs), len(seqs)]"""
+    dist = dist[row_inv_uniqi,:][:,col_inv_uniqi]
+    return dist
+
+
+def distRect_factory(nb_metric): 
+    """Can be passed a numba jit'd distance function and
+    will return a jit'd function for computing all pairwise distances using that function"""
+    @nb.jit(nb.boolean(nb.float64[:,:],nb.int8[:,:],nb.int8[:,:],nb.float64[:,:],nb.boolean),nopython=True) 
+    def nb_distRect(pwdist,rows,cols,substMat,symetric): 
+        n = rows.shape[0] 
+        m = cols.shape[0]
+        for i in range(n): 
+            for j in range(m): 
+                if not symetric:
+                    pwdist[i,j] = nb_seq_similarity(rows[i, :], cols[j, :],substMat=substMat, normed=False, asDistance=True)
+                else:
+                    if j<=i:
+                        pwdist[i,j] = nb_seq_similarity(rows[i, :], cols[j, :],substMat=substMat, normed=False, asDistance=True)
+                        pwdist[j,i] = pwdist[i,j]
+        return True 
+    return nb_distRect
+
+def distRect(row_vecs, col_vecs, substMat, nb_metric, normalize=False, symetric=False):
+    """These conversion will go in a wrapper function with the uniquing business
+    if subst is None:
+        substMat = subst2mat(addGapScores(binarySubst,binGapScores))
+    else:
+        substMat = subst2mat(subst)
+
+    if nb_metric is None:
+        nb_metric = nb_seq_similarity
+
+    row_vecs = seqs2mat(row_seqs)
+    col_vecs = seqs2mat(col_seqs)"""
+
+    nb_drect = distRect_factory(nb_metric)
+    pwdist = zeros((row_vecs.shape[0],col_vecs.shape[0]),dtype=float64)
+    success = nb_drect(pwdist, row_vecs, col_vecs, substMat, symetric)
+    assert success
+
+    if normalize:
+        pwdist = pwdist - pwdist.min()
+    return pwdist
+
+
+
+#@jit()
+def coverageDistance(epitope,peptide, mmTolerance = 1,**kwargs):
+    """Determines whether pepitde covers epitope
+    and can handle epitopes and peptides of different lengths.
+
+    To be a consistent distance matrix:
+        covered = 0
+        not-covered = 1
+
+    If epitope is longer than peptide it is not covered.
+    Otherwise coverage is determined based on a mmTolerance
+
+    Can accomodate strings or np.arrays (but not a mix).
+
+    Parameters
+    ----------
+    epitope : str or np.array
+    peptide : str or np.array
+    mmTolerance : int
+        Number of mismatches tolerated
+        If dist <= mmTolerance then it is covered
+
+    Returns
+    -------
+    covered : int
+        Covered (0) or not-covered (1)"""
+
+    tEpitope, tPeptide = type(epitope), type(peptide)
+    assert tEpitope == tPeptide
+
+    LEpitope, LPeptide = len(epitope), len(peptide)
+    if LEpitope > LPeptide:
+        return 1
+
+    if is_string_like(epitope):
+        min_dist = array([sum([i for i in itertools.imap(operator.__ne__, epitope, peptide[starti:starti+LEpitope])]) for starti in range(LPeptide-LEpitope+1)]).min()
+    else:
+        min_dist = array([(epitope != peptide[starti:starti+LEpitope]).sum() for starti in range(LPeptide-LEpitope+1)]).min()
+    
+    return 0 if min_dist <= mmTolerance else 1
+
 
 def embedDistanceMatrix(dist,method='tsne'):
     """MDS embedding of sequence distances in dist, returning Nx2 x,y-coords: tsne, isomap, pca, mds, kpca"""
