@@ -1,4 +1,4 @@
-from pylab import *
+import matplotlib.pyplot as plt
 import numpy as np
 
 __all__ = ['colorLegend',
@@ -20,8 +20,8 @@ def colorLegend(colors, labels, alphas=None, edgecolor='black',loc='best', **leg
     """
 
     if alphas is None:
-        alphas=np.ones(len(colors))
-    lh = legend((Circle((0,0),fc=c,ec=edgecolor,alpha=a) for c,a in zip(colors,alphas)),
+        alphas = np.ones(len(colors))
+    lh = plt.legend((plt.Circle((0,0), fc = c, ec = edgecolor, alpha = a) for c,a in zip(colors,alphas)),
                labels,
                loc,
                **legendKwargs)
@@ -44,13 +44,13 @@ def symbolLegend(symbols, labels, facecolors=None, edgecolors=None, alphas=None,
     All remaining kwargs are passed to legend()
     """
     if alphas is None:
-        alphas=np.ones(len(symbols))
+        alphas = np.ones(len(symbols))
     if edgecolors is None:
-        edgecolors = ['black']*len(symbols)
+        edgecolors = ['black'] * len(symbols)
     if facecolors is None:
-        facecolors = ['white']*len(symbols)
+        facecolors = ['white'] * len(symbols)
 
-    lh = legend((Line2D([0],[0],ls='',marker=s,markerfacecolor=mfc,markeredgecolor=ec,alpha=a) for s,mfc,ec,a in zip(symbols,facecolors,edgecolors,alphas)),
+    lh = plt.legend((plt.Line2D([0],[0], ls = '', marker = s, markerfacecolor = mfc, markeredgecolor = ec, alpha = a) for s,mfc,ec,a in zip(symbols,facecolors,edgecolors,alphas)),
                 labels,
                 loc,
                 numpoints=1,
