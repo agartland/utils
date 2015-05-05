@@ -101,7 +101,7 @@ def myboxplot(data, x = 1, axh=None, width=0.8, boxcolor='black',scatterwidth=0.
             subsetInd = tmp
     else:
         subsetInd = np.ones(data.shape, dtype=bool)
-    subsetInd = asarray(subsetInd)
+    subsetInd = np.asarray(subsetInd)
 
     if not 's' in kwargs:
         kwargs['s'] = 20
