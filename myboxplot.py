@@ -131,7 +131,7 @@ def myboxplot(data, x = 1, axh=None, width=0.8, boxcolor='black',scatterwidth=0.
     if returnx:
         return outx
 
-def manyboxplots(df, axh=None, cols=None,colLabels=None,annotation='N',horizontal=False,vRange=None,xRot=0,**kwargs):
+def manyboxplots(df, cols=None, axh=None, colLabels=None,annotation='N',horizontal=False,vRange=None,xRot=0,**kwargs):
     """Series of boxplots along x-axis (or flipped horizontally along y-axis [NOT IMPLEMENTED])
 
     WORK IN PROGRESS
@@ -144,10 +144,10 @@ def manyboxplots(df, axh=None, cols=None,colLabels=None,annotation='N',horizonta
     Parameters
     ----------
     df : pd.DataFrame
-    axh : matplotlib figure handle
-        If None then use plt.gca()
     cols : list
         Column names to be plotted
+    axh : matplotlib figure handle
+        If None then use plt.gca()
     colLabels : list
         Column labels (optional)
     annotation : str or None
