@@ -16,7 +16,8 @@ __all__ = ['partialcorr',
            'scatterfit',
            'heatmap',
            'corrheatmap',
-           'validPairwiseCounts']
+           'validPairwiseCounts',
+           'removeNARC']
 
 """Red --> Green colormap with 1024 interpolated values"""
 _cdict = {'green' : ((0, 1, 1), (0.5, 0, 0), (1, 0, 0)),
