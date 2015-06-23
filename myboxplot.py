@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from numpy.random import permutation,seed
 import pandas as pd
+import seaborn as sns
 
 __all__ = ['scatterdots',
            'myboxplot',
@@ -59,7 +60,7 @@ def scatterdots(data, x, axh=None, width=0.8, returnx=False, rseed=820, **kwargs
         outx[validi] = plotx
         return outx
 
-def myboxplot(data, x = 1, axh=None, width=0.8, boxcolor='black',scatterwidth=0.6,dotcolor='red',returnx=False,subsetInd=None,altDotcolor='gray',**kwargs):
+def myboxplot(data, x = 1, axh=None, width=0.8, boxcolor='black',scatterwidth=0.6,dotcolor='red',returnx=False,subsetInd=None,altDotcolor='gray',violin=False,**kwargs):
     """Make a boxplot with scatterdots overlaid.
 
     Parameters
@@ -82,6 +83,8 @@ def myboxplot(data, x = 1, axh=None, width=0.8, boxcolor='black',scatterwidth=0.
         Specify the color of the data points that are not in the subset.
     returnx : bool
         Return the x-coordinates of the data points.
+    violin : bool
+        Specify whether the box is a violin plot.
 
     Returns
     -------
@@ -114,10 +117,13 @@ def myboxplot(data, x = 1, axh=None, width=0.8, boxcolor='black',scatterwidth=0.
     outx = np.zeros(data.shape)
     if subsetInd.sum() > 0:
         if not boxcolor == 'none' and not boxcolor is None:
-            bp = axh.boxplot(data[subsetInd], positions = [x], widths = width, sym = '')
-            for element in bp.keys():
-                for b in bp[element]:
-                    b.set_color(boxcolor)
+            if violin:
+                sns.violinplot(data[subsetInd], color = boxcolor, positions = [x], alpha = 0.5)
+            else:
+                bp = axh.boxplot(data[subsetInd], positions = [x], widths = width, sym = '')
+                for element in bp.keys():
+                    for b in bp[element]:
+                        b.set_color(boxcolor)
 
         kwargs['c'] = dotcolor
         subsetx = scatterdots(data[subsetInd], x = x, axh = axh, width = scatterwidth, returnx = True, **kwargs)
@@ -131,7 +137,7 @@ def myboxplot(data, x = 1, axh=None, width=0.8, boxcolor='black',scatterwidth=0.
     if returnx:
         return outx
 
-def manyboxplots(df, cols=None, axh=None, colLabels=None,annotation='N',horizontal=False,vRange=None,xRot=0,**kwargs):
+def manyboxplots(df, cols=None, axh=None, colLabels=None,annotation='N',horizontal=False,vRange=None,xRot=0, **kwargs):
     """Series of boxplots along x-axis (or flipped horizontally along y-axis [NOT IMPLEMENTED])
 
     WORK IN PROGRESS
