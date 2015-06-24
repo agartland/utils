@@ -11,6 +11,7 @@ import matplotlib as mpl
 import pylab
 import itertools
 
+from corrplots import scatterfit
 
 __all__ = ['plotHCluster',
             'plotHColCluster',
@@ -147,7 +148,7 @@ def plotCorrHeatmap(df=None,metric='spearman',colInd=None,col_labels=None,titleS
     if not titleStr is None:
         heatmapAX.set_xlabel(titleStr,size='x-large')
 
-def plotHColCluster(df,method='complete', metric='euclidean', col_labels=None,titleStr=None,vRange=None,tickSz='small',cmap=None,col_dmat=None,minN=1, K=None, labelCmap=None, noColorBar = False):
+def plotHColCluster(df,method='complete', metric='euclidean', col_labels=None,titleStr=None,vRange=None,tickSz='small',cmap=None,col_dmat=None,minN=1, K=None, labelCmap=None, noColorBar=False, interactive=False):
     """Perform hierarchical clustering on df columns and plot square heatmap of pairwise distances"""
     if cmap is None:
         if metric in ['spearman','pearson','spearman-signed','pearson-signed']:
@@ -212,7 +213,7 @@ def plotHColCluster(df,method='complete', metric='euclidean', col_labels=None,ti
     """Column dendrogaram but along the rows"""
     pylab.axes(col_denAX)
     col_denD = sch.dendrogram(col_clusters,color_threshold=np.inf,orientation='right')
-    colInd=col_denD['leaves']
+    colInd = col_denD['leaves']
     clean_axis(col_denAX)
 
     """Column label colorbar but along the rows"""
@@ -250,6 +251,12 @@ def plotHColCluster(df,method='complete', metric='euclidean', col_labels=None,ti
     """Add title as xaxis label"""
     if not titleStr is None:
         heatmapAX.set_xlabel(titleStr,size='x-large')
+
+    if interactive:
+        scatterFig = plt.figure(fig.number + 100)
+        ps = PairScatter(df.iloc[colInd,:].iloc[:,colInd], heatmapAX, scatterFig.add_subplot(111))
+        return colInd, ps
+
     return colInd
 
 def plotHCluster(df, method='complete', metric='euclidean', clusterBool=[True,True],row_labels=None, col_labels=None, vRange=None,titleStr=None,xTickSz='small',yTickSz='small',cmap=None,minN=1):
@@ -395,3 +402,22 @@ def normalizeAxis(df,axis=0,useMedian=False):
         tmp = tmp - tile(tmp.mean(axis=axis).values,retile)
     tmp = tmp / tile(tmp.std(axis=axis).values,retile)
     return tmp
+
+class PairScatter:
+    """Instantiate this class to interactively pair
+    a heatmap and a pairwise scatterfit plot in a new figure window."""
+    def __init__(self, df, heatmapAx, scatterAx):
+        self.scatterAx = scatterAx
+        self.heatmapAx = heatmapAx
+        self.df = df
+        self.cid = heatmapAx.figure.canvas.mpl_connect('button_press_event', self)
+    def __call__(self, event):
+        if event.inaxes != self.heatmapAx:
+            return
+        else:
+            xind = int(np.floor(event.xdata + 0.5))
+            yind = int(np.floor(event.ydata + 0.5))
+            plt.sca(self.scatterAx)
+            plt.cla()
+            scatterfit(self.df.iloc[:,xind], self.df.iloc[:,yind], method='spearman')
+            self.scatterAx.figure.show()

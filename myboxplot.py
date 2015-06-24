@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from numpy.random import permutation,seed
 import pandas as pd
-import seaborn as sns
+#import seaborn as sns
 
 __all__ = ['scatterdots',
            'myboxplot',
@@ -117,7 +117,7 @@ def myboxplot(data, x = 1, axh=None, width=0.8, boxcolor='black',scatterwidth=0.
     outx = np.zeros(data.shape)
     if subsetInd.sum() > 0:
         if not boxcolor == 'none' and not boxcolor is None:
-            if violin:
+            if violin and False:
                 sns.violinplot(data[subsetInd], color = boxcolor, positions = [x], alpha = 0.5)
             else:
                 bp = axh.boxplot(data[subsetInd], positions = [x], widths = width, sym = '')
