@@ -13,7 +13,8 @@ def computeGapStat(data, pdistFunc, clusterFunc, maxK, bootstraps = 10):
     $Gap(k) - (Gap(k+1) - \sigma_{k+1}) > 0$
 
     The statistic is described here:
-    Tibshirani, R., Walther, G., Hastie, T., 2001. Estimating the number of clusters in a data set via the gap statistic. J. R. Stat. Soc. Ser. B (Statistical Methodol. 63, 411–423. doi:10.1111/1467-9868.00293
+    Tibshirani, R., Walther, G., Hastie, T., 2001. Estimating the number of clusters in a data set via the gap statistic.
+        J. R. Stat. Soc. Ser. B. (Statistical Methodol.) 63, 411-423
 
     and a good example of python code is here:
     https://datasciencelab.wordpress.com/2013/12/27/finding-the-k-in-k-means-clustering/
