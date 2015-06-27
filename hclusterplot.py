@@ -254,7 +254,7 @@ def plotHColCluster(df,method='complete', metric='euclidean', col_labels=None,ti
 
     if interactive:
         scatterFig = plt.figure(fig.number + 100)
-        ps = PairScatter(df.iloc[colInd,:].iloc[:,colInd], heatmapAX, scatterFig.add_subplot(111))
+        ps = PairScatter(df.iloc[:,colInd], heatmapAX, scatterFig.add_subplot(111))
         return colInd, ps
 
     return colInd

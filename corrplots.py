@@ -381,10 +381,10 @@ def scatterfit(x,y,method='pearson',adjustVars=[],labelLookup={},plotLine=True,a
         kwargs.update({'ms':5})
 
     """Try to force X and Y into pandas.Series objects"""
-    if not type(x)==pd.core.series.Series:
-        x = pd.Series(x,name='X')
-    if not type(y)==pd.core.series.Series:
-        y = pd.Series(y,name='Y')
+    if not isinstance(x, pd.core.series.Series):
+        x = pd.Series(x, name='X')
+    if not isinstance(y, pd.core.series.Series):
+        y = pd.Series(y, name='Y')
 
     xlab = x.name
     ylab = y.name
@@ -397,7 +397,9 @@ def scatterfit(x,y,method='pearson',adjustVars=[],labelLookup={},plotLine=True,a
     tmpDf = pd.concat((x,y,),axis=1,join='inner')
     for av in adjustVars:
         tmpDf = pd.concat((tmpDf,pd.DataFrame(av)),axis=1)
-    tmpDf = tmpDf.dropna(axis=0,how='any')
+    
+    """Drop any row with a nan in either column"""
+    tmpDf = tmpDf.dropna(axis = 0, how = 'any')
 
     gca().set_xmargin(0.2)
     gca().set_ymargin(0.2)
@@ -407,13 +409,13 @@ def scatterfit(x,y,method='pearson',adjustVars=[],labelLookup={},plotLine=True,a
     """Print unadjusted AND adjusted rho/pvalues
     Plot unadjusted data with fit though..."""
     
-    if method=='spearman' and plotLine:
+    if method == 'spearman' and plotLine:
         #unrho,unp=stats.spearmanr(tmpDf[xlab],tmpDf[ylab])
         if unrho>0:
             plot(sorted(tmpDf[xlab]),sorted(tmpDf[ylab]),'-',color=lc)
         else:
             plot(sorted(tmpDf[xlab]),sorted(tmpDf[ylab],reverse=True),'-',color=lc)
-    elif method=='pearson' and plotLine:
+    elif method == 'pearson' and plotLine:
         #unrho,unp=stats.pearsonr(tmpDf[xlab],tmpDf[ylab])
         formula_like = ModelDesc([Term([LookupFactor(ylab)])],[Term([]),Term([LookupFactor(xlab)])])
 
@@ -427,17 +429,17 @@ def scatterfit(x,y,method='pearson',adjustVars=[],labelLookup={},plotLine=True,a
 
     if annotateFit:
         if unp>0.001:    
-            s = 'p = %1.3f\nrho = %1.2f' % (unp,unrho)
+            s = 'p = %1.3f\nrho = %1.2f\nn = %d' % (unp, unrho, tmpDf.shape[0])
         else:
-            s = 'p = %1.1e\nrho = %1.2f' % (unp,unrho)
+            s = 'p = %1.1e\nrho = %1.2f\nn = %d' % (unp, unrho, tmpDf.shape[0])
         textTL(gca(),s,color='black')
 
-        if len(adjustVars)>0:
-            rho,p = partialcorr(tmpDf[xlab],tmpDf[ylab],adjust=adjustVars,method=method)
+        if len(adjustVars) > 0:
+            rho,p = partialcorr(tmpDf[xlab], tmpDf[ylab], adjust = adjustVars, method = method)
             if p>0.001:    
-                s = 'adj-p = %1.3f\nadj-rho = %1.2f' % (p,rho)
+                s = 'adj-p = %1.3f\nadj-rho = %1.2f\nn = %d' % (p, rho, tmpDf.shape[0])
             else:
-                s = 'adj-p = %1.1e\nadj-rho = %1.2f' % (p,rho)
+                s = 'adj-p = %1.1e\nadj-rho = %1.2f\nn = %d' % (p, rho, tmpDf.shape[0])
 
             textTR(gca(),s,color='red')
 
