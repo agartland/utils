@@ -1,10 +1,14 @@
-from numpy import *
-import matplotlib
-from pylab import *
+"""TODO: remove these imports from *"""
+#from numpy import *
+#import matplotlib
+#from pylab import *
+
+import numpy as np
+import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from scipy import polyfit, polyval, stats
 import pandas as pd
-from mytext import *
+from mytext import textTL, textTR
 import statsmodels.api as sm
 from patsy import dmatrices,ModelDesc,Term,LookupFactor
 from copy import deepcopy
@@ -17,7 +21,8 @@ __all__ = ['partialcorr',
            'heatmap',
            'corrheatmap',
            'validPairwiseCounts',
-           'removeNARC']
+           'removeNARC',
+           'permcorrp']
 
 """Red --> Green colormap with 1024 interpolated values"""
 _cdict = {'green' : ((0, 1, 1), (0.5, 0, 0), (1, 0, 0)),
@@ -30,6 +35,8 @@ def partialcorr(x, y, adjust=[], method='pearson'):
 
     This function is index aware (i.e. uses index of x, y and adjust for joining).
     Rho and p-value match those from stats.spearmanr, and stats.pearsonr when adjust = [].
+
+    TODO: compute CIs
 
     Parameters
     ----------
@@ -47,6 +54,13 @@ def partialcorr(x, y, adjust=[], method='pearson'):
     pvalue : float
         P-value for the partial correlation coefficient."""
 
+    if not isinstance(x, pd.Series):
+        x = pd.Series(x, name = 'X')
+    if not isinstance(y, pd.Series):
+        y = pd.Series(y, name = 'Y')
+
+    assert x.shape[0] == y.shape[0]
+
     """Make one big DataFrame out of x, y and adjustment variables"""
     tmpDf = pd.concat((x,y), join='inner', axis=1)
     for a in adjust:
@@ -54,9 +68,9 @@ def partialcorr(x, y, adjust=[], method='pearson'):
 
     tmpDf = tmpDf.dropna(axis=0, how='any')
     
-    m = zeros((tmpDf.shape[0], 2+len(adjust)))
+    m = np.zeros((tmpDf.shape[0], 2+len(adjust)))
     
-    if method=='spearman':
+    if method == 'spearman':
         """Convert data to ranks"""
         m[:,0] = tmpDf[x.name].rank()
         m[:,1] = tmpDf[y.name].rank()
@@ -68,7 +82,7 @@ def partialcorr(x, y, adjust=[], method='pearson'):
         for i,a in enumerate(adjust):
             m[:,i+2] = tmpDf[a.name]
 
-    if all(m[:,0]==m[:,1]):
+    if all(m[:,0] == m[:,1]):
         """Testing for perfect correlation avoids SingularMatrix exception"""
         return 1,0.0
     
@@ -77,13 +91,13 @@ def partialcorr(x, y, adjust=[], method='pearson'):
     where p is the inverse covariance matrix'''
     
     try:
-        icv = inv(cov(m,rowvar=0))
-        pc = -icv[0,1]/sqrt(icv[0,0]*icv[1,1])
+        icv = np.inv(np.cov(m,rowvar=0))
+        pc = -icv[0,1] / np.sqrt(icv[0,0] * icv[1,1])
 
         n = m.shape[0]
         gn = len(adjust)
         
-        statistic = pc*sqrt((n-2-gn)/(1-pc**2))
+        statistic = pc * np.sqrt((n-2-gn)/(1-pc**2))
         #pvalue = 2*stats.norm.cdf(-abs(statistic))
 
         #SAS and pearsonr look the statistic up in a t distribution while R uses the normnal
@@ -92,7 +106,7 @@ def partialcorr(x, y, adjust=[], method='pearson'):
     except:
         """These were used to check that non-partial rho's and pvalues match those of their scipy equivalents
         They do! Use them if the other fails and warn the caller"""
-        if method=='pearson':
+        if method == 'pearson':
             pc,pvalue = stats.pearsonr(x,y)    
         else:
             pc,pvalue = stats.spearmanr(x,y)
@@ -106,7 +120,7 @@ def partialcorr(x, y, adjust=[], method='pearson'):
     model=sm.GLM(Y,X,family=sm.families.Gaussian())
     print model.fit().summary()"""
 
-    return pc,pvalue
+    return pc, pvalue
 
 
 def combocorrplot(data,method='spearman',axLimits='variable',axTicks=False,axTicklabels=False,valueFlag=True,ms=2):
@@ -139,8 +153,8 @@ def combocorrplot(data,method='spearman',axLimits='variable',axTicks=False,axTic
     n = coef.shape[0]
 
 
-    axh = empty((n,n),dtype=object)
-    plth = empty((n,n),dtype=object)
+    axh = np.empty((n,n), dtype=object)
+    plth = np.empty((n,n), dtype=object)
 
     mx = None
     mn = None
@@ -151,64 +165,66 @@ def combocorrplot(data,method='spearman',axLimits='variable',axTicks=False,axTic
         mx = max(data[col].max(),mx)
         mn = min(data[col].min(),mn)
 
-    clf()
-    fh = gcf()
-    gs = GridSpec(n,n,left=border,bottom=border,right=1.-border-cbwidth,top=1.-border,wspace=pad,hspace=pad)
+    plt.clf()
+    fh = plt.gcf()
+    gs = GridSpec(n,n, left=border,bottom=border,right=1.-border-cbwidth,top=1.-border,wspace=pad,hspace=pad)
     #cbgs=GridSpec(1,1,left=1.-cbwidth,bottom=border,right=1.-border,top=1.-border,wspace=pad,hspace=pad)
-    for r in xrange(n):
-        for c in xrange(n):
-            if r==c:
+    for r in range(n):
+        for c in range(n):
+            if r == c:
                 axh[r,c] = fh.add_subplot(gs[r,c],yticklabels=[],xticklabels=[],xticks=[],yticks=[])
-                text(0,0,'%s' % (data.columns[r]),ha='center',va='center')
-                axis([-1,1,-1,1])
+                plt.text(0,0,'%s' % (data.columns[r]),ha='center',va='center')
+                plt.axis([-1,1,-1,1])
             elif r>c:
                 if axTicks:
                     if axTicklabels:
-                        if r<len(labels)-1 and c>0:
+                        if r < len(labels)-1 and c>0:
                             axh[r,c] = fh.add_subplot(gs[r,c],xticklabels=[],yticklabels=[])
-                        elif r<len(labels)-1 and c==0:
+                        elif r < len(labels)-1 and c==0:
                             axh[r,c] = fh.add_subplot(gs[r,c],xticklabels=[])
-                        elif r==len(labels)-1 and c>0:
+                        elif r == len(labels)-1 and c>0:
                             axh[r,c] = fh.add_subplot(gs[r,c],yticklabels=[])
-                        elif r==len(labels)-1 and c==0:
+                        elif r == len(labels)-1 and c==0:
                             axh[r,c] = fh.add_subplot(gs[r,c])
                     else:
                         axh[r,c] = fh.add_subplot(gs[r,c],xticklabels=[],yticklabels=[])
 
                 else:
                     axh[r,c] = fh.add_subplot(gs[r,c],xticks=[],yticks=[])
-
-                if method=='pearson':
-                    ar,br = polyfit(data[labels[r]],data[labels[c]],1)
-                    xfit = array([min(data[labels[r]]),max(data[labels[r]])])
+                plotx = data[labels[r]]
+                ploty = data[labels[c]]
+                validInd = (~np.isnan(plotx)) & (~np.isnan(ploty))
+                plotx,ploty = plotx[validInd], ploty[validInd]
+                if method == 'pearson':
+                    ar,br = polyfit(plotx,ploty,1)
+                    xfit = np.array([min(plotx),max(plotx)])
                     yfit = polyval([ar,br],xfit)
-                    plot(xfit,yfit,'-',lw=1,color='gray')
-                    hold(True)
-                plot(data[labels[r]],data[labels[c]],'ok',ms=ms)
+                    plt.plot(xfit,yfit,'-',lw=1,color='gray')
+                plt.plot(plotx, ploty, 'ok', ms = ms)
                 
-                if axLimits=='variable':
-                    rmax,rmin = max(data[labels[r]]),min(data[labels[r]])
-                    cmax,cmin = max(data[labels[c]]),min(data[labels[c]])
+                if axLimits == 'variable':
+                    rmax,rmin = max(plotx),min(plotx)
+                    cmax,cmin = max(ploty),min(ploty)
                 else:
                     rmax,cmax = mx,mx
                     rmin,cmin = mn,mn
 
-                axis([rmin-0.1*(rmax-rmin), rmax+0.1*(rmax-rmin),cmin-0.1*(cmax-cmin), cmax+0.1*(cmax-cmin)])
-            elif r<c:
+                plt.axis([rmin-0.1*(rmax-rmin), rmax+0.1*(rmax-rmin),cmin-0.1*(cmax-cmin), cmax+0.1*(cmax-cmin)])
+            elif r < c:
                 axh[r,c] = fh.add_subplot(gs[r,c],yticklabels=[],xticklabels=[],xticks=[],yticks=[])
                 val = coef[labels[r]][labels[c]]
                 plth[r,c] = pcolor(ones((2,2))*val,cmap=_heatCmap,vmin=-1.,vmax=1.)
-                axis([0,1,0,1])
+                plt.axis([0,1,0,1])
                 if valueFlag:
                     if val<0.5 and val>-0.5:
                         txtcol = 'white'
                     else:
                         txtcol = 'black'
-                    text(0.5,0.5,'%1.2f' % (val),ha='center',va='center',family='monospace',color=txtcol)
+                    plt.text(0.5,0.5,'%1.2f' % (val),ha='center',va='center',family='monospace',color=txtcol)
     cbax = fh.add_axes([1.-cbwidth-border/2,border,cbwidth-border-0.02,1.-2*border])
-    cb = colorbar(plth[0,0],cax=cbax)
+    cb = plt.colorbar(plth[0,0],cax=cbax)
     method = method[0].upper() + method[1:]
-    annotate('%s correlation' % (method),[0.98,0.5],xycoords='figure fraction',ha='right',va='center',rotation='vertical')
+    plt.annotate('%s correlation' % (method),[0.98,0.5],xycoords='figure fraction',ha='right',va='center',rotation='vertical')
 
 def corrheatmap(df,rowVars,colVars,adjust=[],annotation='pvalue',cutoff='pvalue',cutoffValue=0.05,method='spearman',labelLookup={},xtickRotate=False,labelSize='medium',minN=None):
     """Compute pairwise correlations and plot as a heatmap.
@@ -248,9 +264,9 @@ def corrheatmap(df,rowVars,colVars,adjust=[],annotation='pvalue',cutoff='pvalue'
     rho : ndarray [samples, variables]
         Matrix of correlation coefficients."""
     
-    pvalue = zeros((len(rowVars),len(colVars)))
-    qvalue = nan*zeros((len(rowVars),len(colVars)))
-    rho = zeros((len(rowVars),len(colVars)))
+    pvalue = np.zeros((len(rowVars),len(colVars)))
+    qvalue = np.nan*zeros((len(rowVars),len(colVars)))
+    rho = np.zeros((len(rowVars),len(colVars)))
 
     """Store p-values in dict with keys that are unique pairs (so we only adjust across these)"""
     pairedPvalues = {}
@@ -259,18 +275,18 @@ def corrheatmap(df,rowVars,colVars,adjust=[],annotation='pvalue',cutoff='pvalue'
 
     for i,rowv in enumerate(rowVars):
         for j,colv in enumerate(colVars):
-            if not rowv==colv:
-                if not df[[rowv,colv]].dropna().shape[0]<minN:
+            if not rowv == colv:
+                if not df[[rowv,colv]].dropna().shape[0] < minN:
                     rho[i,j],pvalue[i,j] = partialcorr(df[rowv],df[colv],adjust=[df[a] for a in adjust],method=method)
                 else:
                     """Pvalue = nan excludes these from the multiplicity adjustment"""
-                    rho[i,j],pvalue[i,j] = 1,nan
+                    rho[i,j],pvalue[i,j] = 1,np.nan
                 """Define unique key for the pair by sorting in order they appear in df columns"""
-                key = tuple(sorted([rowv,colv],key=allColumns.index))
+                key = tuple(sorted([rowv,colv], key = allColumns.index))
                 pairedPvalues.update({key:pvalue[i,j]})
             else:
                 """By setting these pvalues to nan we exclude them from multiplicity adjustment"""
-                rho[i,j],pvalue[i,j] = 1,nan
+                rho[i,j],pvalue[i,j] = 1,np.nan
             
     """Now only adjust using pvalues in the unique pair dict"""
     keys = pairedPvalues.keys()
@@ -282,19 +298,19 @@ def corrheatmap(df,rowVars,colVars,adjust=[],annotation='pvalue',cutoff='pvalue'
     for i,rowv in enumerate(rowVars):
         for j,colv in enumerate(colVars):
             if not rowv == colv:
-                key = tuple(sorted([rowv,colv], key=allColumns.index))
+                key = tuple(sorted([rowv,colv], key = allColumns.index))
                 qvalue[i,j] = pairedQvalues[key]
             else:
                 pvalue[i,j] = 0.
                 qvalue[i,j] = 0.
 
-    clf()
-    fh = gcf()
+    plt.clf()
+    fh = plt.gcf()
     
     pvalueTxtProp = dict(family='monospace',size='large',weight='bold',color='white',ha='center',va='center')
 
-    axh = fh.add_subplot(111, yticks = arange(len(rowVars))+0.5,
-                              xticks = arange(len(colVars))+0.5)
+    axh = fh.add_subplot(111, yticks = np.arange(len(rowVars))+0.5,
+                              xticks = np.arange(len(colVars))+0.5)
     if xtickRotate:
         rotation = 'vertical'
     else:
@@ -310,16 +326,16 @@ def corrheatmap(df,rowVars,colVars,adjust=[],annotation='pvalue',cutoff='pvalue'
     elif cutoff == 'pvalue':
         criticalValue = pvalue
     elif cutoff == 'rho':
-        criticalValue = abs(rho)
+        criticalValue = np.abs(rho)
     elif cutoff == 'rho2':
         criticalValue = rho**2
         
     tmprho[~(criticalValue <= cutoffValue)] = 0.
 
-    pcolor(tmprho, cmap=_heatCmap,vmin=-1.,vmax=1.)
+    plt.pcolor(tmprho, cmap=_heatCmap,vmin=-1.,vmax=1.)
     for i in xrange(len(rowVars)):
         for j in xrange(len(colVars)):
-            if criticalValue[i,j]<=cutoffValue and not rowVars[i]==colVars[j]:
+            if criticalValue[i,j] <= cutoffValue and not rowVars[i] == colVars[j]:
                 ann = ''
                 if annotation == 'pvalue':
                     if pvalue[i,j]>0.001:
@@ -337,11 +353,11 @@ def corrheatmap(df,rowVars,colVars,adjust=[],annotation='pvalue',cutoff='pvalue'
                         ann = '%1.1e' % qvalue[i,j]
 
                 if not ann == '':
-                    text(j+0.5,i+0.5,ann,**pvalueTxtProp)
+                    plt.text(j+0.5,i+0.5,ann,**pvalueTxtProp)
 
-    colorbar(fraction=0.05)
+    plt.colorbar(fraction=0.05)
     method = method[0].upper() + method[1:]
-    annotate('%s correlation' % method,[0.98,0.5],xycoords='figure fraction',ha='right',va='center',rotation='vertical')
+    plt.annotate('%s correlation' % method,[0.98,0.5],xycoords='figure fraction',ha='right',va='center',rotation='vertical')
 
     return pvalue, qvalue, rho
 
@@ -401,8 +417,8 @@ def scatterfit(x,y,method='pearson',adjustVars=[],labelLookup={},plotLine=True,a
     """Drop any row with a nan in either column"""
     tmpDf = tmpDf.dropna(axis = 0, how = 'any')
 
-    gca().set_xmargin(0.2)
-    gca().set_ymargin(0.2)
+    plt.gca().set_xmargin(0.2)
+    plt.gca().set_ymargin(0.2)
     
     unrho,unp = partialcorr(tmpDf[xlab],tmpDf[ylab],method=method)
 
@@ -412,9 +428,9 @@ def scatterfit(x,y,method='pearson',adjustVars=[],labelLookup={},plotLine=True,a
     if method == 'spearman' and plotLine:
         #unrho,unp=stats.spearmanr(tmpDf[xlab],tmpDf[ylab])
         if unrho>0:
-            plot(sorted(tmpDf[xlab]),sorted(tmpDf[ylab]),'-',color=lc)
+            plt.plot(sorted(tmpDf[xlab]),sorted(tmpDf[ylab]),'-',color=lc)
         else:
-            plot(sorted(tmpDf[xlab]),sorted(tmpDf[ylab],reverse=True),'-',color=lc)
+            plt.plot(sorted(tmpDf[xlab]),sorted(tmpDf[ylab],reverse=True),'-',color=lc)
     elif method == 'pearson' and plotLine:
         #unrho,unp=stats.pearsonr(tmpDf[xlab],tmpDf[ylab])
         formula_like = ModelDesc([Term([LookupFactor(ylab)])],[Term([]),Term([LookupFactor(xlab)])])
@@ -422,17 +438,17 @@ def scatterfit(x,y,method='pearson',adjustVars=[],labelLookup={},plotLine=True,a
         Y, X = dmatrices(formula_like, data=tmpDf, return_type='dataframe')
         model = sm.GLM(Y,X,family=sm.families.Gaussian())
         results = model.fit()
-        mnmxi = array([tmpDf[xlab].idxmin(),tmpDf[xlab].idxmax()])
-        plot(tmpDf[xlab][mnmxi],results.fittedvalues[mnmxi],'-',color=lc)
+        mnmxi = np.array([tmpDf[xlab].idxmin(),tmpDf[xlab].idxmax()])
+        plt.plot(tmpDf[xlab][mnmxi],results.fittedvalues[mnmxi],'-',color=lc)
     
-    plot(tmpDf[xlab],tmpDf[ylab],'o',**kwargs)
+    plt.plot(tmpDf[xlab],tmpDf[ylab],'o',**kwargs)
 
     if annotateFit:
         if unp>0.001:    
             s = 'p = %1.3f\nrho = %1.2f\nn = %d' % (unp, unrho, tmpDf.shape[0])
         else:
             s = 'p = %1.1e\nrho = %1.2f\nn = %d' % (unp, unrho, tmpDf.shape[0])
-        textTL(gca(),s,color='black')
+        textTL(plt.gca(),s,color='black')
 
         if len(adjustVars) > 0:
             rho,p = partialcorr(tmpDf[xlab], tmpDf[ylab], adjust = adjustVars, method = method)
@@ -441,10 +457,10 @@ def scatterfit(x,y,method='pearson',adjustVars=[],labelLookup={},plotLine=True,a
             else:
                 s = 'adj-p = %1.1e\nadj-rho = %1.2f\nn = %d' % (p, rho, tmpDf.shape[0])
 
-            textTR(gca(),s,color='red')
+            textTR(plt.gca(),s,color='red')
 
-    xlabel(labelLookup.get(xlab,xlab))
-    ylabel(labelLookup.get(ylab,ylab))
+    plt.xlabel(labelLookup.get(xlab,xlab))
+    plt.ylabel(labelLookup.get(ylab,ylab))
     if returnModel:
         return model
 
@@ -460,9 +476,9 @@ def _fdrAdjust(pvalues):
     5) Reshape qvalues
     6) Return same type as pvalues
     """
-    p = array(pvalues).flatten()
+    p = np.array(pvalues).flatten()
     qvalues = deepcopy(p)
-    nanInd = isnan(p)
+    nanInd = np.isnan(p)
     dummy,q,dummy,dummy = sm.stats.multipletests(p[~nanInd],alpha=0.2,method='fdr_bh')
     qvalues[~nanInd] = q
     qvalues = qvalues.reshape(pvalues.shape)
@@ -494,7 +510,7 @@ def validPairwiseCounts(df,cols):
         DataFrame with columns and index matching cols"""
 
     n = len(cols)
-    pwCounts = pd.DataFrame(zeros((n,n)), index=cols,columns=cols)
+    pwCounts = pd.DataFrame(np.zeros((n,n)), index=cols,columns=cols)
     for colA,colB in itertools.product(cols,cols):
         if colA == colB:
             pwCounts.loc[colA,colA] = df[colA].dropna().shape[0]
@@ -528,19 +544,19 @@ def heatmap(df,colLabels=None,rowLabels=None,labelSize='medium',**kwargs):
     if rowLabels is None:
         rowLabels = df.index
 
-    clf()
-    axh = subplot(111)
+    plt.clf()
+    axh = plt.subplot(111)
     nrows,ncols = df.shape
-    pcolor(df.values,**kwargs)
+    plt.pcolor(df.values,**kwargs)
     
     axh.xaxis.tick_top()
-    xticks(arange(ncols)+0.5)
-    yticks(arange(nrows)+0.5)
+    plt.xticks(np.arange(ncols)+0.5)
+    plt.yticks(np.arange(nrows)+0.5)
     xlabelsL = axh.set_xticklabels(colLabels,size=labelSize,rotation=90,fontname='Consolas')
     ylabelsL = axh.set_yticklabels(rowLabels,size=labelSize,fontname='Consolas')
-    ylim((nrows,0))
-    xlim((0,ncols))
-    colorbar(fraction = 0.05)
+    plt.ylim((nrows,0))
+    plt.xlim((0,ncols))
+    plt.colorbar(fraction = 0.05)
     
 
 def removeNARC(inDf,minRow=1, minCol=1, minFrac=None):
@@ -556,8 +572,8 @@ def removeNARC(inDf,minRow=1, minCol=1, minFrac=None):
     df = inDf.copy()
 
     if not minFrac is None:
-        minRow = round(df.shape[1] * minFrac)
-        minCol = round(df.shape[0] * minFrac)
+        minRow = np.round(df.shape[1] * minFrac)
+        minCol = np.round(df.shape[0] * minFrac)
 
     nRows = df.shape[0] + 1
     nCols = df.shape[1] + 1
@@ -569,3 +585,41 @@ def removeNARC(inDf,minRow=1, minCol=1, minFrac=None):
         df = df.loc[_validRows(df,minRow)]
 
     return df
+
+def permcorr(a,b,corrFunc, nperms = 10000):
+    """Use shuffled permutations of a and b (np.ndarrays or pd.Series)
+    to estimate the correlation p-value and rho with CIs (TODO)
+
+    Parameters
+    ----------
+    a,b : np.ndarray or pd.Series
+    corrFunc : function
+        Parameters are a and b with return value rho, p-value
+
+    Returns
+    -------
+    rho : float
+    p : float"""
+
+    if isinstance(a,pd.Series):
+        a = a.values
+    if isinstance(b,pd.Series):
+        b = b.values
+
+    rhoShuff = np.zeros(nperms)
+    pShuff = np.zeros(nperms)
+
+    rho,pvalue = corrFunc(a,b)
+
+    L = a.shape[0]
+    for permi in np.arange(nperms):
+        rind = np.floor(np.random.rand(L) * L).astype(int)
+        rhoShuff[permi],pShuff[permi] = corrFunc(a,b[rind])
+
+    if rho >= 0:
+        p = ((rhoShuff >= rho).sum() + 1)/(nperms + 1)
+    else:
+        p = ((rhoShuff <= rho).sum() + 1)/(nperms + 1)
+    return rho, p
+
+

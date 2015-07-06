@@ -107,9 +107,9 @@ def plotGapStat(lsICD, mBSICD, errBSICD, gap):
     
 def _intra_cluster_distances(dmat, labels):
     """Sum of the intra-cluster distances (Wk)"""
-    K = len(unique(labels))
+    K = len(np.unique(labels))
     tot = 0
-    for k in unique(labels):
+    for k in np.unique(labels):
         ind = labels == k
         nk = ind.sum()
         tot += (dmat[ind,:][:,ind].flatten()**2).sum() / (2 * nk)

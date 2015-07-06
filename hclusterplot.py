@@ -182,6 +182,10 @@ def plotHColCluster(df,method='complete', metric='euclidean', col_labels=None,ti
         if not noColorBar:
             scale_cbAX = fig.add_subplot(GridSpec(1,1,left=0.87,bottom=0.05,right=0.93,top=0.85)[0,0])
     
+    if df is None:
+        """If df is None then data will come from a DataFrame dmat. Create dummy df for labels though"""
+        df = pd.DataFrame(data = np.zeros((5, col_dmat.shape[0])), columns = col_dmat.columns)
+
     col_dmat, col_clusters, col_den = computeHCluster(df, method, metric, col_dmat, minN = minN)
 
     if metric in ['spearman','pearson','spearman-signed','pearson-signed']:
@@ -196,6 +200,9 @@ def plotHColCluster(df,method='complete', metric='euclidean', col_labels=None,ti
         colorbarLabel = ''
         col_plot = col_dmat
 
+    if isinstance(col_plot, pd.DataFrame):
+        col_plot = col_plot.values
+
     if col_labels is None and not K is None:
         col_labels = pd.Series(sch.fcluster(col_clusters, K, criterion = 'maxclust'), index = df.columns)
 
@@ -203,8 +210,8 @@ def plotHColCluster(df,method='complete', metric='euclidean', col_labels=None,ti
         if metric in ['spearman','pearson','spearman-signed','pearson-signed']:
             vmin,vmax = (-1,1)
         else:
-            vmin = col_plot.flatten().min()
-            vmax = col_plot.flatten().max()
+            vmin = col_plot.min()
+            vmax = col_plot.max()
     else:
         vmin,vmax = vRange
 
@@ -254,7 +261,7 @@ def plotHColCluster(df,method='complete', metric='euclidean', col_labels=None,ti
 
     if interactive:
         scatterFig = plt.figure(fig.number + 100)
-        ps = PairScatter(df.iloc[:,colInd], heatmapAX, scatterFig.add_subplot(111))
+        ps = PairScatter(df.iloc[:,colInd], heatmapAX, scatterFig.add_subplot(111), method = metric)
         return colInd, ps
 
     return colInd
@@ -406,10 +413,11 @@ def normalizeAxis(df,axis=0,useMedian=False):
 class PairScatter:
     """Instantiate this class to interactively pair
     a heatmap and a pairwise scatterfit plot in a new figure window."""
-    def __init__(self, df, heatmapAx, scatterAx):
+    def __init__(self, df, heatmapAx, scatterAx, method):
         self.scatterAx = scatterAx
         self.heatmapAx = heatmapAx
         self.df = df
+        self.method = method
         self.cid = heatmapAx.figure.canvas.mpl_connect('button_press_event', self)
     def __call__(self, event):
         if event.inaxes != self.heatmapAx:
@@ -419,5 +427,5 @@ class PairScatter:
             yind = int(np.floor(event.ydata + 0.5))
             plt.sca(self.scatterAx)
             plt.cla()
-            scatterfit(self.df.iloc[:,xind], self.df.iloc[:,yind], method='spearman')
+            scatterfit(self.df.iloc[:,xind], self.df.iloc[:,yind], method = self.method)
             self.scatterAx.figure.show()
