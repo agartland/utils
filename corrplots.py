@@ -1,8 +1,8 @@
 """TODO: remove these imports from *"""
 #from numpy import *
-#import matplotlib
 #from pylab import *
 
+import matplotlib
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
@@ -22,7 +22,7 @@ __all__ = ['partialcorr',
            'corrheatmap',
            'validPairwiseCounts',
            'removeNARC',
-           'permcorrp']
+           'permcorr']
 
 """Red --> Green colormap with 1024 interpolated values"""
 _cdict = {'green' : ((0, 1, 1), (0.5, 0, 0), (1, 0, 0)),

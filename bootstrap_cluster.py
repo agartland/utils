@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import itertools
 #import matplotlib.pyplot as plt
 
 __all__ = ['bootstrapClustering']
