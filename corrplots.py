@@ -102,7 +102,7 @@ def partialcorr(x, y, adjust=[], method='pearson'):
 
         #SAS and pearsonr look the statistic up in a t distribution while R uses the normnal
 
-        pvalue = 2*stats.t.cdf(-abs(statistic),n-2-gn)
+        pvalue = 2*stats.t.cdf(-np.abs(statistic),n-2-gn)
     except:
         """These were used to check that non-partial rho's and pvalues match those of their scipy equivalents
         They do! Use them if the other fails and warn the caller"""
@@ -110,7 +110,7 @@ def partialcorr(x, y, adjust=[], method='pearson'):
             pc,pvalue = stats.pearsonr(x,y)    
         else:
             pc,pvalue = stats.spearmanr(x,y)
-        warnings.warn("Error computing %s and %s correlation: using scipy equivalent to return UNADJUSTED results'   % (x.name,y.name)")
+        warnings.warn('Error computing %s and %s correlation: using scipy equivalent to return UNADJUSTED results'   % (x.name,y.name))
     
     """Below verifies that the p-value for the coefficient in the multivariate model including adjust
     is the same as the p-value of the partial correlation"""
@@ -213,7 +213,7 @@ def combocorrplot(data,method='spearman',axLimits='variable',axTicks=False,axTic
             elif r < c:
                 axh[r,c] = fh.add_subplot(gs[r,c],yticklabels=[],xticklabels=[],xticks=[],yticks=[])
                 val = coef[labels[r]][labels[c]]
-                plth[r,c] = pcolor(ones((2,2))*val,cmap=_heatCmap,vmin=-1.,vmax=1.)
+                plth[r,c] = plt.pcolor(np.ones((2,2))*val, cmap=_heatCmap, vmin=-1., vmax=1.)
                 plt.axis([0,1,0,1])
                 if valueFlag:
                     if val<0.5 and val>-0.5:

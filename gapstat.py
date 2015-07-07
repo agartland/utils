@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 
 __all__ = ['computeGapStat',
             'plotGapStat']
@@ -66,7 +67,7 @@ def computeGapStat(data, pdistFunc, clusterFunc, maxK, bootstraps = 10):
         stdBSICD[K-1] = reps.std()
 
     gap = mBSICD - lsICD
-    errBSICD = sqrt(1 + 1./bootstraps) * stdBSICD
+    errBSICD = np.sqrt(1 + 1./bootstraps) * stdBSICD
 
     return lsICD, mBSICD, errBSICD, gap
 
