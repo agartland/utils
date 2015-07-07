@@ -91,7 +91,7 @@ def partialcorr(x, y, adjust=[], method='pearson'):
     where p is the inverse covariance matrix'''
     
     try:
-        icv = np.inv(np.cov(m,rowvar=0))
+        icv = np.linalg.inv(np.cov(m,rowvar=0))
         pc = -icv[0,1] / np.sqrt(icv[0,0] * icv[1,1])
 
         n = m.shape[0]
@@ -107,10 +107,11 @@ def partialcorr(x, y, adjust=[], method='pearson'):
         """These were used to check that non-partial rho's and pvalues match those of their scipy equivalents
         They do! Use them if the other fails and warn the caller"""
         if method == 'pearson':
-            pc,pvalue = stats.pearsonr(x,y)    
+            pc,pvalue = stats.pearsonr(tmpDf[x.name].values,tmpDf[y.name].values)
         else:
-            pc,pvalue = stats.spearmanr(x,y)
+            pc,pvalue = stats.spearmanr(tmpDf[x.name].values,tmpDf[y.name].values)
         warnings.warn('Error computing %s and %s correlation: using scipy equivalent to return UNADJUSTED results'   % (x.name,y.name))
+        raise
     
     """Below verifies that the p-value for the coefficient in the multivariate model including adjust
     is the same as the p-value of the partial correlation"""
