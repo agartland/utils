@@ -2,7 +2,7 @@ from __future__ import division
 import numpy as np
 from matplotlib.pyplot import plot, xticks,is_numlike,bar
 from numpy.random import permutation,randint
-from scipy import stats
+from scipy import stats, special
 
 __all__ = ['objhist',
            'countdict']
@@ -88,6 +88,18 @@ class countdict(dict):
         q = np.array([reference.freq()[k] for k in keys])
         divergence = -p*log_func(p/q)
         return {k:v for k,v in zip(keys,divergence)}
+        
+    def jensen_shannon(b):
+        """Compute Jensen-Shannon divergence between self and b (also an objhist).
+        If keys from self are missing in b assume 0 counts."""
+
+        keys = np.unique(self.keys() + b.keys())
+
+        avec = np.array([self[k] if k in self else 0 for k in keys])
+        bvec = np.array([b[k] if k in self else 0 for k in keys])
+
+        return _jensen_shannon_divergence(avec, bvec)
+
     def uniqueness(self):
         return len(self)/self.sum()
     def sortedKeys(self,reverse=False):
@@ -194,3 +206,32 @@ class countdict(dict):
             out.extend([k for i in arange(self[k])])
         return out
 
+
+def _jensen_shannon_divergence(a, b):
+    """Compute Jensen-Shannon Divergence
+
+    Lifted from github/scipy:
+    https://github.com/luispedro/scipy/blob/ae9ad67bfc2a89aeda8b28ebc2051fff19f1ba4a/scipy/stats/stats.py
+
+    Parameters
+    ----------
+    a : array-like
+        possibly unnormalized distribution
+    b : array-like
+        possibly unnormalized distribution. Must be of same size as ``a``.
+    Returns
+    -------
+    j : float
+    See Also
+    --------
+    jsd_matrix : function
+        Computes all pair-wise distances for a set of measurements
+    """
+    a = np.asanyarray(a, dtype=float)
+    b = np.asanyarray(b, dtype=float)
+    a = a/a.sum()
+    b = b/b.sum()
+    m = (a + b)
+    m /= 2.
+    m = np.where(m,m,1.)
+    return 0.5*np.sum(special.xlogy(a,a/m)+special.xlogy(b,b/m))
