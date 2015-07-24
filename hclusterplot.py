@@ -35,20 +35,36 @@ def mapColors2Labels(labels, setStr = 'Set3', cmap = None):
     cmapLookup = {k:col for k,col in zip(sorted(np.unique(labels)),itertools.cycle(cmap))}
     return labels.map(cmapLookup.get)
 
-def computeDMat(df, metric, minN = 1):
-    if metric in ['spearman', 'pearson']:
-        """Anti-correlations are also considered as high similarity and will cluster together"""
-        """dmat = 1 - df.corr(method = metric, min_periods = minN).values
-        dmat[np.isnan(dmat)] = 1
-        """
-        dmat = 1 - df.corr(method = metric, min_periods = minN).values**2
-        dmat[np.isnan(dmat)] = 1
-    elif metric in ['spearman-signed', 'pearson-signed']:
-        """Anti-correlations are considered as dissimilar and will NOT cluster together"""
-        dmat = (1 - df.corr(method = metric.replace('-signed',''), min_periods = minN).values) / 2
-        dmat[np.isnan(dmat)] = 1
+def computeDMat(df, metric, minN = 1, dfunc = None):
+    if dfunc is None:
+        if metric in ['spearman', 'pearson']:
+            """Anti-correlations are also considered as high similarity and will cluster together"""
+            """dmat = 1 - df.corr(method = metric, min_periods = minN).values
+            dmat[np.isnan(dmat)] = 1
+            """
+            dmat = 1 - df.corr(method = metric, min_periods = minN).values**2
+            dmat[np.isnan(dmat)] = 1
+        elif metric in ['spearman-signed', 'pearson-signed']:
+            """Anti-correlations are considered as dissimilar and will NOT cluster together"""
+            dmat = (1 - df.corr(method = metric.replace('-signed',''), min_periods = minN).values) / 2
+            dmat[np.isnan(dmat)] = 1
+        else:
+            dmat = distance.squareform(distance.pdist(df, metric = metric))
     else:
-        dmat = distance.squareform(distance.pdist(df, metric = metric))
+        ncols = df.shape[1]
+        dmat = np.zeros((ncols,ncols))
+        for i in range(ncols):
+            for j in range(ncols):
+                """Assume its symetrical"""
+                if i<=j:
+                    tmpdf = df.iloc[:,[i,j]]
+                    tmpdf = tmpdf.dropna()
+                    if tmpdf.shape[0] >= minN:
+                        d = dfunc(df.iloc[:,i],df.iloc[:,j])
+                    else:
+                        d = np.nan
+                    dmat[i,j] = d
+                    dmat[j,i] = d
     return dmat
 
 def computeHCluster(df, method = 'complete', metric = 'euclidean', dmat = None, minN = 1):
