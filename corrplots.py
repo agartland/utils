@@ -60,6 +60,9 @@ def partialcorr(x, y, adjust=[], method='pearson'):
         y = pd.Series(y, name = 'Y')
 
     assert x.shape[0] == y.shape[0]
+    if x.name == y.name:
+        x.name += '_X'
+        y.name += '_Y'
 
     """Make one big DataFrame out of x, y and adjustment variables"""
     tmpDf = pd.concat((x,y), join='inner', axis=1)
