@@ -84,6 +84,8 @@ def partialcorr(x, y, adjust=[], method='pearson'):
         m[:,1] = tmpDf[y.name]
         for i,a in enumerate(adjust):
             m[:,i+2] = tmpDf[a.name]
+    
+    """TODO: I need a constant term for proper adjustment."""
 
     if all(m[:,0] == m[:,1]):
         """Testing for perfect correlation avoids SingularMatrix exception"""
@@ -269,7 +271,7 @@ def corrheatmap(df,rowVars,colVars,adjust=[],annotation='pvalue',cutoff='pvalue'
         Matrix of correlation coefficients."""
     
     pvalue = np.zeros((len(rowVars),len(colVars)))
-    qvalue = np.nan*zeros((len(rowVars),len(colVars)))
+    qvalue = np.nan * np.zeros((len(rowVars),len(colVars)))
     rho = np.zeros((len(rowVars),len(colVars)))
 
     """Store p-values in dict with keys that are unique pairs (so we only adjust across these)"""
