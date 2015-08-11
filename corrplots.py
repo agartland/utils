@@ -60,6 +60,9 @@ def partialcorr(x, y, adjust=[], method='pearson'):
         y = pd.Series(y, name = 'Y')
 
     assert x.shape[0] == y.shape[0]
+    if x.name == y.name:
+        x.name += '_X'
+        y.name += '_Y'
 
     """Make one big DataFrame out of x, y and adjustment variables"""
     tmpDf = pd.concat((x,y), join='inner', axis=1)
@@ -81,6 +84,8 @@ def partialcorr(x, y, adjust=[], method='pearson'):
         m[:,1] = tmpDf[y.name]
         for i,a in enumerate(adjust):
             m[:,i+2] = tmpDf[a.name]
+    
+    """TODO: I need a constant term for proper adjustment."""
 
     if all(m[:,0] == m[:,1]):
         """Testing for perfect correlation avoids SingularMatrix exception"""
@@ -110,8 +115,11 @@ def partialcorr(x, y, adjust=[], method='pearson'):
             pc,pvalue = stats.pearsonr(tmpDf[x.name].values,tmpDf[y.name].values)
         else:
             pc,pvalue = stats.spearmanr(tmpDf[x.name].values,tmpDf[y.name].values)
-        warnings.warn('Error computing %s and %s correlation: using scipy equivalent to return UNADJUSTED results'   % (x.name,y.name))
-        raise
+        if len(adjust) > 0:
+            warnings.warn('Error computing %s and %s correlation: using scipy equivalent to return UNADJUSTED results'   % (x.name,y.name))
+        else:
+            warnings.warn('Error computing %s and %s correlation: using scipy equivalent'   % (x.name,y.name))
+        #raise
     
     """Below verifies that the p-value for the coefficient in the multivariate model including adjust
     is the same as the p-value of the partial correlation"""
@@ -227,7 +235,7 @@ def combocorrplot(data,method='spearman',axLimits='variable',axTicks=False,axTic
     method = method[0].upper() + method[1:]
     plt.annotate('%s correlation' % (method),[0.98,0.5],xycoords='figure fraction',ha='right',va='center',rotation='vertical')
 
-def corrheatmap(df,rowVars,colVars,adjust=[],annotation='pvalue',cutoff='pvalue',cutoffValue=0.05,method='spearman',labelLookup={},xtickRotate=False,labelSize='medium',minN=None):
+def corrheatmap(df,rowVars,colVars,adjust=[],annotation='pvalue',cutoff='pvalue',cutoffValue=0.05,method='spearman',labelLookup={},xtickRotate=False,labelSize='medium',minN=None,adjMethod='fdr_bh'):
     """Compute pairwise correlations and plot as a heatmap.
 
     Parameters
@@ -261,12 +269,12 @@ def corrheatmap(df,rowVars,colVars,adjust=[],annotation='pvalue',cutoff='pvalue'
     pvalue : ndarray [samples, variables]
         Matrix of pvalues for pairwise correlations.
     qvalue : ndarray [samples, variables]
-        Matrix of FDR-adjusted q-values for pairwise correlations.
+        Matrix of multiplicity adjusted q-values for pairwise correlations.
     rho : ndarray [samples, variables]
         Matrix of correlation coefficients."""
     
     pvalue = np.zeros((len(rowVars),len(colVars)))
-    qvalue = np.nan*zeros((len(rowVars),len(colVars)))
+    qvalue = np.nan * np.zeros((len(rowVars),len(colVars)))
     rho = np.zeros((len(rowVars),len(colVars)))
 
     """Store p-values in dict with keys that are unique pairs (so we only adjust across these)"""
@@ -291,7 +299,7 @@ def corrheatmap(df,rowVars,colVars,adjust=[],annotation='pvalue',cutoff='pvalue'
             
     """Now only adjust using pvalues in the unique pair dict"""
     keys = pairedPvalues.keys()
-    qvalueTmp = _fdrAdjust(array([pairedPvalues[k] for k in keys]))
+    qvalueTmp = _pvalueAdjust(array([pairedPvalues[k] for k in keys]), method = adjMethod)
     """Build a unique qvalue dict from teh same unique keys"""
     pairedQvalues = {k:q for k,q in zip(keys,qvalueTmp)}
     
@@ -465,8 +473,8 @@ def scatterfit(x,y,method='pearson',adjustVars=[],labelLookup={},plotLine=True,a
     if returnModel:
         return model
 
-def _fdrAdjust(pvalues):
-    """Convenient function for doing FDR adjustment
+def _pvalueAdjust(pvalues, method = 'fdr_bh'):
+    """Convenient function for doing p-value adjustment
     Accepts any matrix shape and adjusts across the entire matrix
     Ignores nans appropriately
 
@@ -480,7 +488,7 @@ def _fdrAdjust(pvalues):
     p = np.array(pvalues).flatten()
     qvalues = deepcopy(p)
     nanInd = np.isnan(p)
-    dummy,q,dummy,dummy = sm.stats.multipletests(p[~nanInd],alpha=0.2,method='fdr_bh')
+    dummy,q,dummy,dummy = sm.stats.multipletests(p[~nanInd], alpha=0.2, method=method)
     qvalues[~nanInd] = q
     qvalues = qvalues.reshape(pvalues.shape)
 

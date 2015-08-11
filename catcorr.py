@@ -26,7 +26,8 @@ def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=0.2, sRange=(50,i
     """Make a network plot showing the correlations among the
     categorical variables in the columns of df.
 
-    Each node is a unique value in one of the columns (Node is specified as a tuple (column, value))
+    Each node is a unique value in one of the columns
+    (Node is specified as a tuple (column, value))
     Node size is proportional to the value's frequency.
 
     Each edge is a unique pair of values in two columns.
@@ -35,13 +36,17 @@ def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=0.2, sRange=(50,i
     Parameters
     ----------
     df : pandas.DataFrame
-        Nodes will be created for each unique value within each column of this object
+        Nodes will be created for each unique value within
+        each column of this object
     layout : str
-        Choose one of ['twopi', 'fdp','circo', 'neato', 'dot']
-        to change the layout of the nodes. See Graphviz for details about each layout.
+        Choose one of [twopi, fdp, circo, neato, dot]
+        to change the layout of the nodes.
+        See Graphviz for details about each layout.
     mode : str
-        Specifies whether the resulting plot will be a matplotlib figure (default: 'mpl')
-        or if any other value it specifies the filename of a figure to be posted to plot.ly
+        Specifies whether the resulting plot will be a
+        matplotlib figure (default: 'mpl')
+        OR if any other value it specifies the filename
+        of a figure to be posted to plot.ly
         (user needs to be logged in previously).
     titleStr : str
         Printed at the top of the plot.
