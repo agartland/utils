@@ -427,5 +427,5 @@ class PairScatter:
             yind = int(np.floor(event.ydata + 0.5))
             plt.sca(self.scatterAx)
             plt.cla()
-            scatterfit(self.df.iloc[:,xind], self.df.iloc[:,yind], method = self.method)
+            scatterfit(self.df.iloc[:,xind], self.df.iloc[:,yind], method = self.method, plotLine = True)
             self.scatterAx.figure.show()
