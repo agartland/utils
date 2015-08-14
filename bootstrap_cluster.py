@@ -3,15 +3,14 @@ import pandas as pd
 import itertools
 #import matplotlib.pyplot as plt
 
-__all__ = ['bootstrapClustering']
+__all__ = ['bootstrapFeatures', 'bootstrapObservations']
 
-def bootstrapClustering(dmat, clusterFunc, bootstraps = 100):
-    """Determine the reliability of clusters using the bootstrap.
+def bootstrapFeatures(dmat, clusterFunc, bootstraps = 100):
+    """Determine the reliability of clusters using a bootstrap.
 
     This algorithm is from this article as it was applied to gene chips:
     "Bagging to improve the accuracy of a clustering procedure"
     http://bioinformatics.oxfordjournals.org/content/19/9/1090.full.pdf+html
-
 
     Parameters
     ----------
@@ -68,6 +67,73 @@ def bootstrapClustering(dmat, clusterFunc, bootstraps = 100):
     for j,k in itertools.product(range(N),range(N)):
         if j<k:
             pwrel[j,k] = pwrel[j,k] / tot[j,k]
+            pwrel[k,j] = pwrel[j,k]
+        elif j == k:
+            pwrel[j,k] = 1
+    pwrel = 1 - pwrel
+
+    if isinstance(dmat, pd.DataFrame):
+        pwrel = pd.DataFrame(pwrel, index = dmat.index, columns = dmat.columns)
+    clusters = clusterFunc(pwrel)
+    return pwrel, clusters
+
+
+def bootstrapObservations(df, dmatFunc, clusterFunc, bootstraps = 100):
+    """Determine the reliability of clusters using a bootstrap.
+
+    This algorithm bootstraps the observations and repeats the clustering.
+
+    Parameters
+    ----------
+    df : np.array or pd.DataFrame
+        Features on the columns and observations on the rows.
+    dmatFunc : function
+        Function that takes the df and produces a square distance matrix.
+    clusterFunc : function
+        Function that takes the distance matrix and returns cluster labels.
+        Use partial to prespecify method arguments if neccessary.
+    bootstraps : int
+        Number of bootstrap samples to use.
+
+    Returns
+    -------
+    pwrel : np.array or pd.DataFrame
+        Distance matrix based on the fraction of times each variable clusters together.
+        (actually 1 - fraction)
+    clusters : np.ndarray
+        Array of labels after applying the clustering function
+        to the reliability distance matrix pwrel"""
+    dmat = dmatFunc(df)
+
+    Nobs = df.shape[0]
+    N = df.shape[1]
+
+    assert N == dmat.shape[0]
+    assert N == dmat.shape[1]
+
+    pwrel = np.zeros((N,N))
+    """Keep track of the number of times that two variables are sampled together"""
+    tot = np.zeros((N,N))
+  
+    for i in range(bootstraps):
+        """Resample observations (rows) with replacement"""
+        rind = np.floor(np.random.rand(Nobs) * Nobs).astype(int)
+        if isinstance(df, pd.DataFrame):
+            rdmat = dmatFunc(df.iloc[rind,:])
+        else:
+            rdmat = dmatFunc(df[rind,:])
+
+        labels = clusterFunc(rdmat)
+
+        for j,k in itertools.product(range(N),range(N)):
+            """Go through all pairs of variables (lower half of the pwdist matrix)"""
+            if j<k:
+                if labels[j] == labels[k]:
+                    pwrel[j,k] += 1.
+
+    for j,k in itertools.product(range(N),range(N)):
+        if j<k:
+            pwrel[j,k] = pwrel[j,k] / bootstraps
             pwrel[k,j] = pwrel[j,k]
         elif j == k:
             pwrel[j,k] = 1
