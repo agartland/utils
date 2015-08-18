@@ -27,7 +27,7 @@ def bootstrapFeatures(dmat, clusterFunc, bootstraps = 100):
     pwrel : np.array or pd.DataFrame
         Distance matrix based on the fraction of times each variable clusters together.
         (actually 1 - fraction)
-    clusters : np.ndarray
+    clusters : np.ndarray or pd.Series
         Array of labels after applying the clustering function
         to the reliability distance matrix pwrel
     """
@@ -75,6 +75,8 @@ def bootstrapFeatures(dmat, clusterFunc, bootstraps = 100):
     if isinstance(dmat, pd.DataFrame):
         pwrel = pd.DataFrame(pwrel, index = dmat.index, columns = dmat.columns)
     clusters = clusterFunc(pwrel)
+    if isinstance(dmat, pd.DataFrame):
+        clusters = pd.Series(clusters, index = dmat.index)
     return pwrel, clusters
 
 
@@ -100,7 +102,7 @@ def bootstrapObservations(df, dmatFunc, clusterFunc, bootstraps = 100):
     pwrel : np.array or pd.DataFrame
         Distance matrix based on the fraction of times each variable clusters together.
         (actually 1 - fraction)
-    clusters : np.ndarray
+    clusters : np.ndarray or pd.Series
         Array of labels after applying the clustering function
         to the reliability distance matrix pwrel"""
     dmat = dmatFunc(df)
@@ -142,4 +144,6 @@ def bootstrapObservations(df, dmatFunc, clusterFunc, bootstraps = 100):
     if isinstance(dmat, pd.DataFrame):
         pwrel = pd.DataFrame(pwrel, index = dmat.index, columns = dmat.columns)
     clusters = clusterFunc(pwrel)
+    if isinstance(dmat, pd.DataFrame):
+        clusters = pd.Series(clusters, index = dmat.index)
     return pwrel, clusters
