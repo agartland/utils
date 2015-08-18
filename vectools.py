@@ -9,14 +9,21 @@ __all__ = ['unique_rows',
 def unique_rows(a, return_index = False, return_inverse = False, return_counts = False):
     """Performs np.unique on whole rows of matrix a using a "view".
     See http://stackoverflow.com/a/16971324/74616"""
-    dummy,uniqi,inv_uniqi,counts = np.unique(a.view(a.dtype.descr * a.shape[1]), return_index = True, return_inverse = True, return_counts = True)
-    out = [a[uniqi,:]]
-    if return_index:
-        out.append(uniqi)
-    if return_inverse:
-        out.append(inv_uniqi)
-    if return_counts:
-        out.append(counts)
+    try:
+        dummy,uniqi,inv_uniqi,counts = np.unique(a.view(a.dtype.descr * a.shape[1]), return_index = True, return_inverse = True, return_counts = True)
+        out = [a[uniqi,:]]
+        if return_index:
+            out.append(uniqi)
+        if return_inverse:
+            out.append(inv_uniqi)
+        if return_counts:
+            out.append(counts)
+    except ValueError:
+        """This doesn't work with all types of data, so fall back on slow-simple algo"""
+        s = set()
+        for i in range(a.shape[0]):
+            s.add(tuple(a[i,:].tolist()))
+        out = [np.array([row for row in s])]
     return tuple(out)
 
 def argrank(vec):
