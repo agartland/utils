@@ -49,7 +49,7 @@ def computeDMat(df, metric = None, minN = 1, dfunc = None):
             dmat = (1 - df.corr(method = metric.replace('-signed',''), min_periods = minN).values) / 2
             dmat[np.isnan(dmat)] = 1
         else:
-            dmat = distance.squareform(distance.pdist(df, metric = metric))
+            dmat = distance.squareform(distance.pdist(df.T, metric = metric))
     else:
         ncols = df.shape[1]
         dmat = np.zeros((ncols,ncols))
@@ -65,6 +65,8 @@ def computeDMat(df, metric = None, minN = 1, dfunc = None):
                         d = np.nan
                     dmat[i,j] = d
                     dmat[j,i] = d
+    assert dmat.shape[0] == dmat.shape[1]
+    assert dmat.shape[0] == df.shape[1]
     return dmat
 
 def computeHCluster(df, method = 'complete', metric = 'euclidean', dmat = None, minN = 1):
