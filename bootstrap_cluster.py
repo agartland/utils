@@ -5,7 +5,7 @@ import itertools
 
 __all__ = ['bootstrapFeatures', 'bootstrapObservations']
 
-def bootstrapFeatures(dmat, clusterFunc, bootstraps = 100):
+def bootstrapFeatures(dmat, clusterFunc, bootstraps = 100, rseed = 110820):
     """Determine the reliability of clusters using a bootstrap.
 
     This algorithm is from this article as it was applied to gene chips:
@@ -21,6 +21,8 @@ def bootstrapFeatures(dmat, clusterFunc, bootstraps = 100):
         Use partial to prespecify method arguments if neccessary.
     bootstraps : int
         Number of bootstrap samples to use.
+    rseed : int
+        Sets the random state of numpy for reproducible clustering results.
 
     Returns
     -------
@@ -31,6 +33,8 @@ def bootstrapFeatures(dmat, clusterFunc, bootstraps = 100):
         Array of labels after applying the clustering function
         to the reliability distance matrix pwrel
     """
+    np.random.seed(rseed)
+
     assert dmat.shape[0] == dmat.shape[1]
 
     N = dmat.shape[0]
@@ -80,7 +84,7 @@ def bootstrapFeatures(dmat, clusterFunc, bootstraps = 100):
     return pwrel, clusters
 
 
-def bootstrapObservations(df, dmatFunc, clusterFunc, bootstraps = 100):
+def bootstrapObservations(df, dmatFunc, clusterFunc, bootstraps = 100, rseed = 110820):
     """Determine the reliability of clusters using a bootstrap.
 
     This algorithm bootstraps the observations and repeats the clustering.
@@ -96,6 +100,8 @@ def bootstrapObservations(df, dmatFunc, clusterFunc, bootstraps = 100):
         Use partial to prespecify method arguments if neccessary.
     bootstraps : int
         Number of bootstrap samples to use.
+    rseed : int
+        Sets the random state of numpy for reproducible clustering results.
 
     Returns
     -------
@@ -105,6 +111,8 @@ def bootstrapObservations(df, dmatFunc, clusterFunc, bootstraps = 100):
     clusters : np.ndarray or pd.Series
         Array of labels after applying the clustering function
         to the reliability distance matrix pwrel"""
+    np.random.seed(rseed)
+
     dmat = dmatFunc(df)
 
     Nobs = df.shape[0]
