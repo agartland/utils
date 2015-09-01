@@ -1,13 +1,13 @@
 from numpy import *
 from numpy.random import permutation,randint
-from utilHelpers import unique_rows
+from vectools import unique_rows
 
 __all__ = ['kmedoids',
            'precomputeWeightedSqDmat',
            'reassignClusters',
            'computeInertia']
 
-def kmedoids(dmat, k=3, weights = None, nPasses = 1, maxIter=1000,initInds=None,potentialMedoidInds=None):
+def kmedoids(dmat, k = 3, weights = None, nPasses = 1, maxIter = 1000, initInds = None, potentialMedoidInds = None):
     """Identify the k points that minimize all intra-cluster distances.
 
     The algorithm completes nPasses of the algorithm with random restarts.
@@ -127,7 +127,7 @@ def kmedoids(dmat, k=3, weights = None, nPasses = 1, maxIter=1000,initInds=None,
     """Return the results from the best pass"""
     return bestMedoids, bestLabels, bestInertia, bestNIter, nfound
 
-def precomputeWeightedSqDmat(dmat,weights):
+def precomputeWeightedSqDmat(dmat, weights):
     """Compute the weighted and squared distance matrix for kmedoids.
     
     Adding weight to a point increases its impact on inertia linearly,
@@ -165,7 +165,7 @@ def precomputeWeightedSqDmat(dmat,weights):
     wdmat2 = (dmat**2) * tiledWeights
     return wdmat2
 
-def reassignClusters(dmat,currMedoids,oldLabels=None):
+def reassignClusters(dmat, currMedoids, oldLabels = None):
     """Assigns/reassigns points to clusters based on the minimum (unweighted) distance.
     
     Note: if oldLabels are specified then only reassigns points that
@@ -208,7 +208,7 @@ def reassignClusters(dmat,currMedoids,oldLabels=None):
     #print unique(labels).shape[0],sorted(unique(labels)),sorted(currMedoids)
     return labels
 
-def computeInertia(wdmat2,labels,currMedoids):
+def computeInertia(wdmat2, labels, currMedoids):
     """Computes inertia for a set of clustered points using
     a precomputed weighted and squared distance matrix.
     
