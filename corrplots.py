@@ -30,13 +30,18 @@ _cdict = {'green' : ((0, 1, 1), (0.5, 0, 0), (1, 0, 0)),
           'blue' :  ((0, 0, 0), (1, 0, 0))}
 _heatCmap = matplotlib.colors.LinearSegmentedColormap('my_colormap', _cdict, 1024)
 
-def partialcorr(x, y, adjust=[], method='pearson'):
+def partialcorr(x, y, adjust=[], method='pearson', minN = None):
     """Finds partial correlation of x with y adjusting for variables in adjust
 
     This function is index aware (i.e. uses index of x, y and adjust for joining).
     Rho and p-value match those from stats.spearmanr, and stats.pearsonr when adjust = [].
 
-    TODO: compute CIs
+    TODO:
+        (1) Compute CIs
+        (2) Make into its own testable module
+        (3) Include partial_corr gist
+        (4) Include function to compute whole partial correlation matrix
+        (5) Add second method which takes correlation of residuals (should be equivalent, but is nice test)
 
     Parameters
     ----------
@@ -46,6 +51,8 @@ def partialcorr(x, y, adjust=[], method='pearson'):
         Correlation is assessed between x and y adjusting for all variables in z (default: [])
     method : string
         Method can be 'pearson' (default) or 'spearman', which uses rank-based correlation and adjustment.
+    minN : int
+        Minimum number of non-nan paired observations. If N < minN then returns pc = nan and p = 1
     
     Returns
     -------
@@ -70,6 +77,9 @@ def partialcorr(x, y, adjust=[], method='pearson'):
         tmpDf = tmpDf.join(a, how='left')
 
     tmpDf = tmpDf.dropna(axis=0, how='any')
+
+    if not minN is None and tmpDf.shape[0] < minN:
+        return np.nan, 1.
     
     m = np.zeros((tmpDf.shape[0], 2+len(adjust)))
     
@@ -85,15 +95,13 @@ def partialcorr(x, y, adjust=[], method='pearson'):
         for i,a in enumerate(adjust):
             m[:,i+2] = tmpDf[a.name]
     
-    """TODO: I need a constant term for proper adjustment."""
-
     if all(m[:,0] == m[:,1]):
         """Testing for perfect correlation avoids SingularMatrix exception"""
         return 1,0.0
     
-    '''Take the inverse of the covariance matrix including all variables
+    """Take the inverse of the covariance matrix including all variables
     pc = -p_ij / sqrt(p_ii * p_ij)
-    where p is the inverse covariance matrix'''
+    where p is the inverse covariance matrix"""
     
     try:
         icv = np.linalg.inv(np.cov(m,rowvar=0))
