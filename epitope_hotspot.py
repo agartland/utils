@@ -110,7 +110,7 @@ def getBAMat(seqs, hlas, ba, k = 9, gapless = False):
 
     nHLAs = len(hlas)
     nSeqs = len(seqs)
-    nSites = int(median(map(len,seqs)))
+    nSites = int(np.median(map(len,seqs)))
     nKmers = nSites - k + 1
 
     try:
@@ -131,7 +131,7 @@ def getBAMat(seqs, hlas, ba, k = 9, gapless = False):
                 mer = gappedMer
             
             if mer is None:
-                baMat[meri,seqi,:] = nan
+                baMat[meri,seqi,:] = np.nan
             else:
                 for hlai,h in enumerate(hlaList):
                     baMat[meri,seqi,hlai] = ba[(h,mer)]
@@ -304,7 +304,7 @@ def computeHLAHotspots(seqs, hlas, ba, hlaMask = None, bindingThreshold = 5, nPe
     nPerms = int(nPerms)
     nHLAs = len(hlas)
     nSeqs = len(seqs)
-    nSites = int(median(map(len,seqs)))
+    nSites = int(np.median(map(len,seqs)))
     nKmers = nSites-k+1
 
     if hlaMask is None:
@@ -465,7 +465,7 @@ def plotAlignmentBindingGrid(hlas, align, ba, topN = 5, k = 9, annotateIC50 = Tr
 
     nHLAs = len(hlas)
     nSeqs = len(align)
-    nSites = int(median(map(len,align)))
+    nSites = int(np.median(map(len,align)))
     nKmers = nSites - k + 1
 
     """[hla,kmer]"""
@@ -501,7 +501,7 @@ def _plotBindingGridCommon(hlas, peptides, baDf, annotateIC50):
 
     for bound in sorted(quantization.keys(), reverse = True):
         qmat[baDf.values < bound] = quantization[bound]
-    qmat[isnan(qmat)] = 0.9
+    qmat[np.isnan(qmat)] = 0.9
 
     """Heatmap of covariation"""
     cdict = {'green'  :  ((0, 0, 0), (1, 0, 0)),
