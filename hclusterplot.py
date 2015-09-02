@@ -26,6 +26,8 @@ def clean_axis(ax):
     ax.get_yaxis().set_ticks([])
     for sp in ax.spines.values():
         sp.set_visible(False)
+    ax.grid(False)
+    ax.set_axis_bgcolor('white')
 
 def mapColors2Labels(labels, setStr = 'Set3', cmap = None):
     """Return pd.Series of colors based on labels"""
@@ -236,7 +238,7 @@ def plotHColCluster(df,method='complete', metric='euclidean', col_labels=None,ti
     my_norm = mpl.colors.Normalize(vmin = vmin, vmax = vmax)
 
     """Column dendrogaram but along the rows"""
-    pylab.axes(col_denAX)
+    plt.sca(col_denAX)
     col_denD = sch.dendrogram(col_clusters,color_threshold=np.inf,orientation='right')
     colInd = col_denD['leaves']
     clean_axis(col_denAX)
@@ -245,6 +247,7 @@ def plotHColCluster(df,method='complete', metric='euclidean', col_labels=None,ti
     if not col_labels is None:
         col_cbSE = mapColors2Labels(col_labels, cmap = labelCmap)
         col_axi = col_cbAX.imshow([[x] for x in col_cbSE.iloc[colInd].values],interpolation='nearest',aspect='auto',origin='lower')
+        
         clean_axis(col_cbAX)
         #row_axi = row_cbAX.imshow([x for x in col_cbSE.iloc[colInd].values],interpolation='nearest',aspect='auto',origin='lower')
         #clean_axis(row_cbAX)

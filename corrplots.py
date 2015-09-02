@@ -157,7 +157,9 @@ def combocorrplot(data,method='spearman',axLimits='variable',axTicks=False,axTic
     valueFlag : bool
         Display correlation coefficient in each square?
     ms : int
-        Scatter plot marker size in points."""
+        Scatter plot marker size in points.
+    plotLine : bool
+        Plot fit-line on the subplots?"""
 
     border = 0.05
     pad = 0.02
@@ -184,12 +186,12 @@ def combocorrplot(data,method='spearman',axLimits='variable',axTicks=False,axTic
 
     plt.clf()
     fh = plt.gcf()
-    gs = GridSpec(n,n, left=border,bottom=border,right=1.-border-cbwidth,top=1.-border,wspace=pad,hspace=pad, axisbg = 'gray')
+    gs = GridSpec(n,n, left=border,bottom=border,right=1.-border-cbwidth,top=1.-border,wspace=pad,hspace=pad)
     #cbgs=GridSpec(1,1,left=1.-cbwidth,bottom=border,right=1.-border,top=1.-border,wspace=pad,hspace=pad)
     for r in range(n):
         for c in range(n):
             if r == c:
-                axh[r,c] = fh.add_subplot(gs[r,c],yticklabels=[],xticklabels=[],xticks=[],yticks=[])
+                axh[r,c] = fh.add_subplot(gs[r,c],yticklabels=[],xticklabels=[],xticks=[],yticks=[], axisbg = 'gray')
                 plt.text(0,0,'%s' % (data.columns[r]),ha='center',va='center')
                 plt.axis([-1,1,-1,1])
             elif r>c:
