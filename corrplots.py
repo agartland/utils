@@ -140,7 +140,7 @@ def partialcorr(x, y, adjust=[], method='pearson', minN = None):
     return pc, pvalue
 
 
-def combocorrplot(data,method='spearman',axLimits='variable',axTicks=False,axTicklabels=False,valueFlag=True,ms=2):
+def combocorrplot(data,method='spearman',axLimits='variable',axTicks=False,axTicklabels=False,valueFlag=True,ms=2, plotLine = False):
     """Shows correlation scatter plots in combination with a heatmap for small sets of variables.
 
     Parameters
@@ -212,7 +212,7 @@ def combocorrplot(data,method='spearman',axLimits='variable',axTicks=False,axTic
                 ploty = data[labels[c]]
                 validInd = (~np.isnan(plotx)) & (~np.isnan(ploty))
                 plotx,ploty = plotx[validInd], ploty[validInd]
-                if method == 'pearson':
+                if method == 'pearson' and plotLine:
                     ar,br = polyfit(plotx,ploty,1)
                     xfit = np.array([min(plotx),max(plotx)])
                     yfit = polyval([ar,br],xfit)
