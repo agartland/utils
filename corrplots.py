@@ -184,7 +184,7 @@ def combocorrplot(data,method='spearman',axLimits='variable',axTicks=False,axTic
 
     plt.clf()
     fh = plt.gcf()
-    gs = GridSpec(n,n, left=border,bottom=border,right=1.-border-cbwidth,top=1.-border,wspace=pad,hspace=pad)
+    gs = GridSpec(n,n, left=border,bottom=border,right=1.-border-cbwidth,top=1.-border,wspace=pad,hspace=pad, axisbg = 'gray')
     #cbgs=GridSpec(1,1,left=1.-cbwidth,bottom=border,right=1.-border,top=1.-border,wspace=pad,hspace=pad)
     for r in range(n):
         for c in range(n):
