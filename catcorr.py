@@ -1,7 +1,7 @@
 from __future__ import division
 import networkx as nx
 import itertools
-import brewer2mpl
+import palettable
 import plotly.plotly as py
 import plotly.graph_objs as pygo
 from pylab import *
@@ -114,7 +114,7 @@ def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=0.2, sRange=(50,i
     nodesize = array([d['freq'] for n,d in g.nodes(data=True)])
 
     nColors = min(max(len(df.columns),3),9)
-    colors = brewer2mpl.get_map('Set1','Qualitative',nColors).mpl_colors
+    colors = palettable.colorbrewer.get_map('Set1','Qualitative',nColors).mpl_colors
     cmap = {c:color for c,color in zip(df.columns, itertools.cycle(colors))}
     nodecolors = [cmap[n[0]] for n in g.nodes()]
     if layout == 'twopi':
