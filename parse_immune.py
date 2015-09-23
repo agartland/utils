@@ -3,9 +3,24 @@ import numpy as np
 
 __all__ = ['parseICS',
            'parseBAMA',
-           'parseNAB']
-def parseICS():
+           'parseNAB',
+           'unstackIR']
+
+def unstackIR(df, uVars):
+    """Return a df with one row per ptid
+    and columns for each combination of uVars"""
     pass
+
+def parseICS(fn, uVars = ['visitno','tcellsub','cytokine','antigen'], subset={}, mag='pctpos_adj'):
+    """Parse a processed ICS file.
+    Returns one row per response, subsetting on subset values."""
+
+    raw = pd.read_csv(fn, dtype = {'ptid':str}, skipinitialspace = True)
+    
+    cols = ['ptid','response','mag'] + uVars
+    raw['mag'] = raw[mag]
+    
+    return raw[cols]
 def parseBAMA():
     pass
 def parseNAB():
