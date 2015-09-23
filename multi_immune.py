@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import palettable
 from sklearn.decomposition import KernelPCA, PCA
+from sklearn.preprocessing import Imputer
 import itertools
 from functools import partial
 
@@ -26,10 +27,14 @@ __all__ = ['corrDmatFunc',
             'plotHierClust',
             'combocorrplot']
 
+def imputeNA(df, strategy='median', axis=0, copy=True):
+    imp = Imputer(strategy=strategy, axis=axis, copy=copy)
+    return pd.DataFrame(imp.fit_transform(df.values), columns=df.columns, index=df.index)
+
 def corrTDmatFunc(df, *args, **kwargs):
     return corrDmatFunc(df.T, *args, **kwargs)
 
-def corrDmatFunc(df, metric = 'pearson-signed', dfunc = None, minN = 30):
+def corrDmatFunc(df, metric = 'pearson-signed', dfunc = None, minN = 10):
     if dfunc is None:
         if metric in ['spearman', 'pearson']:
             """Anti-correlations are also considered as high similarity and will cluster together"""
@@ -175,21 +180,35 @@ def _computePCA(df, method='pca', n_components=2, dmatFunc=None):
     return xy, pca
 
 def screeplot(df, method='pca', n_components=10, dmatFunc=None):
+    n_components = int(np.min([n_components,df.columns.shape[0]]))
     xy,pca = _computePCA(df, method, n_components, dmatFunc)
     
     figh = plt.gcf()
     figh.clf()
     axh1 = figh.add_subplot(2,1,1)
-    axh1.bar(left=range(n_components), height=pca.explained_variance_ratio_[:n_components])
+    axh1.bar(left=range(n_components),
+             height=pca.explained_variance_ratio_[:n_components],
+             align='center')
+    plt.ylabel('Fraction of\nvariance explained')
+    plt.xticks(())
 
+    colors = itertools.cycle(palettable.colorbrewer.qualitative.Set3_12.mpl_colors)
     axh2 = figh.add_subplot(2,1,2)
     for compi in range(n_components):
         bottom = 0
-        for dimi in range(df.shape[1]):
-            height = pca.components_[compi,dimi]
-            axh2.bar(left=compi, bottom=bottom, height=height)
+        for dimi,col in zip(range(df.shape[1]), colors):
+            height = np.abs(pca.components_[compi,dimi]) / np.abs(pca.components_[compi,:]).sum()
+            axh2.bar(left=compi, bottom=bottom, height=height, align='center', color=col)
+            if height > 0.1:
+                note = df.columns[dimi].replace(' ','\n')
+                note += '(+)' if pca.components_[compi,dimi] >= 0 else '(-)'
+                axh2.annotate(note, xy=(compi, bottom+height/2), ha='center', va='center',size='small')
             bottom += height
-def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0,1], plotVars='all', dmatFunc=None):
+    plt.xticks(range(n_components),['PCA%d' % (i+1) for i in range(n_components)],rotation=90)
+    plt.ylim([0,1])
+    plt.ylabel('Fraction of\ncomponent variance')
+
+def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0,1], plotVars='all', dmatFunc=None, varThresh=0.2):
     """Perform PCA on df, reducing along columns.
     Plot in two-dimensions.
     Color by labels.
@@ -212,27 +231,41 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0,1], plotV
     colors = palettable.colorbrewer.get_map('Set1', 'qualitative', min(12,max(3,len(uLabels)))).mpl_colors
     plt.clf()
     figh = plt.gcf()
-    axh = figh.add_axes([0.03,0.03,0.94,0.94])
-    axh.axis('off')
+    axh = figh.add_axes([0.1,0.1,0.8,0.8])
+    axh.axis('on')
     figh.set_facecolor('white')
-    annotationParams = dict(xytext=(0,5), textcoords='offset points', size='x-small')
-    alpha = 0.6
+    annotationParams = dict(xytext=(0,5), textcoords='offset points', size='medium')
+    alpha = 0.8
     for i,obs in enumerate(df.index):
         if plotLabels:
-            axh.annotate(obs, xy = (xy[cyi,plotDims[0]], xy[cyi,plotDims[1]]), **annotationParams)
+            axh.annotate(obs, xy = (xy[i,plotDims[0]], xy[i,plotDims[1]]), **annotationParams)
     for labi, lab in enumerate(uLabels):
         col = colors[labi]
         ind = np.where(labels==lab)[0]
-        axh.scatter(xy[ind, plotDims[0]], xy[ind, plotDims[1]], marker='o', s=100, alpha=alpha, c=col, label=lab)
-
+        axh.scatter(xy[ind, plotDims[0]], xy[ind, plotDims[1]], marker='o', s=50, alpha=alpha, c=col, label=lab)
+        axh.scatter(xy[ind, plotDims[0]].mean(axis=0), xy[ind, plotDims[1]].mean(axis=0), marker='o', s=300, alpha=alpha/1.5, c=col)
+    arrowParams = dict(arrowstyle='<-',
+                        connectionstyle='Arc3',
+                        color='black',
+                        lw=1)
+    annotationParams = dict(xy=(0,0),
+                            textcoords='data',
+                            color='black',
+                            arrowprops=arrowParams,
+                            ha='center',
+                            va='center')
     for i,v in enumerate(df.columns):
         if v in plotVars and not method == 'kpca':
-            arrowx = pca.components_[plotDims[0],i] * max(xy[:,plotDims[0]])
-            arrowy = pca.components_[plotDims[1],i] * max(xy[:,plotDims[1]])
-            plt.arrow(0, 0, arrowx, arrowy, color='gray', width=0.0005, head_width=0.0025)
-            axh.annotate(v, xy=(arrowx,arrowy), color='gray', **annotationParams)
-    plt.xlabel('PCA%d (%1.1f)' % (plotDims[0],pca.explained_variance_ratio_[plotDims[0]] * 100))
-    plt.ylabel('PCA%d (%1.1f)' % (plotDims[1],pca.explained_variance_ratio_[plotDims[1]] * 100))
+            mxx = max(xy[:,plotDims[0]])
+            mxy = max(xy[:,plotDims[1]])
+            arrowx = pca.components_[plotDims[0],i] * mxx
+            arrowy = pca.components_[plotDims[1],i] * mxy
+            if (arrowx > varThresh*mxx) or (arrowy > varThresh*mxy):
+                axh.annotate(v, xytext=(arrowx,arrowy), **annotationParams)
+    plt.xlabel('PCA%d (%1.1f%%)' % (plotDims[0] + 1,pca.explained_variance_ratio_[plotDims[0]] * 100))
+    plt.ylabel('PCA%d (%1.1f%%)' % (plotDims[1] + 1,pca.explained_variance_ratio_[plotDims[1]] * 100))
+    plt.xticks([0])
+    plt.yticks([0])
     if len(uLabels) > 1:
         legend(loc=0)
     plt.draw()

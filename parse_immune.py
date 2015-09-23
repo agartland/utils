@@ -4,7 +4,15 @@ import numpy as np
 __all__ = ['parseICS',
            'parseBAMA',
            'parseNAB',
-           'unstackIR']
+           'unstackIR',
+           'irLabels']
+
+def irLabels(c):
+    poss = ['CD4+', 'CD8+', 'IgG', 'IgA']
+    for p in poss:
+        if c.find(p) >=0:
+            return p
+    return 'Other'
 
 def unstackIR(df, uVars):
     """Return a response and magnitude df with one row per ptid
@@ -19,13 +27,18 @@ def unstackIR(df, uVars):
     return responseDf, magDf
 
 def _parseIR(fn, uVars, mag, subset={}, printUnique=False):
-    raw = pd.read_csv(fn, dtype = {'ptid':str}, skipinitialspace = True)
+    raw = pd.read_csv(fn, dtype = {'ptid':str,'Ptid':str}, skipinitialspace = True)
+    raw = raw.rename_axis({'Ptid':'ptid'}, axis=1)
     if uVars is None:
         uVars = raw.columns.drop(['ptid','response',mag]).tolist()
 
     if printUnique:
         for v in uVars:
-            print '%s: %s' % (v, ', '.join(raw[v].astype(str).unique()))
+            u = raw[v].astype(str).unique()
+            if raw[v].dtype == object or len(u) <= 20:
+                print '%s: %s' % (v, ', '.join(u))
+            else:
+                print '%s: mean %1.2f' % (v, np.nanmean(raw[v]))
         return
 
     cols = ['ptid','response','mag'] + uVars
@@ -50,12 +63,27 @@ def _parseIR(fn, uVars, mag, subset={}, printUnique=False):
 def parseICS(fn, uVars = ['visitno','tcellsub','cytokine','antigen'], mag='pctpos_adj', subset={}, printUnique=False):
     """Parse a processed ICS file.
     Returns one row per response, subsetting on subset values."""
-    return _parseIR(fn, uVars, mag, subset=subset, printUnique=printUnique)
-def parseBAMA(fn, uVars = ['isotype','antigen'], mag='delta', subset={}, printUnique=False):
+    out = _parseIR(fn, uVars, mag, subset=subset, printUnique=printUnique)
+    if not printUnique:
+        """Enforce LOD"""
+        out.loc[out.mag < 0.00025, 'mag'] = 0.00025
+        out['mag'] = np.log(out.mag)
+    return out
+
+def parseBAMA(fn, uVars = ['isotype','antigen'], mag='delta_baseline', subset={}, printUnique=False):
     #cols = ['protocol','ptid','antigen','response','delta','rx_code','antigen_label','visitno']
-    return _parseIR(fn, uVars, mag, subset=subset, printUnique=printUnique)
-def parseNAB():
-    pass
+    out = _parseIR(fn, uVars, mag, subset=subset, printUnique=printUnique)
+    if not printUnique:
+        """Enforce LOD"""
+        #out.loc[out.mag < 1, 'mag'] = 1
+        out['mag'] = np.log(out.mag)
+    return out
+
+def parseNAB(fn, uVars = ['celltype','virusdilution','isolate'], mag='titer_num', subset={}, printUnique=False):
+    out = _parseIR(fn, uVars, mag, subset=subset, printUnique=printUnique)
+    if not printUnique:
+        out['mag'] = np.log(out.mag)
+    return out    
 
 def parseRx(rxFn, demFn=None):
     trtCols = ['ptid', 'arm', 'grp', 'protocol', 'rx_code', 'rx']
