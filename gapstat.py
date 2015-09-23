@@ -104,7 +104,7 @@ def plotGapStat(lsICD, mBSICD, errBSICD, gap):
     plt.xticks(np.arange(maxK) + 1)
     plt.ylabel('$Gap(k) - (Gap(k+1) - \sigma_{k+1})$')
     plt.xlabel('Number of clusters (K)')
-    plt.tight_layout()
+    #plt.tight_layout()
     
 def _intra_cluster_distances(dmat, labels):
     """Sum of the intra-cluster distances (Wk)"""
@@ -113,7 +113,10 @@ def _intra_cluster_distances(dmat, labels):
     for k in np.unique(labels):
         ind = labels == k
         nk = ind.sum()
-        tot += (dmat[ind,:][:,ind].flatten()**2).sum() / (2 * nk)
+        if isinstance(dmat, pd.DataFrame):
+            tot += (dmat.loc[ind,:].loc[:,ind].values.flatten()**2).sum() / (2 * nk)
+        else:
+            tot += (dmat[ind,:][:,ind].flatten()**2).sum() / (2 * nk)
     return tot
 
 def _bootstrap_each_column(d):
