@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import palettable
 from sklearn.decomposition import KernelPCA, PCA
-from sklearn.preprocessing import Imputer
+from sklearn.preprocessing import Imputer, StandardScaler
 import itertools
 from functools import partial
 
@@ -163,7 +163,7 @@ def plotHierClust(dmatDf, Z, labels=None, titleStr=None, vRange=None, tickSz='sm
     if not titleStr is None:
         heatmapAX.set_xlabel(titleStr,size='x-large')
 
-def _computePCA(df, method='pca', n_components=2, dmatFunc=None):
+def _computePCA(df, method='pca', n_components=2, standardize=False, dmatFunc=None):
     if method == 'kpca':
         """By using KernelPCA for dimensionality reduction we don't need to impute missing values"""
         if dmatFunc is None:
@@ -175,13 +175,18 @@ def _computePCA(df, method='pca', n_components=2, dmatFunc=None):
         pca.components_ = pca.alphas_
         pca.explained_variance_ratio_ = pca.lambdas_ / pca.lambdas_.sum()
     elif method == 'pca':
+        if standardize:
+            normed = StandardScaler().fit_transform(df)
+        else:
+            normed = df
         pca = PCA(n_components=n_components)
-        xy = pca.fit_transform(df)
+        
+        xy = pca.fit_transform(normed)
     return xy, pca
 
-def screeplot(df, method='pca', n_components=10, dmatFunc=None):
+def screeplot(df, method='pca', n_components=10, standardize=False, dmatFunc=None):
     n_components = int(np.min([n_components,df.columns.shape[0]]))
-    xy,pca = _computePCA(df, method, n_components, dmatFunc)
+    xy,pca = _computePCA(df, method, n_components, standardize, dmatFunc)
     
     figh = plt.gcf()
     figh.clf()
@@ -192,12 +197,12 @@ def screeplot(df, method='pca', n_components=10, dmatFunc=None):
     plt.ylabel('Fraction of\nvariance explained')
     plt.xticks(())
 
-    colors = itertools.cycle(palettable.colorbrewer.qualitative.Set3_12.mpl_colors)
     axh2 = figh.add_subplot(2,1,2)
     for compi in range(n_components):
         bottom = 0
-        for dimi,col in zip(range(df.shape[1]), colors):
+        for dimi,col in zip(range(df.shape[1]), itertools.cycle(palettable.colorbrewer.qualitative.Set3_12.mpl_colors)):
             height = np.abs(pca.components_[compi,dimi]) / np.abs(pca.components_[compi,:]).sum()
+            #height = np.abs(pca.components_[compi,dimi])
             axh2.bar(left=compi, bottom=bottom, height=height, align='center', color=col)
             if height > 0.1:
                 note = df.columns[dimi].replace(' ','\n')
@@ -208,7 +213,7 @@ def screeplot(df, method='pca', n_components=10, dmatFunc=None):
     plt.ylim([0,1])
     plt.ylabel('Fraction of\ncomponent variance')
 
-def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0,1], plotVars='all', dmatFunc=None, varThresh=0.2):
+def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0,1], plotVars='all', standardize=False, dmatFunc=None, varThresh=0.2):
     """Perform PCA on df, reducing along columns.
     Plot in two-dimensions.
     Color by labels.
@@ -226,7 +231,7 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0,1], plotV
 
     n_components = max(plotDims) + 1
 
-    xy,pca = _computePCA(df, method, n_components, dmatFunc)
+    xy,pca = _computePCA(df, method, n_components, standardize, dmatFunc)
 
     colors = palettable.colorbrewer.get_map('Set1', 'qualitative', min(12,max(3,len(uLabels)))).mpl_colors
     plt.clf()
