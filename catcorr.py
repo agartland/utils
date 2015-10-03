@@ -1,16 +1,22 @@
 from __future__ import division
+import matplotlib.pyplot as plt
+import matplotlib as mpl
 import networkx as nx
 import itertools
 import palettable
 import plotly.plotly as py
 import plotly.graph_objs as pygo
+"""TODO: remove dependency on this * import"""
 from pylab import *
 import pandas as pd
 import statsmodels.api as sm
+import numpy as np
 
 from myfisher import *
 from objhist import *
 from custom_legends import *
+
+from networkx.drawing.layout import spring_layout, spectral_layout
 
 __all__ = ['catcorr',
            'layouts',
@@ -18,11 +24,11 @@ __all__ = ['catcorr',
            'testEdge',
            'cull_rows']
 
-layouts = ['twopi', 'fdp','circo', 'neato', 'dot']
+layouts = ['twopi', 'fdp','circo', 'neato', 'dot', 'spring', 'spectral']
 
 color2str = lambda col: 'rgb'+str(tuple((array(col)*256).round().astype(int)))
 
-def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=0.2, sRange=(50,inf), wRange=(0.1,inf)):
+def catcorr(df, layout='spring', mode='mpl', titleStr='', testSig=0.2, sRange=(50,inf), wRange=(0.5,inf), labelThresh=0.05):
     """Make a network plot showing the correlations among the
     categorical variables in the columns of df.
 
@@ -121,8 +127,12 @@ def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=0.2, sRange=(50,i
         """If using this layout specify the most common node as the root"""
         freq = {n:d['freq'] for n,d in g.nodes(data=True)}
         pos = nx.graphviz_layout(g,prog=layout, root=max(freq.keys(),key=freq.get))
+    elif layout == 'spring':
+        pos = spring_layout(g)
+    elif layout == 'spectral':
+        pos = spectral_layout(g)
     else:
-        pos = nx.graphviz_layout(g,prog=layout)
+        pos = nx.graphviz_layout(g, prog=layout)
 
     """Use either matplotlib or plot.ly to plot the network"""
     if mode == 'mpl':
@@ -150,15 +160,16 @@ def catcorr(df, layout='fdp', mode='mpl', titleStr='', testSig=0.2, sRange=(50,i
                 s=szscale(nodesize,mn=sRange[0],mx=sRange[1]), #Units for scatter is (size in points)**2
                 c=nodecolors,
                 alpha=1,zorder=2)
-        for n in g.nodes():
-            annotate(n[1],
-                    xy=pos[n],
-                    fontname='Consolas',
-                    size='medium',
-                    weight='bold',
-                    color='black',
-                    va='center',
-                    ha='center')
+        for n,d in g.nodes(data=True):
+            if d['freq'] >= labelThresh:
+                annotate(n[1],
+                        xy=pos[n],
+                        fontname='Bitstream Vera Sans',
+                        size='medium',
+                        weight='bold',
+                        color='black',
+                        va='center',
+                        ha='center')
         colorLegend(labels=df.columns,colors = [c for x,c in zip(df.columns,colors)],loc=0)
         title(titleStr)
     else:
