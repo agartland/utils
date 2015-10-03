@@ -42,14 +42,7 @@ def estTECI(df, treatment_col='treated', event_col='disease2'):
     b = ((df[treatment_col]==1) & (df[event_col]==0)).sum()
     c = ((df[treatment_col]==0) & (df[event_col]==1)).sum()
     d = ((df[treatment_col]==0) & (df[event_col]==0)).sum()
-    rr = (a/(a+b)) / (c/(c+d))
-
-    te = 1 - rr
-    se = sqrt(b/(a*(a+b))+ d/(c*(c+d)))
-    ci = 1 - exp(array([log(rr)+se*1.96, log(rr)-se*1.96]))
-    """Use the two-sided p-value from a Fisher's Exact test for now, although I think there are better ways.
-    Consider a Binomial Test"""
-    pvalue = fisherTest([[a,b],[c,d]])[1]
+    
     
     return te,ci,pvalue
 
@@ -118,3 +111,44 @@ def scoreci(x, n, conf_level=0.95):
     lowlim = midpnt - bound
 
     return array([lowlim, uplim])
+
+def unconditionalVE(nv,Nv, np, Np, alpha=0.025):
+    """VE point-estimate, CI and p-value, without conditioning on the total number of events"""
+    rr = (nv/(Nv)) / (np/(Np))
+
+    ve = 1 - rr
+    se = sqrt((Nv-nv)/(nv*Nv) + (Np-np)/(np*Np))
+
+    z = stats.norm.ppf(1 - alpha)
+
+    ci = 1 - exp(array([log(rr) + se*z, log(rr) - se*z]))
+    
+    """Wald CI"""
+    pvalue = stats.norm.cdf(log(rr)/se)
+
+    return  pd.Series([ve, ci[0], ci[1], pvalue], index=['VE','LL', 'UL','p'])
+
+def AgrestiScoreVE(nv,Nv, np, Np, alpha=0.025):
+    """Conditional test based on a fixed number of events,
+    n = nv + np
+    phat = nv/n"""
+    def scoreCIbinProp(pHat, n, alpha):
+        """Score confidence interval for binomial proportion following Agresti and Coull (Am Statistician, 1998)"""
+        z = stats.norm.ppf(1-alpha)
+        return ((pHat + z**2/(2*n) + z*sqrt((pHat*(1-pHat)+z**2/(4*n))/n))/(1+z**2/n),
+                (pHat + z**2/(2*n) - z*sqrt((pHat*(1-pHat)+z**2/(4*n))/n))/(1+z**2/n))
+
+    veFunc = lambda pvhat, Nv, Np: 1 - (Np/Nv)*(pvhat/(1-pvhat))
+    rr = (nv/Nv)/(np/Np)
+    ve = 1 - rr
+    n = nv + np
+    pvhat = nv/n
+
+    ll,ul = scoreCIbinProp(pvhat, n, alpha=alpha)
+    
+    
+    ve = veFunc(pvhat, Nv, Np)
+    ci = veFunc(ll, Nv, Np), veFunc(ul, Nv, Np)
+    p = stats.binom.cdf(nv,n,Nv/(Nv+Np))
+    
+    return  pd.Series([ve, ci[0], ci[1], p], index=['VE','LL', 'UL','p'])
