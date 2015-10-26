@@ -13,6 +13,7 @@ from __future__ import division
 import numpy as np
 from scikits_bootstrap import ci
 from numpy.random import randint
+from functools import partial
 
 __all__ = ['permTwoSampTest',
            'bootstrapTwoSampTest',
@@ -130,15 +131,38 @@ def bootstrapSE(data,statFunc,nPerms=1000):
         inds = randint(L,size=L)
         samples[sampi] = statFunc([data[i] for i in inds])
     return samples.std()
-def bootstrapCI(data,statFunc=np.mean,alpha=0.05,nPerms=10000,output='lowhigh'):
+    
+def bootstrapCI(data, statFunc=None, alpha=0.05, nPerms=10000, output='lowhigh'):
     """Wrapper around a function in the scikits_bootstrap module:
         https://pypi.python.org/pypi/scikits.bootstrap
-    Returns the [alpha/2, 1-alpha/2] percentile confidence intervals
-    Use output = 'errorbar' for matplotlib errorbars"""
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Data for computing the confidence interval.
+    statFunc : function
+        Should take data and operate along axis=0
+    alpha : float
+        Returns the [alpha/2, 1-alpha/2] percentile confidence intervals.
+    nPerms : int
+    output : str
+        Use 'lowhigh' or 'errorbar', for matplotlib errorbars"""
+    if statFunc is None:
+        statFunc = partial(np.nanmean, axis=0)
     try:
-        out = ci(data=data,statfunction=statFunc,alpha=alpha,n_samples = nPerms,output=output)
+        out = ci(data=data, statfunction=statFunc, alpha=alpha, n_samples=nPerms, output='lowhigh')
     except IndexError:
-        out = [np.nan,np.nan]
+        shp = list(data.shape)
+        shp[0] = 2
+        out = np.nan * np.ones(shp)
+    
+    if output == 'errorbar':
+        mu = statFunc(data)
+        shp = list(out.shape)
+        
+        out[0,:] = out[0,:] - mu
+        out[1,:] = mu - out[1,:]
+        out = np.reshape(out, shp)
     return out
 
 

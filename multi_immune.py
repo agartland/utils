@@ -228,9 +228,7 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0,1], plotV
     assert np.all(labels.index == df.index)
 
     uLabels = np.unique(labels).tolist()
-
     n_components = max(plotDims) + 1
-
     xy,pca = _computePCA(df, method, n_components, standardize, dmatFunc)
 
     colors = palettable.colorbrewer.get_map('Set1', 'qualitative', min(12,max(3,len(uLabels)))).mpl_colors
@@ -265,12 +263,12 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0,1], plotV
             mxy = max(xy[:,plotDims[1]])
             arrowx = pca.components_[plotDims[0],i] * mxx
             arrowy = pca.components_[plotDims[1],i] * mxy
-            if (arrowx > varThresh*mxx) or (arrowy > varThresh*mxy):
+            if (np.abs(arrowx) > varThresh*mxx) or (np.abs(arrowy) > varThresh*mxy):
                 axh.annotate(v, xytext=(arrowx,arrowy), **annotationParams)
     plt.xlabel('PCA%d (%1.1f%%)' % (plotDims[0] + 1,pca.explained_variance_ratio_[plotDims[0]] * 100))
     plt.ylabel('PCA%d (%1.1f%%)' % (plotDims[1] + 1,pca.explained_variance_ratio_[plotDims[1]] * 100))
     plt.xticks([0])
     plt.yticks([0])
     if len(uLabels) > 1:
-        legend(loc=0)
+        plt.legend(loc=0)
     plt.draw()
