@@ -4,6 +4,7 @@ import numpy as np
 __all__ = ['parseICS',
            'parseBAMA',
            'parseNAB',
+           'parseRx',
            'unstackIR',
            'irLabels']
 
