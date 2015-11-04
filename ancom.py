@@ -43,6 +43,9 @@ def ancom(otuDf, labels, alpha=0.2, statfunc=_dmeanStat, nperms=0, adjMethod='fd
     adjMethod : string
         Passed to sm.stats.multipletests for p-value multiplicity adjustment.
         If value is None then no adjustment is made.
+    wCutoff : int
+        Cutoff for the number of Q/p-values required for a significant OTU
+        Reject H0 if sum(q < alpha) >= (nOTUs - wCutoff)
     
     Returns:
     --------
@@ -60,7 +63,7 @@ def ancom(otuDf, labels, alpha=0.2, statfunc=_dmeanStat, nperms=0, adjMethod='fd
     labelBool = labels.values.astype(bool)
 
     """Define minimum OTU abundance to avoid log(0)"""
-    constant = otuDf.values.min()/2
+    constant = otuDf.values[otuDf.values>0].min()/2
     logOTU = np.log(otuDf + constant).values
     
     nRatios = int(nOTUs * (nOTUs-1) / 2)
@@ -84,7 +87,7 @@ def ancom(otuDf, labels, alpha=0.2, statfunc=_dmeanStat, nperms=0, adjMethod='fd
         for permi in range(nperms):
             rind = np.random.permutation(nSamples)
             samples[permi, :] = statfunc(logRatio, labelBool[rind])
-        pvalues = ((samples >= obs[None, :]).sum(axis=0) + 1) / (nperms + 1)
+        pvalues = ((np.abs(samples) >= np.abs(obs[None, :])).sum(axis=0) + 1) / (nperms + 1)
     else:
         pvalues = np.zeros(nRatios)
         for ratioi in range(nRatios):
@@ -100,8 +103,9 @@ def ancom(otuDf, labels, alpha=0.2, statfunc=_dmeanStat, nperms=0, adjMethod='fd
     """Number of hypotheses rejected, for each OTU"""
     W = (otuQvalues < alpha).sum(axis=1)
 
-    """Use cutoff of (nOTUs - 1), requiring that all log-ratios are significant for a given OTU (conservative)"""
-    rej = pd.Series(W > (nOTUs-1), index=otuDf.columns)
+    """Use cutoff of (nOTUs - 1), requiring that all log-ratios are significant for a given OTU (quite conservative)"""
+    rej = pd.Series(W >= (nOTUs-1), index=otuDf.columns)
+
     otuQvalues = pd.DataFrame(otuQvalues, index=otuDf.columns, columns=['ratio_%d' % i for i in range(nOTUs-1)])
     cols = [(otuDf.columns[ratioIndices[r][0]], otuDf.columns[ratioIndices[r][1]]) for r in range(nRatios)]
     qvalues = pd.Series(qvalues, index=cols)
