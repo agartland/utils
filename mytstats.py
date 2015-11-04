@@ -2,9 +2,25 @@ from __future__ import division
 import numpy as np
 
 __all__ = ['tstatistic',
-           'nantstatistic']
+           'nantstatistic',
+           'diffmean']
 
-def tstatistic(a, b, axis = 0, equal_var = True):
+def diffmean(a, b, axis=0):
+    """Difference of means statistic.
+
+    Parameters
+    ----------
+    a,b : ndarray with shapes equal along all dims except axis
+        Input data for the calculation.
+    axis : int
+        Specify the axis along which the statistic will be computed.
+
+    Returns
+    -------
+    dm : ndarray with one less dimension"""
+    return a.mean(axis=axis) - b.mean(axis=axis)
+
+def tstatistic(a, b, axis=0, equal_var=True):
     """Computes a two-sample t-statistic on a and b along the specific axis
     Code is lifted from scipy.stats.ttest_ind except that there is no
     calculation of the associated p-value
@@ -21,8 +37,7 @@ def tstatistic(a, b, axis = 0, equal_var = True):
 
     Returns
     -------
-    t : ndarray with one less dimension
-    """
+    t : ndarray with one less dimension"""
     v1 = np.var(a, axis, ddof=1)
     v2 = np.var(b, axis, ddof=1)
     n1 = a.shape[axis]
@@ -90,6 +105,7 @@ def nantstatistic(a, b, axis = 0, equal_var = True):
     t = np.divide(d, denom)
     return t
 
+'''TODO: implement in numba so they can be used in a numbized permutation test
 """Attempt to import numba and define numba compiled versions of these functions"""
 import os
 import sys
@@ -176,3 +192,4 @@ if NB_SUCCESS and False:
         t = np.divide(d, denom)
         return t
 
+'''
