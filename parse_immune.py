@@ -61,7 +61,7 @@ def _parseIR(fn, uVars, mag, subset={}, printUnique=False):
     """What about dropping the negative controls?"""
     return raw[cols]
 
-def parseICS(fn, uVars = ['visitno','tcellsub','cytokine','antigen'], mag='pctpos_adj', subset={}, printUnique=False):
+def parseICS(fn, uVars=['visitno','tcellsub','cytokine','antigen'], mag='pctpos_adj', subset={}, printUnique=False):
     """Parse a processed ICS file.
     Returns one row per response, subsetting on subset values."""
     out = _parseIR(fn, uVars, mag, subset=subset, printUnique=printUnique)
@@ -71,7 +71,7 @@ def parseICS(fn, uVars = ['visitno','tcellsub','cytokine','antigen'], mag='pctpo
         out['mag'] = np.log(out.mag)
     return out
 
-def parseBAMA(fn, uVars = ['isotype','antigen'], mag='delta_baseline', subset={}, printUnique=False):
+def parseBAMA(fn, uVars=['isotype','antigen'], mag='delta', subset={}, printUnique=False):
     #cols = ['protocol','ptid','antigen','response','delta','rx_code','antigen_label','visitno']
     out = _parseIR(fn, uVars, mag, subset=subset, printUnique=printUnique)
     if not printUnique:
@@ -80,7 +80,7 @@ def parseBAMA(fn, uVars = ['isotype','antigen'], mag='delta_baseline', subset={}
         out['mag'] = np.log(out.mag)
     return out
 
-def parseNAB(fn, uVars = ['celltype','virusdilution','isolate'], mag='titer_num', subset={}, printUnique=False):
+def parseNAB(fn, uVars=['celltype','virusdilution','isolate'], mag='titer_num', subset={}, printUnique=False):
     out = _parseIR(fn, uVars, mag, subset=subset, printUnique=printUnique)
     if not printUnique:
         out['mag'] = np.log(out.mag)
