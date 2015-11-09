@@ -68,7 +68,7 @@ def parseICS(fn, uVars=['visitno','tcellsub','cytokine','antigen'], mag='pctpos_
     if not printUnique:
         """Enforce LOD"""
         out.loc[out.mag < 0.00025, 'mag'] = 0.00025
-        out['mag'] = np.log(out.mag)
+        out['mag'] = np.log10(out.mag)
     return out
 
 def parseBAMA(fn, uVars=['isotype','antigen'], mag='delta', subset={}, printUnique=False):
@@ -77,13 +77,13 @@ def parseBAMA(fn, uVars=['isotype','antigen'], mag='delta', subset={}, printUniq
     if not printUnique:
         """Enforce LOD"""
         #out.loc[out.mag < 1, 'mag'] = 1
-        out['mag'] = np.log(out.mag)
+        out['mag'] = np.log10(out.mag)
     return out
 
 def parseNAB(fn, uVars=['celltype','virusdilution','isolate'], mag='titer_num', subset={}, printUnique=False):
     out = _parseIR(fn, uVars, mag, subset=subset, printUnique=printUnique)
     if not printUnique:
-        out['mag'] = np.log(out.mag)
+        out['mag'] = np.log10(out.mag)
     return out    
 
 def parseRx(rxFn, demFn=None):

@@ -213,7 +213,7 @@ def screeplot(df, method='pca', n_components=10, standardize=False, dmatFunc=Non
     plt.ylim([0,1])
     plt.ylabel('Fraction of\ncomponent variance')
 
-def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0,1], plotVars='all', standardize=False, dmatFunc=None, varThresh=0.2):
+def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0,1], plotVars='all', standardize=False, dmatFunc=None, varThresh=0.2, dropna=False):
     """Perform PCA on df, reducing along columns.
     Plot in two-dimensions.
     Color by labels.
@@ -226,6 +226,11 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0,1], plotV
 
     assert labels.shape[0] == df.shape[0]
     assert np.all(labels.index == df.index)
+
+    if dropna:
+        keepInd = (~df.isnull()).all(axis=1)
+        df = df.loc[keepInd]
+        labels = labels.loc[keepInd]
 
     uLabels = np.unique(labels).tolist()
     n_components = max(plotDims) + 1
