@@ -38,7 +38,7 @@ def corrDmatFunc(df, metric = 'pearson-signed', dfunc = None, minN = 10):
     if dfunc is None:
         if metric in ['spearman', 'pearson']:
             """Anti-correlations are also considered as high similarity and will cluster together"""
-            dmat = (1 - df.corr(method = metric, min_periods = minN).values**2)
+            dmat = 1 - df.corr(method = metric, min_periods = minN).values**2
             dmat[np.isnan(dmat)] = 1
         elif metric in ['spearman-signed', 'pearson-signed']:
             """Anti-correlations are considered as dissimilar and will NOT cluster together"""
@@ -88,6 +88,71 @@ def _clean_axis(ax):
         sp.set_visible(False)
     ax.grid(False)
     ax.set_axis_bgcolor('white')
+
+def plotHeatmap(df, labels=None, titleStr=None, vRange=None, tickSz='small', cmap=None, cmapLabel=''):
+    """Display a heatmap with labels."""
+    if vRange is None:
+        vmin = np.min(np.ravel(df.values))
+        vmax = np.max(np.ravel(df.values))
+    else:
+        vmin,vmax = vRange
+    
+    if cmap is None:
+        if vmin < 0 and vmax > 0 and vmax <= 1 and vmin >= -1:
+            cmap = cm.RdBu_r
+        else:
+            cmap = cm.YlOrRd
+
+    fig = plt.gcf()
+    fig.clf()
+
+    if labels is None:
+        heatmapAX = fig.add_subplot(GridSpec(1,1,left=0.05,bottom=0.05,right=0.78,top=0.85)[0,0])
+        scale_cbAX = fig.add_subplot(GridSpec(1,1,left=0.87,bottom=0.05,right=0.93,top=0.85)[0,0])
+    else:
+        cbAX = fig.add_subplot(GridSpec(1,1,left=0.05,bottom=0.05,right=0.09,top=0.85)[0,0])
+        heatmapAX = fig.add_subplot(GridSpec(1,1,left=0.1,bottom=0.05,right=0.78,top=0.85)[0,0])
+        scale_cbAX = fig.add_subplot(GridSpec(1,1,left=0.87,bottom=0.05,right=0.93,top=0.85)[0,0])
+
+    my_norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
+
+    if not labels is None:
+        cbSE = _colors2labels(labels)
+        axi = cbAX.imshow(cbSE.values, interpolation='nearest', aspect='auto', origin='lower')
+        _clean_axis(cbAX)
+
+    """Heatmap plot"""
+    axi = heatmapAX.imshow(df.values, interpolation='nearest', aspect='auto', origin='lower', norm=my_norm, cmap=cmap)
+    _clean_axis(heatmapAX)
+
+    """Column tick labels along the rows"""
+    if tickSz is None:
+        heatmapAX.set_yticks(())
+        heatmapAX.set_xticks(())
+    else:
+        heatmapAX.set_yticks(np.arange(df.shape[1]))
+        heatmapAX.yaxis.set_ticks_position('right')
+        heatmapAX.set_yticklabels(df.columns, fontsize=tickSz, fontname='Consolas')
+
+        """Column tick labels"""
+        heatmapAX.set_xticks(np.arange(df.shape[1]))
+        heatmapAX.xaxis.set_ticks_position('top')
+        xlabelsL = heatmapAX.set_xticklabels(df.columns, fontsize=tickSz, rotation=90, fontname='Consolas')
+
+        """Remove the tick lines"""
+        for l in heatmapAX.get_xticklines() + heatmapAX.get_yticklines(): 
+            l.set_markersize(0)
+
+    """Add a colorbar"""
+    cb = fig.colorbar(axi,scale_cbAX) # note that we could pass the norm explicitly with norm=my_norm
+    cb.set_label(cmapLabel)
+    """Make colorbar labels smaller"""
+    for t in cb.ax.yaxis.get_ticklabels():
+        t.set_fontsize('small')
+
+    """Add title as xaxis label"""
+    if not titleStr is None:
+        heatmapAX.set_xlabel(titleStr, size='x-large')
 
 def plotHierClust(dmatDf, Z, labels=None, titleStr=None, vRange=None, tickSz='small', cmap=None, cmapLabel=''):
     """Display a hierarchical clustering result."""
@@ -163,7 +228,7 @@ def plotHierClust(dmatDf, Z, labels=None, titleStr=None, vRange=None, tickSz='sm
     if not titleStr is None:
         heatmapAX.set_xlabel(titleStr,size='x-large')
 
-def _computePCA(df, method='pca', n_components=2, standardize=False, dmatFunc=None):
+def _computePCA(df, method='pca', n_components=2, labels=None, standardize=False, dmatFunc=None):
     if method == 'kpca':
         """By using KernelPCA for dimensionality reduction we don't need to impute missing values"""
         if dmatFunc is None:
@@ -182,6 +247,18 @@ def _computePCA(df, method='pca', n_components=2, standardize=False, dmatFunc=No
         pca = PCA(n_components=n_components)
         
         xy = pca.fit_transform(normed)
+    elif method == 'lda' and not labels is None:
+        if standardize:
+            normed = StandardScaler().fit_transform(df)
+        else:
+            normed = df
+        """Pre-PCA step"""
+        if df.shape[1] > df.shape[0]:
+            ppca = PCA(n_components=int(df.shape[0]/1.5))
+            normed = ppca.fit_transform(df)
+
+        pca = LDA(solver='eigen', shrinkage='auto', n_components=n_components).fit(normed, labels.values)
+        xy = pca.transform(normed)
     return xy, pca
 
 def screeplot(df, method='pca', n_components=10, standardize=False, dmatFunc=None):
@@ -234,7 +311,7 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0,1], plotV
 
     uLabels = np.unique(labels).tolist()
     n_components = max(plotDims) + 1
-    xy,pca = _computePCA(df, method, n_components, standardize, dmatFunc)
+    xy,pca = _computePCA(df, method=method, n_components=n_components, standardize=standardize, dmatFunc=dmatFunc, labels=labels)
 
     colors = palettable.colorbrewer.get_map('Set1', 'qualitative', min(12,max(3,len(uLabels)))).mpl_colors
     plt.clf()
@@ -263,15 +340,20 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0,1], plotV
                             ha='center',
                             va='center')
     for i,v in enumerate(df.columns):
-        if v in plotVars and not method == 'kpca':
+        if v in plotVars and method == 'pca':
             mxx = max(xy[:,plotDims[0]])
             mxy = max(xy[:,plotDims[1]])
             arrowx = pca.components_[plotDims[0],i] * mxx
             arrowy = pca.components_[plotDims[1],i] * mxy
             if (np.abs(arrowx) > varThresh*mxx) or (np.abs(arrowy) > varThresh*mxy):
                 axh.annotate(v, xytext=(arrowx,arrowy), **annotationParams)
-    plt.xlabel('PCA%d (%1.1f%%)' % (plotDims[0] + 1,pca.explained_variance_ratio_[plotDims[0]] * 100))
-    plt.ylabel('PCA%d (%1.1f%%)' % (plotDims[1] + 1,pca.explained_variance_ratio_[plotDims[1]] * 100))
+    if method in ['kpca', 'pca']:
+        plt.xlabel('%s%d (%1.1f%%)' % (method.upper(), plotDims[0] + 1,pca.explained_variance_ratio_[plotDims[0]] * 100))
+        plt.ylabel('%s%d (%1.1f%%)' % (method.upper(), plotDims[1] + 1,pca.explained_variance_ratio_[plotDims[1]] * 100))
+    elif method == 'lda':
+        plt.xlabel('%s%d' % (method.upper(), plotDims[0] + 1))
+        plt.ylabel('%s%d' % (method.upper(), plotDims[1] + 1))
+
     plt.xticks([0])
     plt.yticks([0])
     if len(uLabels) > 1:
