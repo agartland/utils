@@ -1,8 +1,12 @@
 from __future__ import division
 import numpy as np
-from matplotlib.pyplot import plot, xticks,is_numlike,bar
 from numpy.random import permutation,randint
 from scipy import stats, special
+
+try:
+    from matplotlib.pyplot import plot, xticks,is_numlike,bar
+except ImportError:
+    print 'Imported objhist without matplotlib.'
 
 __all__ = ['objhist',
            'countdict']
