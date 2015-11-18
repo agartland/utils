@@ -1,12 +1,16 @@
 from __future__ import division
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib
 from numpy.random import permutation
 import time
-
 import logging
+
+try:
+    import matplotlib.pyplot as plt
+    import matplotlib
+except ImportError:
+    print 'Imported epitope_hotspot without matplotlib.'
+
 
 import statsmodels.api as sm
 from HLAPredCache import *
