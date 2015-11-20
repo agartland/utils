@@ -357,7 +357,7 @@ def fuzzycmedoids(dmat, c=3, weights=None, nPasses=1, maxIter=1000, initInds=Non
             membership = recomputeMembership(dmat, currMedoids)
             
             """Choose new medoid for each cluster, minimizing fuzzy objective function"""
-            newMedoids = 
+            newMedoids = None #WORKING HERE
             totInertia = 0
             for medi,med in enumerate(currMedoids):
                 clusterInd = where(labels==med)[0]
