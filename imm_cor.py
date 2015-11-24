@@ -1,50 +1,58 @@
 from __future__ import division
 import pandas as pd
+import numpy as np
 from lifelines.estimation import KaplanMeierFitter
 from lifelines.statistics import logrank_test
 from lifelines import CoxPHFitter
 from myfisher import *
-from numpy import *
 
 __all__ = ['estTECI',
             'estTEPH']
 
-def estTECI(df, treatment_col='treated', event_col='disease2'):
-    """Estimates treatment efficacy using cumulative incidence/attack rate.
+def estTECI(df, followup, treatment_col='treated', duration_col='dx', event_col='disease', alpha=0.05):
+    """Estimates treatment efficacy using cumulative incidence (CI) Nelson-Aalen (NA) estimators.
 
-    Ignores all censoring information. 
-    
     TE = 1 - RR
     
-    RR = (c1/N1) / (c0/N0)
+    RR = CI_NA1 / CI_NA2
+
+    Confidence 
     
     Parameters
     ----------
     df : pandas.DataFrame
-
+        Each row is a participant.
+    followup : float
+        Follow-up time tau, at which CI will be estimated.
     treatment_col : string
-        Column in df indicating treatment.
+        Column in df indicating treatment (values 1 or 0).
+    dx_col : string
+        Column in df indicating time of the event or censoring.
     event_col : string
-        Column in df indicating events (censored data are 0)
-    covars : list
-        List of other columns to include in Cox model as covariates.
+        Column in df indicating events (values 1 or 0 with censored data as 0).
     
     Returns
     -------
     est : float
-        Estimate of vaccine efficacy
+        Estimate of treatment efficacy
     ci : vector, length 2
-        95% confidence interval, [LL, UL]
+        (1-alpha)%  confidence interval, [LL, UL]
     pvalue : float
-        P-value for H0: TE=0 from Fisher's Exact test"""
+        P-value for H0: TE=0 from Wald statistic"""
     
-    a = ((df[treatment_col]==1) & (df[event_col]==1)).sum()
-    b = ((df[treatment_col]==1) & (df[event_col]==0)).sum()
-    c = ((df[treatment_col]==0) & (df[event_col]==1)).sum()
-    d = ((df[treatment_col]==0) & (df[event_col]==0)).sum()
+    ind1 = df[treatment_col] == 0
+    naf1 = NelsonAalenFitter()
+    naf1.fit(durations=df.loc[ind1, duration_col], event_observed=df.loc[ind1, event_col])
+
+    ind2 = df[treatment_col] == 1
+    naf2 = NelsonAalenFitter()
+    naf2.fit(durations=df.loc[ind2, duration_col], event_observed=df.loc[ind2, event_col])
+
+    te = 1 - naf1._cumulative_hazard / naf2._cumulative_hazard
+    ci = np.array([np.nan, np.nan])
+    pvalue = np.nan
     
-    
-    return te,ci,pvalue
+    return te, ci, pvalue
 
 def estTEPH(df, treatment_col='treated', duration_col='dx2', event_col='disease2',covars=[]):
     """Estimates treatment efficacy using proportional hazards (Cox model).
