@@ -1,4 +1,4 @@
-from numpy import *
+import numpy as np
 from numpy.random import permutation,randint
 from vectools import unique_rows
 
@@ -286,4 +286,103 @@ def _test_kmedoids(nPasses=20):
     title('Bio.Cluster K-medoids (%1.3f sec, %d solns)' % (bioet,bionfound))
 
 
- 
+def fuzzycmedoids(dmat, c=3, weights=None, nPasses=1, maxIter=1000, initInds=None, potentialMedoidInds=None):
+    """Implementation of fuzz c-medoids (FCMdd)
+
+    Krishnapuram, Raghu, Anupam Joshi, Liyu Yi, Computer Sciences, and Baltimore County.
+        "A Fuzzy Relative of the K-Medoids Algorithm with Application to Web Documen."
+        Electrical Engineering. doi:10.1109/FUZZY.1999.790086.
+
+    The algorithm completes nPasses of the algorithm with random restarts.
+    Each pass consists of iteratively assigning/improving the medoids.
+    
+    To apply to points in euclidean space pass dmat using:
+    dmat = sklearn.neighbors.DistanceMetric.get_metric('euclidean').pairwise(points_array)
+    
+    Parameters
+    ----------
+    dmat : array-like of floats, shape (n_samples, n_samples)
+        Pairwise distance matrix of observations to cluster.
+    weights : array-like of floats, shape (n_samples)
+        Relative weights for each observation in inertia computation.
+    c : int
+        The number of clusters to form as well as the number of medoids to generate.
+    nPasses : int
+        Number of times the algorithm is restarted with random medoid initializations.
+        The best solution is returned.
+    maxIter : int, optional, default None (inf)
+        Maximum number of iterations of the c-medoids algorithm to run.
+    initInds : ndarray
+        Medoid indices used for random initialization and restarts for each pass.
+    potentialMedoidInds : array of indices
+        If specified, then medoids are constrained to be chosen from this array.
+
+    Returns
+    -------
+    medoids : float ndarray with shape (c)
+        Indices into dmat that indicate medoids found at the last iteration of FCMdd
+    membership : float ndarray with shape (n_samples, c)
+        Each row contains the membership of a point to each of the clusters.
+    nIter : int
+        Number of iterations run.
+    nFound : int
+        Number of unique solutions found (out of nPasses)"""
+
+    """Number of points"""
+    N = dmat.shape[0]
+
+    if initInds is None:
+        initInds = np.arange(N)
+
+    wdmat2 = precomputeWeightedSqDmat(dmat, weights)
+
+    if not potentialMedoidInds is None:
+        potentialMedoidSet = set(potentialMedoidInds)
+        initInds = np.array([i for i in potentialMedoidSet.intersection(set(initInds))], dtype=int)
+    else:
+        potentialMedoidSet = np.arange(N)
+
+    if len(initInds) == 0:
+        print 'No possible initInds provided.'
+        return
+
+    allMedoids = np.zeros((nPasses, c))
+    for passi in range(nPasses):
+        """Pick c random medoids"""
+        currMedoids = np.random.permutation(initInds)[:c]
+        newMedoids = np.zeros(c, dtype=np.int32)
+        membership = np.zeros((N, c))
+        for i in range(maxIter):
+            """(Re)compute memberships"""
+            membership = recomputeMembership(dmat, currMedoids)
+            
+            """Choose new medoid for each cluster, minimizing fuzzy objective function"""
+            newMedoids = None #WORKING HERE
+            totInertia = 0
+            for medi,med in enumerate(currMedoids):
+                clusterInd = where(labels==med)[0]
+                """Limit medoids to those specified by indexing axis=0 with the intersection of potential medoids and all points in the cluster"""
+                potentialInds = array([i for i in potentialMedoidSet.intersection(set(clusterInd))])
+                """Inertia is the sum of the squared distances (vec is shape (len(clusterInd))"""
+                inertiaVec = (wdmat2[potentialInds,:][:,clusterInd]).sum(axis=1)
+                mnInd = argmin(inertiaVec)
+                newMedoids[medi] = potentialInds[mnInd]
+                """Add inertia of this new medoid to the running total"""
+                totInertia += inertiaVec[mnInd]
+
+            if (newMedoids == currMedoids).all():
+                """If the medoids didn't need to be updated then we're done!"""
+                allMedoids[passi,:] = sorted(currMedoids)
+                break
+            currMedoids = newMedoids.copy()
+        if bestInertia is None or totInertia < bestInertia:
+            """For multiple passes, see if this pass was better than the others"""
+            bestInertia = totInertia
+            bestMedoids = currMedoids.copy()
+            bestLabels = labels.copy()
+            bestNIter = i
+    
+    """nfound is the number of unique solutions (each row is a solution)"""
+    nfound = len(unique_rows(allMedoids)[:])
+    """Return the results from the best pass"""
+    return bestMedoids, bestMembership, bestNIter, nfound

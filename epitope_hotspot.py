@@ -1,17 +1,20 @@
 from __future__ import division
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib
 from numpy.random import permutation
 import time
-
 import logging
 
+try:
+    import matplotlib.pyplot as plt
+    import matplotlib
+except ImportError:
+    print 'Imported epitope_hotspot without matplotlib.'
+
+
 import statsmodels.api as sm
-from HLAPredCache import *
+from HLAPredCache import grabKmer
 from objhist import objhist
-from seqtools import *
 
 __all__ = ['getBAMat',
            'get2DBAMat',
@@ -72,7 +75,7 @@ def get2DBAMat(peptides, hlas, ba):
     baDf = pd.DataFrame(bamat, index = hlaList, columns = peptides)
     return baDf
 
-def getBAMat(seqs, hlas, ba, k = 9, gapless = False):
+def getBAMat(seqs, hlas, ba, k=9, gapless=False):
     """Generate a 3D np.ndarray of log(IC50) binding affinities
     with shape [nKmers x nSeqs x nHLAs]
 
@@ -137,7 +140,7 @@ def getBAMat(seqs, hlas, ba, k = 9, gapless = False):
                     baMat[meri,seqi,hlai] = ba[(h,mer)]
     return baMat
 
-def BAMat2map(mat, hlas, siteMap = True, k = 9, phenotypicFrequencies = False):
+def BAMat2map(mat, hlas, siteMap=True, k=9, phenotypicFrequencies=False):
     """Take a matrix containing HLA binding data organized by [kmers, seqs, hlas]
     and return a vector of length nKmers or nSites that is:
 
@@ -474,7 +477,7 @@ def plotAlignmentBindingGrid(hlas, align, ba, topN = 5, k = 9, annotateIC50 = Tr
     peptides=[]
     for hlai,h in enumerate(hlas):
         for meri in np.arange(bamat.shape[1]):
-            seqs = sliceAlign(align,(meri,meri+k))
+            seqs = _sliceAlign(align,(meri,meri+k))
             """Remove any sequences with a gap at any position"""
             seqs = [s for s in seqs if s.find('-')==-1]
 
@@ -538,3 +541,12 @@ def _plotBindingGridCommon(hlas, peptides, baDf, annotateIC50):
     plt.xlabel('Peptides')
     plt.ylabel('HLA alleles')
 
+def _sliceAlign(align, region, sites=False):
+    """Return a region of the alignment where region is (start, end)
+    OR if sites is True then include all sites in region (not range)"""
+    if region is None:
+        return align
+    elif sites:
+        return align.map(lambda seq: ''.join([seq[r] for r in region]))
+    else:
+        return align.map(lambda seq: seq[region[0]:region[1]])
