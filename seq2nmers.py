@@ -3,7 +3,7 @@ from Bio import SeqIO
 import argparse
 import re
 
-BADAA='-B#X*'
+BADAA='-B#X*?'
 
 def main():
     """Read in a FASTA file and spit out a txt file with one unique 9-mer per line.
