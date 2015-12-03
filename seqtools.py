@@ -920,7 +920,7 @@ def tree2pwdist(tree):
         return
     return pd.DataFrame(pwdist,index = names, columns = names)
 
-def overlappingKmers(s,k=15,overlap=11):
+def overlappingKmers(s, k=15, overlap=11, includeFinalPeptide=True, returnStartInds=False):
     """Create a list of overlapping kmers from a single sequence
 
     Params
@@ -930,9 +930,23 @@ def overlappingKmers(s,k=15,overlap=11):
         Length of each mer
     overlap : int
         Overlap between each consecutive kmer
+    includeFinalPeptide : bool
+        If True, include a peptide of length k that covers the end of the sequence.
+    returnStartInds : bool
+        If True, return start indices for each peptide.
 
     Returns
     -------
-    out : list of kmers"""
+    mers : list of kmers
+    inds : list of indices (optional)"""
+    inds = [i for i in range(0, len(s), k-overlap) if i+k < len(s)]
 
-    return [s[i:i+k] for i in arange(0,len(s),k-overlap) if i+k < len(s)]
+    if includeFinalPeptide and not s[-k:] == s[inds[-1]:inds[-1]+k]:
+        inds.append(len(s)-k)
+
+    mers = [s[i:i+k] for i in inds]
+
+    if returnStartInds:
+        return mers, inds
+    else:
+        return mers
