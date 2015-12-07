@@ -1,7 +1,3 @@
-"""TODO: remove these imports from *"""
-#from numpy import *
-#from pylab import *
-
 import matplotlib
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,11 +10,14 @@ from patsy import dmatrices,ModelDesc,Term,LookupFactor
 from copy import deepcopy
 import itertools
 import warnings
+import palettable
 
 __all__ = ['partialcorr',
            'combocorrplot',
            'scatterfit',
            'heatmap',
+           'crosscorr',
+           'pwpartialcorr',
            'corrheatmap',
            'validPairwiseCounts',
            'removeNARC',
@@ -28,7 +27,9 @@ __all__ = ['partialcorr',
 _cdict = {'green' : ((0, 1, 1), (0.5, 0, 0), (1, 0, 0)),
           'red':    ((0, 0, 0), (0.5, 0, 0), (1, 1, 1)),
           'blue' :  ((0, 0, 0), (1, 0, 0))}
-_heatCmap = matplotlib.colors.LinearSegmentedColormap('my_colormap', _cdict, 1024)
+#_heatCmap = matplotlib.colors.LinearSegmentedColormap('my_colormap', _cdict, 1024)
+_heatCmap = palettable.colorbrewer.diverging.RdBu_11_r.mpl_colormap
+
 
 def partialcorr(x, y, adjust=[], method='pearson', minN = None):
     """Finds partial correlation of x with y adjusting for variables in adjust
@@ -139,7 +140,6 @@ def partialcorr(x, y, adjust=[], method='pearson', minN = None):
 
     return pc, pvalue
 
-
 def combocorrplot(data,method='spearman',axLimits='variable',axTicks=False,axTicklabels=False,valueFlag=True,ms=2, plotLine = False):
     """Shows correlation scatter plots in combination with a heatmap for small sets of variables.
 
@@ -245,7 +245,124 @@ def combocorrplot(data,method='spearman',axLimits='variable',axTicks=False,axTic
     method = method[0].upper() + method[1:]
     plt.annotate('%s correlation' % (method),[0.98,0.5],xycoords='figure fraction',ha='right',va='center',rotation='vertical')
 
-def corrheatmap(df,rowVars,colVars,adjust=[],annotation='pvalue',cutoff='pvalue',cutoffValue=0.05,method='spearman',labelLookup={},xtickRotate=False,labelSize='medium',minN=None,adjMethod='fdr_bh'):
+def pwpartialcorr(df, rowVars=None, colVars=None, adjust=[], method='pearson', minN=0, adjMethod='fdr_bh'):
+    """Pairwise partial correlation.
+
+    Parameters
+    ----------
+    df : pd.DataFrame [samples, variables]
+        Data for correlation assessment (Nans will be ignored for each column pair)
+    rowVars, colVars : lists
+        List of column names to incude on heatmap axes.
+    adjust : list
+        List of column names that will be adjusted for in the pairwise correlations.
+    method : string
+        Specifies whether a pearson or spearman correlation is performed. (default: 'spearman')
+    minN : int
+        If a correlation has fewer than minN samples after dropping Nans
+        it will be reported as rho = 0, pvalue = 1 and will not be included in the multiplicity adjustment.
+
+    Returns
+    -------
+    rho : pd.DataFrame [rowVars, colVars]
+        Correlation coefficients.
+    pvalue : pd.DataFrame [rowVars, colVars]
+        Pvalues for pairwise correlations.
+    qvalue : pd.DataFrame [rowVars, colVars]
+        Multiplicity adjusted q-values for pairwise correlations."""
+
+    if rowVars is None:
+        rowVars = df.columns
+    if colVars is None:
+        colVars = df.columns
+
+    pvalue = np.zeros((len(rowVars),len(colVars)))
+    qvalue = np.nan * np.zeros((len(rowVars),len(colVars)))
+    rho = np.zeros((len(rowVars),len(colVars)))
+
+    """Store p-values in dict with keys that are unique pairs (so we only adjust across these)"""
+    pairedPvalues = {}
+    paireQPvalues = {}
+    allColumns = df.columns.tolist()
+
+    for i,rowv in enumerate(rowVars):
+        for j,colv in enumerate(colVars):
+            if not rowv == colv:
+                if not df[[rowv,colv]].dropna().shape[0] < minN:
+                    rho[i,j],pvalue[i,j] = partialcorr(df[rowv],df[colv],adjust=[df[a] for a in adjust], method=method)
+                else:
+                    """Pvalue = nan excludes these from the multiplicity adjustment"""
+                    rho[i,j],pvalue[i,j] = 1,np.nan
+                """Define unique key for the pair by sorting in order they appear in df columns"""
+                key = tuple(sorted([rowv,colv], key = allColumns.index))
+                pairedPvalues.update({key:pvalue[i,j]})
+            else:
+                """By setting these pvalues to nan we exclude them from multiplicity adjustment"""
+                rho[i,j],pvalue[i,j] = 1,np.nan
+            
+    """Now only adjust using pvalues in the unique pair dict"""
+    keys = pairedPvalues.keys()
+    qvalueTmp = _pvalueAdjust(np.array([pairedPvalues[k] for k in keys]), method=adjMethod)
+    """Build a unique qvalue dict from teh same unique keys"""
+    pairedQvalues = {k:q for k,q in zip(keys,qvalueTmp)}
+    
+    """Assign the unique qvalues to the correct comparisons"""
+    for i,rowv in enumerate(rowVars):
+        for j,colv in enumerate(colVars):
+            if not rowv == colv:
+                key = tuple(sorted([rowv,colv], key = allColumns.index))
+                qvalue[i,j] = pairedQvalues[key]
+            else:
+                pvalue[i,j] = 0.
+                qvalue[i,j] = 0.
+    pvalue = pd.DataFrame(pvalue, index=rowVars, columns=colVars)
+    qvalue = pd.DataFrame(qvalue, index=rowVars, columns=colVars)
+    rho = pd.DataFrame(rho, index=rowVars, columns=colVars)
+    return rho, pvalue, qvalue
+
+def crosscorr(dfA, dfB, method='pearson', minN=0, adjMethod='fdr_bh'):
+    """Pairwise correlations between A and B after a join,
+    when there are potential column name overlaps.
+
+    Parameters
+    ----------
+    dfA,dfB : pd.DataFrame [samples, variables]
+        DataFrames for correlation assessment (Nans will be ignored in pairwise correlations)
+    method : string
+        Specifies whether a pearson or spearman correlation is performed. (default: 'spearman')
+    minN : int
+        If a correlation has fewer than minN samples after dropping Nans
+        it will be reported as rho = 0, pvalue = 1 and will not be included in the multiplicity adjustment.
+
+    Returns
+    -------
+    rho : pd.DataFrame [rowVars, colVars]
+        Correlation coefficients.
+    pvalue : pd.DataFrame [rowVars, colVars]
+        Pvalues for pairwise correlations.
+    qvalue : pd.DataFrame [rowVars, colVars]
+        Multiplicity adjusted q-values for pairwise correlations."""
+    colA = dfA.columns
+    colB = dfB.columns
+    dfA = dfA.rename_axis(lambda s: s + '_A', axis=1)
+    dfB = dfB.rename_axis(lambda s: s + '_B', axis=1)
+
+    joinedDf = pd.merge(dfA, dfB, left_index=True, right_index=True)
+
+    rho, pvalue, qvalue = pwpartialcorr(joinedDf, rowVars=dfA.columns, colVars=dfB.columns, method=method, minN=minN, adjMethod=adjMethod)
+
+    rho.index = colA
+    rho.columns = colB
+
+    pvalue.index = colA
+    pvalue.columns = colB
+
+    qvalue.index = colA
+    qvalue.columns = colB
+    return rho, pvalue, qvalue
+
+
+def corrheatmap(df, rowVars=None, colVars=None, adjust=[], annotation=None, cutoff=None, cutoffValue=0.05, method='pearson', labelLookup={}, xtickRotate=True, labelSize='medium', minN=0, adjMethod='fdr_bh'):
     """Compute pairwise correlations and plot as a heatmap.
 
     Parameters
@@ -276,57 +393,29 @@ def corrheatmap(df,rowVars,colVars,adjust=[],annotation='pvalue',cutoff='pvalue'
 
     Returns
     -------
+    rho : ndarray [samples, variables]
+        Matrix of correlation coefficients.
     pvalue : ndarray [samples, variables]
         Matrix of pvalues for pairwise correlations.
     qvalue : ndarray [samples, variables]
-        Matrix of multiplicity adjusted q-values for pairwise correlations.
-    rho : ndarray [samples, variables]
-        Matrix of correlation coefficients."""
-    
-    pvalue = np.zeros((len(rowVars),len(colVars)))
-    qvalue = np.nan * np.zeros((len(rowVars),len(colVars)))
-    rho = np.zeros((len(rowVars),len(colVars)))
+        Matrix of multiplicity adjusted q-values for pairwise correlations."""
+    if rowVars is None:
+        rowVars = df.columns
+    if colVars is None:
+        colVars = df.columns
+    if cutoff is None:
+        cutoff = 'pvalue'
 
-    """Store p-values in dict with keys that are unique pairs (so we only adjust across these)"""
-    pairedPvalues = {}
-    paireQPvalues = {}
-    allColumns = df.columns.tolist()
-
-    for i,rowv in enumerate(rowVars):
-        for j,colv in enumerate(colVars):
-            if not rowv == colv:
-                if not df[[rowv,colv]].dropna().shape[0] < minN:
-                    rho[i,j],pvalue[i,j] = partialcorr(df[rowv],df[colv],adjust=[df[a] for a in adjust],method=method)
-                else:
-                    """Pvalue = nan excludes these from the multiplicity adjustment"""
-                    rho[i,j],pvalue[i,j] = 1,np.nan
-                """Define unique key for the pair by sorting in order they appear in df columns"""
-                key = tuple(sorted([rowv,colv], key = allColumns.index))
-                pairedPvalues.update({key:pvalue[i,j]})
-            else:
-                """By setting these pvalues to nan we exclude them from multiplicity adjustment"""
-                rho[i,j],pvalue[i,j] = 1,np.nan
-            
-    """Now only adjust using pvalues in the unique pair dict"""
-    keys = pairedPvalues.keys()
-    qvalueTmp = _pvalueAdjust(array([pairedPvalues[k] for k in keys]), method = adjMethod)
-    """Build a unique qvalue dict from teh same unique keys"""
-    pairedQvalues = {k:q for k,q in zip(keys,qvalueTmp)}
-    
-    """Assign the unique qvalues to the correct comparisons"""
-    for i,rowv in enumerate(rowVars):
-        for j,colv in enumerate(colVars):
-            if not rowv == colv:
-                key = tuple(sorted([rowv,colv], key = allColumns.index))
-                qvalue[i,j] = pairedQvalues[key]
-            else:
-                pvalue[i,j] = 0.
-                qvalue[i,j] = 0.
-
+    rho,pvalue,qvalue = pwpartialcorr(df, rowVars=rowVars, colVars=colVars, adjust=adjust, method=method, minN=minN)
+   
     plt.clf()
     fh = plt.gcf()
-    
-    pvalueTxtProp = dict(family='monospace',size='large',weight='bold',color='white',ha='center',va='center')
+    pvalueTxtProp = dict(family='monospace',
+                         size='large',
+                         weight='bold',
+                         color='white',
+                         ha='center',
+                         va='center')
 
     axh = fh.add_subplot(111, yticks = np.arange(len(rowVars))+0.5,
                               xticks = np.arange(len(colVars))+0.5)
@@ -351,35 +440,33 @@ def corrheatmap(df,rowVars,colVars,adjust=[],annotation='pvalue',cutoff='pvalue'
         
     tmprho[~(criticalValue <= cutoffValue)] = 0.
 
-    plt.pcolor(tmprho, cmap=_heatCmap,vmin=-1.,vmax=1.)
-    for i in xrange(len(rowVars)):
-        for j in xrange(len(colVars)):
-            if criticalValue[i,j] <= cutoffValue and not rowVars[i] == colVars[j]:
+    plt.pcolor(tmprho, cmap=_heatCmap, vmin=-1., vmax=1.)
+    for i in range(len(rowVars)):
+        for j in range(len(colVars)):
+            if criticalValue.iloc[i,j] <= cutoffValue and not rowVars[i] == colVars[j]:
                 ann = ''
                 if annotation == 'pvalue':
-                    if pvalue[i,j]>0.001:
-                        ann = '%1.3f' % pvalue[i,j]
+                    if pvalue.iloc[i,j] > 0.001:
+                        ann = '%1.3f' % pvalue.iloc[i,j]
                     else:
-                        ann = '%1.1e' % pvalue[i,j]
+                        ann = '%1.1e' % pvalue.iloc[i,j]
                 elif annotation == 'rho':
-                    ann = '%1.2f' % rho[i,j]
+                    ann = '%1.2f' % rho.iloc[i,j]
                 elif annotation == 'rho2':
-                    ann = '%1.2f' % (rho[i,j]*rho[i,j])
+                    ann = '%1.2f' % (rho.iloc[i,j] ** 2)
                 elif annotation == 'qvalue':
                     if qvalue[i,j]>0.001:
-                        ann = '%1.3f' % qvalue[i,j]
+                        ann = '%1.3f' % qvalue.iloc[i,j]
                     else:
-                        ann = '%1.1e' % qvalue[i,j]
+                        ann = '%1.1e' % qvalue.iloc[i,j]
 
                 if not ann == '':
-                    plt.text(j+0.5,i+0.5,ann,**pvalueTxtProp)
+                    plt.text(j+0.5, i+0.5, ann, **pvalueTxtProp)
 
     plt.colorbar(fraction=0.05)
     method = method[0].upper() + method[1:]
-    plt.annotate('%s correlation' % method,[0.98,0.5],xycoords='figure fraction',ha='right',va='center',rotation='vertical')
-
-    return pvalue, qvalue, rho
-
+    plt.annotate('%s correlation' % method,[0.98,0.5], xycoords='figure fraction', ha='right', va='center', rotation='vertical')
+    return rho, pvalue, qvalue
 
 def scatterfit(x,y,method='pearson',adjustVars=[],labelLookup={},plotLine=True,annotateFit=True,returnModel=False,lc = 'gray', **kwargs):
     """Scatter plot of x vs. y with a fitted line overlaid.
@@ -509,7 +596,7 @@ def _pvalueAdjust(pvalues, method = 'fdr_bh'):
     else:
         return qvalues
 
-def validPairwiseCounts(df,cols):
+def validPairwiseCounts(df, cols=None):
     """Count the number of non-NA data points for
     all pairs of cols in df, as would be needed for
     generating a correlation heatmap.
@@ -527,9 +614,10 @@ def validPairwiseCounts(df,cols):
     -------
     pwCounts : pd.DataFrame
         DataFrame with columns and index matching cols"""
-
+    if cols is None:
+        cols = df.columns
     n = len(cols)
-    pwCounts = pd.DataFrame(np.zeros((n,n)), index=cols,columns=cols)
+    pwCounts = pd.DataFrame(np.zeros((n,n)), index=cols, columns=cols)
     for colA,colB in itertools.product(cols,cols):
         if colA == colB:
             pwCounts.loc[colA,colA] = df[colA].dropna().shape[0]
@@ -540,7 +628,7 @@ def validPairwiseCounts(df,cols):
 
     return pwCounts
 
-def heatmap(df,colLabels=None,rowLabels=None,labelSize='medium',**kwargs):
+def heatmap(df, colLabels=None, rowLabels=None, labelSize='medium', **kwargs):
     """Heatmap based on values in df
 
     Parameters
@@ -566,16 +654,17 @@ def heatmap(df,colLabels=None,rowLabels=None,labelSize='medium',**kwargs):
     plt.clf()
     axh = plt.subplot(111)
     nrows,ncols = df.shape
-    plt.pcolor(df.values,**kwargs)
+    plt.pcolor(df.values, **kwargs)
     
     axh.xaxis.tick_top()
-    plt.xticks(np.arange(ncols)+0.5)
-    plt.yticks(np.arange(nrows)+0.5)
-    xlabelsL = axh.set_xticklabels(colLabels,size=labelSize,rotation=90,fontname='Consolas')
-    ylabelsL = axh.set_yticklabels(rowLabels,size=labelSize,fontname='Consolas')
+    plt.xticks(np.arange(ncols) + 0.5)
+    plt.yticks(np.arange(nrows) + 0.5)
+    xlabelsL = axh.set_xticklabels(colLabels, size=labelSize, rotation=90, fontname='Consolas')
+    ylabelsL = axh.set_yticklabels(rowLabels, size=labelSize, fontname='Consolas')
     plt.ylim((nrows,0))
     plt.xlim((0,ncols))
-    plt.colorbar(fraction = 0.05)
+    plt.colorbar(fraction=0.05)
+    plt.tight_layout()
     
 
 def removeNARC(inDf,minRow=1, minCol=1, minFrac=None):
