@@ -10,15 +10,19 @@ from scipy import stats
 __all__ = ['estCumTE',
             'estCoxPHTE']
 
-def estCumTE(df, treatment_col='treated', duration_col='dx', event_col='disease', followupT=None, alpha=0.05, bootstraps=None):
+def estCumTE(df, treatment_col='treated', duration_col='dx', event_col='disease', followupT=None, alpha=0.05, H1=0, bootstraps=None):
     """Estimates treatment efficacy using cumulative incidence (CI) Nelson-Aalen (NA) estimators.
+
+    TODO:
+        (1) Base the p-value and confidence intervals on the NA variance estimator (instead of KM)
+        (2) Test different H1/alternative hypotheses
     
     TE = 1 - RR
     
     RR = CI_NA1 / CI_NA2
 
     P-value tests the hypothesis:
-        H0: TE = 0
+        H0: TE = H1
     
     Status
     ------
@@ -40,6 +44,8 @@ def estCumTE(df, treatment_col='treated', duration_col='dx', event_col='disease'
     followupT : float (optional)
         Follow-up time inlcuded in the anlaysis
         (also therefore the time at which a p-value is computed)
+    H1 : float
+        Alternative hypothesis for p-value on the fractional TE scale.
     bootstraps : int or None (optional)
         If not None, then confidence interval and p-value are estimated using
             a bootstrap approach with nstraps.
@@ -194,7 +200,7 @@ def estCumTE(df, treatment_col='treated', duration_col='dx', event_col='disease'
     resDf.columns = ['TE','UB','LB']
     
     pvalues = np.nan * np.zeros(resDf.shape[0])
-    """TODO: Compute p-value for single and final time T"""
+
     avarsa1, avarsa2
     wald_stat = (asa1 - asa2) / np.sqrt(avarsa1 + avarsa2)
     wald_pvalue = 2 * stats.norm.cdf(-np.abs(wald_stat))

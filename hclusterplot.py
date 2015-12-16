@@ -29,7 +29,7 @@ def clean_axis(ax):
     ax.grid(False)
     ax.set_axis_bgcolor('white')
 
-def mapColors2Labels(labels, setStr = 'Set3', cmap = None):
+def mapColors2Labels(labels, setStr='Set3', cmap=None):
     """Return pd.Series of colors based on labels"""
     if cmap is None:
         N = max(3,min(12,len(np.unique(labels))))
@@ -218,11 +218,10 @@ def plotHColCluster(df=None, col_dmat=None, method='complete', metric='euclidean
 
     if col_labels is None and not K is None:
         col_labels = pd.Series(sch.fcluster(col_clusters, K, criterion='maxclust'), index=columnLabels)
-
     
     if isinstance(col_plot, pd.DataFrame):
         col_plot = col_plot.values
-    
+
     if vRange is None:
         if metric in ['spearman','pearson','spearman-signed','pearson-signed']:
             vmin,vmax = (-1,1)
