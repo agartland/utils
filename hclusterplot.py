@@ -29,7 +29,7 @@ def clean_axis(ax):
     ax.grid(False)
     ax.set_axis_bgcolor('white')
 
-def mapColors2Labels(labels, setStr = 'Set3', cmap = None):
+def mapColors2Labels(labels, setStr='Set3', cmap=None):
     """Return pd.Series of colors based on labels"""
     if cmap is None:
         N = max(3,min(12,len(np.unique(labels))))
@@ -227,9 +227,9 @@ def plotHColCluster(df,method='complete', metric='euclidean', col_labels=None,ti
         
         colorbarLabel = 'Correlation coefficient'
         if metric in ['spearman-signed','pearson-signed']:
-            col_plot = df.corr(method = metric.replace('-signed',''), min_periods = minN).values
+            col_plot = df.corr(method=metric.replace('-signed',''), min_periods=minN).values
         else:
-            col_plot = df.corr(method = metric, min_periods = minN).values
+            col_plot = df.corr(method=metric, min_periods=minN).values
     else:
         colorbarLabel = ''
         col_plot = col_dmat
@@ -238,7 +238,7 @@ def plotHColCluster(df,method='complete', metric='euclidean', col_labels=None,ti
         col_plot = col_plot.values
 
     if col_labels is None and not K is None:
-        col_labels = pd.Series(sch.fcluster(col_clusters, K, criterion = 'maxclust'), index = df.columns)
+        col_labels = pd.Series(sch.fcluster(col_clusters, K, criterion='maxclust'), index=df.columns)
 
     if vRange is None:
         if metric in ['spearman','pearson','spearman-signed','pearson-signed']:
@@ -249,7 +249,7 @@ def plotHColCluster(df,method='complete', metric='euclidean', col_labels=None,ti
     else:
         vmin,vmax = vRange
 
-    my_norm = mpl.colors.Normalize(vmin = vmin, vmax = vmax)
+    my_norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
 
     """Column dendrogaram but along the rows"""
     plt.sca(col_denAX)
@@ -259,7 +259,7 @@ def plotHColCluster(df,method='complete', metric='euclidean', col_labels=None,ti
 
     """Column label colorbar but along the rows"""
     if not col_labels is None:
-        col_cbSE = mapColors2Labels(col_labels, cmap = labelCmap)
+        col_cbSE = mapColors2Labels(col_labels, cmap=labelCmap)
         col_axi = col_cbAX.imshow([[x] for x in col_cbSE.iloc[colInd].values],interpolation='nearest',aspect='auto',origin='lower')
         
         clean_axis(col_cbAX)
