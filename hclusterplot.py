@@ -37,7 +37,7 @@ def mapColors2Labels(labels, setStr = 'Set3', cmap = None):
     cmapLookup = {k:col for k,col in zip(sorted(np.unique(labels)),itertools.cycle(cmap))}
     return labels.map(cmapLookup.get)
 
-def computeDMat(df, metric = None, minN = 1, dfunc = None):
+def computeDMat(df, metric=None, minN=1, dfunc=None):
     if dfunc is None:
         if metric in ['spearman', 'pearson']:
             """Anti-correlations are also considered as high similarity and will cluster together"""
@@ -71,20 +71,18 @@ def computeDMat(df, metric = None, minN = 1, dfunc = None):
     assert dmat.shape[0] == df.shape[1]
     return dmat
 
-def computeHCluster(df, method = 'complete', metric = 'euclidean', dmat = None, minN = 1):
+def computeHCluster(dmat, method='complete'):
     """Compute dmat, clusters and dendrogram of df using
     the linkage method and distance metric given"""
-    if dmat is None:
-        dmat = computeDMat(df, metric, minN = minN)
-    clusters = sch.linkage(dmat, method = method)
-    den = sch.dendrogram(clusters, color_threshold = np.inf, no_plot=True)
-    return dmat, clusters, den
+    clusters = sch.linkage(dmat, method=method)
+    den = sch.dendrogram(clusters, color_threshold=np.inf, no_plot=True)
+    return clusters, den
 
 def testData(rows=50,columns=20):
-    data=np.random.multivariate_normal(rand(columns),rand(columns,columns),rows)
-    df=pd.DataFrame(data,columns=[''.join([lett]*9) for lett in 'ABCDEFGHIJKLMNOPQRST'])
-    rowLabels=pd.Series(rand(rows).round(),index=df.index)
-    columnLabels=pd.Series(rand(columns).round(),index=df.columns)
+    data = np.random.multivariate_normal(rand(columns),rand(columns,columns),rows)
+    df = pd.DataFrame(data,columns=[''.join([lett]*9) for lett in 'ABCDEFGHIJKLMNOPQRST'])
+    rowLabels = pd.Series(rand(rows).round(),index=df.index)
+    columnLabels = pd.Series(rand(columns).round(),index=df.columns)
     return {'df':df,'row_labels':rowLabels,'col_labels':columnLabels}
 
 def addColorbar(fig,cb_ax,data_ax,label='Correlation'):
@@ -182,64 +180,49 @@ def plotCorrHeatmap(df=None, metric='pearson', rowInd=None, colInd=None, col_lab
     if not titleStr is None:
         heatmapAX.set_xlabel(titleStr,size='x-large')
 
-def plotHColCluster(df,method='complete', metric='euclidean', col_labels=None,titleStr=None,vRange=None,tickSz='small',cmap=None,col_dmat=None,minN=1, K=None, labelCmap=None, noColorBar=False, interactive=False):
+def plotHColCluster(df=None, col_dmat=None, method='complete', metric='euclidean', col_labels=None, titleStr=None, vRange=None, tickSz='small', cmap=None,  minN=1, K=None, labelCmap=None, noColorBar=False, interactive=False):
     """Perform hierarchical clustering on df columns and plot square heatmap of pairwise distances"""
+    if col_dmat is None and df is None:
+        print 'Need to provide df or col_dmat'
+        return
+    elif df is None:
+        columnLabels = col_dmat.columns
+        col_dmat = col_dmat.values
+        colorbarLabel = ''
+        col_plot = col_dmat
+    elif col_dmat is None:
+        col_dmat = computeDMat(df, metric, minN=minN)
+        columnLabels = df.columns
+
+        if metric in ['spearman','pearson','spearman-signed','pearson-signed']:
+            """If it's a correlation metric, plot Rho not the dmat"""
+      
+            colorbarLabel = 'Correlation coefficient'
+            if metric in ['spearman-signed','pearson-signed']:
+                col_plot = df.corr(method=metric.replace('-signed',''), min_periods=minN).values
+            else:
+                col_plot = df.corr(method=metric, min_periods=minN).values
+        else:
+            colorbarLabel = ''
+            col_plot = col_dmat
+
+    nCols = col_dmat.shape[1]
+
     if cmap is None:
         if metric in ['spearman','pearson','spearman-signed','pearson-signed']:
             cmap = palettable.colorbrewer.diverging.RdBu_11_r.mpl_colormap
         else:
             cmap = palettable.colorbrewer.sequential.YlOrRd_9.mpl_colormap
-    fig = plt.gcf()
-    fig.clf()
-    #heatmapGS = gridspec.GridSpec(1,4,wspace=0.0,width_ratios=[0.25,0.01,2,0.15])
-    if col_labels is None and K is None:
-        """heatmapGS = gridspec.GridSpec(2,3,width_ratios=[0.2,2,0.15],height_ratios=[0.1,1])
-        col_denAX = fig.add_subplot(heatmapGS[1,0])
-        heatmapAX = fig.add_subplot(heatmapGS[1,1])
-        scale_cbAX = fig.add_subplot(heatmapGS[1,2])"""
-        col_denAX = fig.add_subplot(GridSpec(1,1,left=0.05,bottom=0.05,right=0.15,top=0.85)[0,0])
-        heatmapAX = fig.add_subplot(GridSpec(1,1,left=0.16,bottom=0.05,right=0.78,top=0.85)[0,0])
-        if not noColorBar:
-            scale_cbAX = fig.add_subplot(GridSpec(1,1,left=0.87,bottom=0.05,right=0.93,top=0.85)[0,0])
-    else:
-        """heatmapGS = gridspec.GridSpec(2,3,width_ratios=[0.2,0.01,2,0.15],height_ratios=[0.1,1])
-        col_denAX = fig.add_subplot(heatmapGS[1,0])
-        col_cbAX = fig.add_subplot(heatmapGS[1,1])
-        heatmapAX = fig.add_subplot(heatmapGS[1,2])
-        scale_cbAX = fig.add_subplot(heatmapGS[1,3])"""
-
-        """TODO: work on row_cbAX so that I can have the data labels on the top and left"""
-        col_denAX = fig.add_subplot(GridSpec(1,1,left=0.05,bottom=0.05,right=0.15,top=0.85)[0,0])
-        col_cbAX = fig.add_subplot(GridSpec(1,1,left=0.16,bottom=0.05,right=0.19,top=0.85)[0,0])
-        #row_cbAX = fig.add_subplot(GridSpec(1,1,left=0.2,bottom=0.83,right=0.78,top=0.86)[0,0])
-        heatmapAX = fig.add_subplot(GridSpec(1,1,left=0.2,bottom=0.05,right=0.78,top=0.85)[0,0])
-        if not noColorBar:
-            scale_cbAX = fig.add_subplot(GridSpec(1,1,left=0.87,bottom=0.05,right=0.93,top=0.85)[0,0])
     
-    if df is None:
-        """If df is None then data will come from a DataFrame dmat. Create dummy df for labels though"""
-        df = pd.DataFrame(data = np.zeros((5, col_dmat.shape[0])), columns = col_dmat.columns)
-
-    col_dmat, col_clusters, col_den = computeHCluster(df, method, metric, col_dmat, minN = minN)
-
-    if metric in ['spearman','pearson','spearman-signed','pearson-signed']:
-        """If it's a correlation metric, plot Rho not the dmat"""
-        
-        colorbarLabel = 'Correlation coefficient'
-        if metric in ['spearman-signed','pearson-signed']:
-            col_plot = df.corr(method = metric.replace('-signed',''), min_periods = minN).values
-        else:
-            col_plot = df.corr(method = metric, min_periods = minN).values
-    else:
-        colorbarLabel = ''
-        col_plot = col_dmat
-
-    if isinstance(col_plot, pd.DataFrame):
-        col_plot = col_plot.values
+    col_clusters, col_den = computeHCluster(col_dmat, method)
 
     if col_labels is None and not K is None:
-        col_labels = pd.Series(sch.fcluster(col_clusters, K, criterion = 'maxclust'), index = df.columns)
+        col_labels = pd.Series(sch.fcluster(col_clusters, K, criterion='maxclust'), index=columnLabels)
 
+    
+    if isinstance(col_plot, pd.DataFrame):
+        col_plot = col_plot.values
+    
     if vRange is None:
         if metric in ['spearman','pearson','spearman-signed','pearson-signed']:
             vmin,vmax = (-1,1)
@@ -249,8 +232,25 @@ def plotHColCluster(df,method='complete', metric='euclidean', col_labels=None,ti
     else:
         vmin,vmax = vRange
 
-    my_norm = mpl.colors.Normalize(vmin = vmin, vmax = vmax)
+    my_norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
 
+    fig = plt.gcf()
+    fig.clf()
+    #heatmapGS = gridspec.GridSpec(1,4,wspace=0.0,width_ratios=[0.25,0.01,2,0.15])
+    if col_labels is None and K is None:
+        col_denAX = fig.add_subplot(GridSpec(1,1,left=0.05,bottom=0.05,right=0.15,top=0.85)[0,0])
+        heatmapAX = fig.add_subplot(GridSpec(1,1,left=0.16,bottom=0.05,right=0.75,top=0.85)[0,0])
+        if not noColorBar:
+            scale_cbAX = fig.add_subplot(GridSpec(1,1,left=0.94, bottom=0.05, right=0.97,top=0.85)[0,0])
+    else:
+        """TODO: work on row_cbAX so that I can have the data labels on the top and left"""
+        col_denAX = fig.add_subplot(GridSpec(1,1,left=0.05,bottom=0.05,right=0.15,top=0.85)[0,0])
+        col_cbAX = fig.add_subplot(GridSpec(1,1,left=0.16,bottom=0.05,right=0.19,top=0.85)[0,0])
+        #row_cbAX = fig.add_subplot(GridSpec(1,1,left=0.2,bottom=0.83,right=0.75,top=0.86)[0,0])
+        heatmapAX = fig.add_subplot(GridSpec(1,1,left=0.2,bottom=0.05,right=0.75,top=0.85)[0,0])
+        if not noColorBar:
+            scale_cbAX = fig.add_subplot(GridSpec(1,1,left=0.94,bottom=0.05,right=0.97,top=0.85)[0,0])
+    
     """Column dendrogaram but along the rows"""
     plt.sca(col_denAX)
     col_denD = sch.dendrogram(col_clusters,color_threshold=np.inf,orientation='right')
@@ -259,15 +259,17 @@ def plotHColCluster(df,method='complete', metric='euclidean', col_labels=None,ti
 
     """Column label colorbar but along the rows"""
     if not col_labels is None:
-        col_cbSE = mapColors2Labels(col_labels, cmap = labelCmap)
+        col_cbSE = mapColors2Labels(col_labels, cmap=labelCmap)
         col_axi = col_cbAX.imshow([[x] for x in col_cbSE.iloc[colInd].values],interpolation='nearest',aspect='auto',origin='lower')
-        
         clean_axis(col_cbAX)
-        #row_axi = row_cbAX.imshow([x for x in col_cbSE.iloc[colInd].values],interpolation='nearest',aspect='auto',origin='lower')
-        #clean_axis(row_cbAX)
 
     """Heatmap plot"""
-    axi = heatmapAX.imshow(col_plot[colInd,:][:,colInd],interpolation='nearest',aspect='auto',origin='lower',norm=my_norm,cmap=cmap)
+    axi = heatmapAX.imshow(col_plot[colInd,:][:,colInd],
+                           interpolation='nearest',
+                           aspect='auto',
+                           origin='lower',
+                           norm=my_norm,
+                           cmap=cmap)
     clean_axis(heatmapAX)
 
     """Column tick labels along the rows"""
@@ -275,14 +277,14 @@ def plotHColCluster(df,method='complete', metric='euclidean', col_labels=None,ti
         heatmapAX.set_yticks(())
         heatmapAX.set_xticks(())
     else:
-        heatmapAX.set_yticks(np.arange(df.shape[1]))
+        heatmapAX.set_yticks(np.arange(nCols))
         heatmapAX.yaxis.set_ticks_position('right')
-        heatmapAX.set_yticklabels(df.columns[colInd],fontsize=tickSz,fontname='Consolas')
+        heatmapAX.set_yticklabels(columnLabels[colInd], fontsize=tickSz, fontname='Consolas')
 
         """Column tick labels"""
-        heatmapAX.set_xticks(np.arange(df.shape[1]))
+        heatmapAX.set_xticks(np.arange(nCols))
         heatmapAX.xaxis.set_ticks_position('top')
-        xlabelsL = heatmapAX.set_xticklabels(df.columns[colInd],fontsize=tickSz,rotation=90,fontname='Consolas')
+        xlabelsL = heatmapAX.set_xticklabels(columnLabels[colInd], fontsize=tickSz, rotation=90, fontname='Consolas')
 
         """Remove the tick lines"""
         for l in heatmapAX.get_xticklines() + heatmapAX.get_yticklines(): 
@@ -294,14 +296,14 @@ def plotHColCluster(df,method='complete', metric='euclidean', col_labels=None,ti
     if not titleStr is None:
         heatmapAX.set_xlabel(titleStr,size='x-large')
 
-    if interactive:
+    if interactive and not df is None:
         scatterFig = plt.figure(fig.number + 100)
-        ps = PairScatter(df.iloc[:,colInd], heatmapAX, scatterFig.add_subplot(111), method = metric)
+        ps = PairScatter(df.iloc[:,colInd], heatmapAX, scatterFig.add_subplot(111), method=metric)
         return colInd, ps
 
     return colInd
 
-def plot1DHClust(distDf, hclusters, labels = None, titleStr = None, vRange = None, tickSz='small', cmap = None, colorbarLabel = None, labelCmap = None, noColorBar = False):
+def plot1DHClust(distDf, hclusters, labels=None, titleStr=None, vRange=None, tickSz='small', cmap=None, colorbarLabel=None, labelCmap=None, noColorBar=False):
     """Plot hierarchical clustering results (no computation)
     I'm not even sure this is useful..."""
     if cmap is None:
@@ -402,7 +404,8 @@ def plotHCluster(df, method='complete', metric='euclidean', clusterBool=[True,Tr
         heatmapGS = gridspec.GridSpec(3,3,wspace=0.0,hspace=0.0,width_ratios=[0.15,0.02,1],height_ratios=[0.001,0.02,1])
 
     if clusterBool[0]:
-        row_dmat,row_clusters,row_den = computeHCluster(df.T, method, metric, minN = minN)
+        row_dmat = computeDMat(df.T, metric, minN=minN)
+        row_clusters,row_den = computeHCluster(row_dmat, method)
 
         """Dendrogarams"""
         row_denAX = fig.add_subplot(heatmapGS[2,0])
@@ -423,7 +426,8 @@ def plotHCluster(df, method='complete', metric='euclidean', clusterBool=[True,Tr
         clean_axis(row_cbAX)
 
     if clusterBool[1]:
-        col_dmat,col_clusters,col_den = computeHCluster(df, method, metric, minN = minN)
+        col_dmat = computeDMat(df, metric, minN=minN)
+        col_clusters,col_den = computeHCluster(col_dmat, method)
 
         """Dendrogarams"""
         col_denAX = fig.add_subplot(heatmapGS[0,2])
@@ -431,9 +435,9 @@ def plotHCluster(df, method='complete', metric='euclidean', clusterBool=[True,Tr
         clean_axis(col_denAX)
 
         
-        colInd=col_denD['leaves']
+        colInd = col_denD['leaves']
     else:
-        colInd=np.arange(df.shape[1])
+        colInd = np.arange(df.shape[1])
 
     """Column colorbar"""
     if not col_labels is None:
