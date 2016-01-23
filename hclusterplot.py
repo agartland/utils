@@ -18,7 +18,8 @@ __all__ = ['plotHCluster',
             'plotCorrHeatmap',
             'mapColors2Labels',
             'computeDMat',
-            'computeHCluster']
+            'computeHCluster',
+            'plotBicluster']
 
 def clean_axis(ax):
     """Remove ticks, tick labels, and frame from axis"""
@@ -205,6 +206,10 @@ def plotHColCluster(df=None, col_dmat=None, method='complete', metric='euclidean
         else:
             colorbarLabel = ''
             col_plot = col_dmat
+    else:
+        col_plot = col_dmat
+        columnLabels = df.columns
+        colorbarLabel = ''
 
     nCols = col_dmat.shape[1]
 
