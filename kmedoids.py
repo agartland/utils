@@ -1,13 +1,13 @@
 import numpy as np
-from numpy.random import permutation,randint
 from vectools import unique_rows
 
 __all__ = ['kmedoids',
+           'fuzzycmedoids',
            'precomputeWeightedSqDmat',
            'reassignClusters',
            'computeInertia']
 
-def kmedoids(dmat, k = 3, weights = None, nPasses = 1, maxIter = 1000, initInds = None, potentialMedoidInds = None):
+def kmedoids(dmat, k=3, weights=None, nPasses=1, maxIter=1000, initInds=None, potentialMedoidInds=None):
     """Identify the k points that minimize all intra-cluster distances.
 
     The algorithm completes nPasses of the algorithm with random restarts.
@@ -49,50 +49,49 @@ def kmedoids(dmat, k = 3, weights = None, nPasses = 1, maxIter = 1000, initInds 
     nIter : int
         Number of iterations run.
     nFound : int
-        Number of unique solutions found (out of nPasses)
-    """
+        Number of unique solutions found (out of nPasses)"""
 
     """Number of points"""
     N = dmat.shape[0]
 
     if initInds is None:
-        initInds = arange(N)
+        initInds = np.arange(N)
 
-    wdmat2 = precomputeWeightedSqDmat(dmat,weights)
+    wdmat2 = precomputeWeightedSqDmat(dmat, weights)
 
     if not potentialMedoidInds is None:
         potentialMedoidSet = set(potentialMedoidInds)
-        initInds = array([i for i in potentialMedoidSet.intersection(set(initInds))],dtype=int)
+        initInds = np.array([i for i in potentialMedoidSet.intersection(set(initInds))], dtype=int)
     else:
-        potentialMedoidSet = arange(N)
+        potentialMedoidSet = np.arange(N)
 
     if len(initInds)==0:
         print 'No possible initInds provided.'
         return
 
     bestInertia = None
-    allMedoids = zeros((nPasses,k))
+    allMedoids = np.zeros((nPasses,k))
     for passi in range(nPasses):
         """Pick k random medoids"""
-        currMedoids = permutation(initInds)[:k]
-        newMedoids = zeros(k,dtype=int32)
-        labels = currMedoids[randint(k,size=N)]
+        currMedoids = np.random.permutation(initInds)[:k]
+        newMedoids = np.zeros(k, dtype=np.int32)
+        labels = currMedoids[randint(k, size=N)]
         for i in range(maxIter):
             """Assign each point to the closest cluster,
             but don't reassign a point if the distance isn't an improvement."""
-            labels = reassignClusters(dmat,currMedoids,oldLabels=labels)
+            labels = reassignClusters(dmat, currMedoids, oldLabels=labels)
             
             """If clusters are lost during (re)assignment step, pick random points
             as new medoids and reassign until we have k clusters again"""
-            uLabels = unique(labels[potentialMedoidInds])
+            uLabels = np.unique(labels[potentialMedoidInds])
             while uLabels.shape[0]<k:
                 for medi,med in enumerate(currMedoids):
                     if not med in uLabels:
                         choices = list(set(initInds).difference(set(uLabels)))
-                        currMedoids[medi] = choices[randint(len(choices))]
+                        currMedoids[medi] = choices[np.random.randint(len(choices))]
                         
-                        labels = reassignClusters(dmat,currMedoids,oldLabels=labels)
-                        uLabels = unique(labels[potentialMedoidInds])
+                        labels = reassignClusters(dmat, currMedoids, oldLabels=labels)
+                        uLabels = np.unique(labels[potentialMedoidInds])
                         break
 
             """ISSUE: If len(unique(labels)) < k there is an error"""
@@ -102,10 +101,10 @@ def kmedoids(dmat, k = 3, weights = None, nPasses = 1, maxIter = 1000, initInds 
             for medi,med in enumerate(currMedoids):
                 clusterInd = where(labels==med)[0]
                 """Limit medoids to those specified by indexing axis=0 with the intersection of potential medoids and all points in the cluster"""
-                potentialInds = array([i for i in potentialMedoidSet.intersection(set(clusterInd))])
+                potentialInds = np.array([i for i in potentialMedoidSet.intersection(set(clusterInd))])
                 """Inertia is the sum of the squared distances (vec is shape (len(clusterInd))"""
                 inertiaVec = (wdmat2[potentialInds,:][:,clusterInd]).sum(axis=1)
-                mnInd = argmin(inertiaVec)
+                mnInd = np.argmin(inertiaVec)
                 newMedoids[medi] = potentialInds[mnInd]
                 """Add inertia of this new medoid to the running total"""
                 totInertia += inertiaVec[mnInd]
@@ -149,23 +148,23 @@ def precomputeWeightedSqDmat(dmat, weights):
     Returns
     -------
     wdmat2 : ndarray shape[N x N]
-        Weighted and squared distance matrix, ready for computing inertia.
-    """
+        Weighted and squared distance matrix, ready for computing inertia."""
+    
     N = dmat.shape[0]
     """Default weights are ones"""
     if weights is None:
-        weights = ones(N)
+        weights = np.ones(N)
 
     assert weights.shape[0]==N
 
     """Tile weights for multiplying by dmat"""
-    tiledWeights = tile(weights[None,:],(N,1))
+    tiledWeights = np.tile(weights[None,:], (N,1))
 
     """Precompute weighted squared distances"""
     wdmat2 = (dmat**2) * tiledWeights
     return wdmat2
 
-def reassignClusters(dmat, currMedoids, oldLabels = None):
+def reassignClusters(dmat, currMedoids, oldLabels=None):
     """Assigns/reassigns points to clusters based on the minimum (unweighted) distance.
     
     Note: if oldLabels are specified then only reassigns points that
@@ -186,8 +185,8 @@ def reassignClusters(dmat, currMedoids, oldLabels = None):
     Returns
     -------
     labels : ndarray shape[N]
-        New labels such that unique(labels) equals currMedoids.
-    """
+        New labels such that unique(labels) equals currMedoids."""
+
     N = dmat.shape[0]
     k = len(currMedoids)
 
@@ -195,13 +194,13 @@ def reassignClusters(dmat, currMedoids, oldLabels = None):
     but don't reassign a point if the distance isn't an improvement."""
     if not oldLabels is None:
         labels = oldLabels
-        oldD = dmat[arange(N),labels]
+        oldD = dmat[np.arange(N), labels]
         minD = (dmat[:,currMedoids]).min(axis=1)
         """Points where reassigning is neccessary"""
-        reassignInds = (minD<oldD) | ~any(tile(labels[:,None],(1,k))==tile(currMedoids[None,:],(N,1)),axis=1)
+        reassignInds = (minD<oldD) | ~np.any(np.tile(labels[:,None],(1,k))==np.tile(currMedoids[None,:],(N,1)),axis=1)
     else:
-        reassignInds = arange(N)
-        labels = zeros(N)
+        reassignInds = np.arange(N)
+        labels = np.zeros(N)
     #print unique(labels).shape[0],sorted(unique(labels)),sorted(currMedoids)
     #print reassignInds.sum(),currMedoids[argmin(dmat[reassignInds,:][:,currMedoids], axis=1)]
     labels[reassignInds] = currMedoids[argmin(dmat[reassignInds,:][:,currMedoids], axis=1)]
@@ -230,60 +229,78 @@ def computeInertia(wdmat2, labels, currMedoids):
     inertia : float
         Total inertia of all k clusters
     """
-    assert all(sorted(unique(labels)) == sorted(currMedoids))
+    assert np.all(np.unique(labels) == np.unique(currMedoids))
     
     totInertia = 0
     for medi,med in enumerate(currMedoids):
-        clusterInd = where(labels==med)[0]
+        clusterInd = np.where(labels == med)[0]
         """Inertia is the sum of the squared distances"""
         totInertia += wdmat2[med,clusterInd].sum()
     return totInertia
+
+def _rangenorm(vec, mx=1, mn=0):
+    """Normazlize values of vec in-place to [mn, mx] interval"""
+    vec = vec - np.nanmin(vec)
+    vec = vec / np.nanmax(vec)
+    vec = vec * (mx-mn) + mn
+    return vec
 
 def _test_kmedoids(nPasses=20):
     from sklearn import neighbors, datasets
     import brewer2mpl
     from Bio.Cluster import kmedoids as biokmedoids
     import time
-    from seqtools import mynorm
+    import matplotlib.pyplot as plt
 
     iris = datasets.load_iris()
     obs = iris['data']
 
     dmat = neighbors.DistanceMetric.get_metric('euclidean').pairwise(obs)
-    weights = rand(obs.shape[0])
+    weights = np.random.rand(obs.shape[0])
     k = 3
 
-    cmap = brewer2mpl.get_map('set1','qualitative',min([max([3,k]),9])).mpl_colors
+    cmap = palettable.colorbrewer.qualitative.Set1_9.mpl_colors
+    #cmap = brewer2mpl.get_map('set1','qualitative',min([max([3,k]),9])).mpl_colors
 
-    figure(2)
-    clf()
-    subplot(2,2,3)
+    plt.figure(2)
+    plt.clf()
+    plt.subplot(2,2,1)
     startTime = time.time()
-    medoids,labels,inertia,niter,nfound = kmedoids(dmat,k=k,maxIter=1000,nPasses=nPasses,weights=weights)
-    et = time.time()-startTime
+    medoids,labels,inertia,niter,nfound = kmedoids(dmat, k=k, maxIter=1000, nPasses=nPasses)
+    et = time.time() - startTime
     for medi,med in enumerate(medoids):
-        scatter(obs[labels==med,0],obs[labels==med,1],color=cmap[medi],s=mynorm(weights,mn=10,mx=200),edgecolor='black',alpha=0.5)
-        plot(obs[med,0],obs[med,1],'sk',markersize=10,color=cmap[medi])
-    title('Weighted K-medoids (%1.3f sec, %d iterations, %d solns)' % (et,niter,nfound))
+        plt.scatter(obs[labels==med,0],obs[labels==med,1],color=cmap[medi])
+        plt.plot(obs[med,0],obs[med,1],'sk',markersize=10,color=cmap[medi], alpha=0.5)
+    plt.title('K-medoids (%1.3f sec, %d iterations, %d solns)' % (et,niter,nfound))
 
-    subplot(2,2,1)
+    plt.subplot(2,2,3)
     startTime = time.time()
-    medoids,labels,inertia,niter,nfound = kmedoids(dmat,k=k,maxIter=1000,nPasses=nPasses)
-    et = time.time()-startTime
+    medoids,labels,inertia,niter,nfound = kmedoids(dmat, k=k, maxIter=1000, nPasses=nPasses, weights=weights)
+    et = time.time() - startTime
     for medi,med in enumerate(medoids):
-        scatter(obs[labels==med,0],obs[labels==med,1],color=cmap[medi])
-        plot(obs[med,0],obs[med,1],'sk',markersize=10,color=cmap[medi],alpha = 0.5)
-    title('K-medoids (%1.3f sec, %d iterations, %d solns)' % (et,niter,nfound))
+        nWeights = _rangenorm(weights,mn=10,mx=200)
+        plt.scatter(obs[labels==med,0], obs[labels==med,1], color=cmap[medi], s=nWeights, edgecolor='black', alpha=0.5)
+        plt.plot(obs[med,0], obs[med,1], 'sk', markersize=10, color=cmap[medi])
+    plt.title('Weighted K-medoids (%1.3f sec, %d iterations, %d solns)' % (et,niter,nfound))
 
     subplot(2,2,2)
     startTime = time.time()
-    biolabels, bioerror, bionfound = biokmedoids(dmat,nclusters = k,npass=nPasses)
-    biomedoids = unique(biolabels)
-    bioet = time.time()-startTime
+    biolabels, bioerror, bionfound = biokmedoids(dmat, nclusters=k, npass=nPasses)
+    biomedoids = np.unique(biolabels)
+    bioet = time.time() - startTime
     for medi,med in enumerate(biomedoids):
-        scatter(obs[biolabels==med,0],obs[biolabels==med,1],color=cmap[medi])
-        plot(obs[med,0],obs[med,1],'sk',color=cmap[medi],markersize=10,alpha = 0.5)
-    title('Bio.Cluster K-medoids (%1.3f sec, %d solns)' % (bioet,bionfound))
+        plt.scatter(obs[biolabels==med,0], obs[biolabels==med,1], color=cmap[medi])
+        plt.plot(obs[med,0], obs[med,1],'sk', color=cmap[medi], markersize=10, alpha = 0.5)
+    plt.title('Bio.Cluster K-medoids (%1.3f sec, %d solns)' % (bioet,bionfound))
+
+    plt.subplot(2,2,4)
+    startTime = time.time()
+    medoids,membership,niter,nfound = fuzzycmedoids(dmat, c=k, maxIter=1000, nPasses=nPasses)
+    et = time.time() - startTime
+    for medi,med in enumerate(medoids):
+        plt.scatter(obs[labels==med,0], obs[labels==med,1], color=cmap[medi])
+        plt.plot(obs[med,0],obs[med,1], 'sk', markersize=10, color=cmap[medi], alpha=0.5)
+    plt.title('Fuzzy c-medoids (%1.3f sec, %d iterations, %d solns)' % (et,niter,nfound))
 
 
 def fuzzycmedoids(dmat, c=3, weights=None, nPasses=1, maxIter=1000, initInds=None, potentialMedoidInds=None):
