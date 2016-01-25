@@ -74,8 +74,8 @@ def kmedoids(dmat, k=3, weights=None, nPasses=1, maxIter=1000, initInds=None, po
     for passi in range(nPasses):
         """Pick k random medoids"""
         currMedoids = np.random.permutation(initInds)[:k]
-        newMedoids = np.zeros(k, dtype=np.int32)
-        labels = currMedoids[randint(k, size=N)]
+        newMedoids = np.zeros(k, dtype=int)
+        labels = currMedoids[np.random.randint(k, size=N)]
         for i in range(maxIter):
             """Assign each point to the closest cluster,
             but don't reassign a point if the distance isn't an improvement."""
@@ -99,7 +99,7 @@ def kmedoids(dmat, k=3, weights=None, nPasses=1, maxIter=1000, initInds=None, po
             """Choose new medoids for each cluster, minimizing intra-cluster distance"""
             totInertia = 0
             for medi,med in enumerate(currMedoids):
-                clusterInd = where(labels==med)[0]
+                clusterInd = np.where(labels == med)[0]
                 """Limit medoids to those specified by indexing axis=0 with the intersection of potential medoids and all points in the cluster"""
                 potentialInds = np.array([i for i in potentialMedoidSet.intersection(set(clusterInd))])
                 """Inertia is the sum of the squared distances (vec is shape (len(clusterInd))"""
@@ -126,8 +126,10 @@ def kmedoids(dmat, k=3, weights=None, nPasses=1, maxIter=1000, initInds=None, po
     """Return the results from the best pass"""
     return bestMedoids, bestLabels, bestInertia, bestNIter, nfound
 
-def precomputeWeightedSqDmat(dmat, weights):
+def precomputeWeightedSqDmat(dmat, weights, squared=True):
     """Compute the weighted and squared distance matrix for kmedoids.
+
+    Optionally, do not square dmat before applying weights (for FCMdd)
     
     Adding weight to a point increases its impact on inertia linearly,
     such that the algorithm will tend to favor minimization of distances
@@ -161,7 +163,10 @@ def precomputeWeightedSqDmat(dmat, weights):
     tiledWeights = np.tile(weights[None,:], (N,1))
 
     """Precompute weighted squared distances"""
-    wdmat2 = (dmat**2) * tiledWeights
+    if squared:
+        wdmat2 = (dmat**2) * tiledWeights
+    else:
+        wdmat2 = dmat * tiledWeights
     return wdmat2
 
 def reassignClusters(dmat, currMedoids, oldLabels=None):
@@ -197,14 +202,11 @@ def reassignClusters(dmat, currMedoids, oldLabels=None):
         oldD = dmat[np.arange(N), labels]
         minD = (dmat[:,currMedoids]).min(axis=1)
         """Points where reassigning is neccessary"""
-        reassignInds = (minD<oldD) | ~np.any(np.tile(labels[:,None],(1,k))==np.tile(currMedoids[None,:],(N,1)),axis=1)
+        reassignInds = (minD<oldD) | ~np.any(np.tile(labels[:,None],(1,k)) == np.tile(currMedoids[None,:],(N,1)),axis=1)
     else:
         reassignInds = np.arange(N)
         labels = np.zeros(N)
-    #print unique(labels).shape[0],sorted(unique(labels)),sorted(currMedoids)
-    #print reassignInds.sum(),currMedoids[argmin(dmat[reassignInds,:][:,currMedoids], axis=1)]
-    labels[reassignInds] = currMedoids[argmin(dmat[reassignInds,:][:,currMedoids], axis=1)]
-    #print unique(labels).shape[0],sorted(unique(labels)),sorted(currMedoids)
+    labels[reassignInds] = currMedoids[np.argmin(dmat[reassignInds,:][:,currMedoids], axis=1)]
     return labels
 
 def computeInertia(wdmat2, labels, currMedoids):
@@ -296,10 +298,11 @@ def _test_kmedoids(nPasses=20):
     plt.subplot(2,2,4)
     startTime = time.time()
     medoids,membership,niter,nfound = fuzzycmedoids(dmat, c=k, maxIter=1000, nPasses=nPasses)
+    labels = medoids[np.argmax(membership, axis=0)]
     et = time.time() - startTime
     for medi,med in enumerate(medoids):
         plt.scatter(obs[labels==med,0], obs[labels==med,1], color=cmap[medi])
-        plt.plot(obs[med,0],obs[med,1], 'sk', markersize=10, color=cmap[medi], alpha=0.5)
+        plt.plot(obs[med,0], obs[med,1], 'sk', markersize=10, color=cmap[medi], alpha=0.5)
     plt.title('Fuzzy c-medoids (%1.3f sec, %d iterations, %d solns)' % (et,niter,nfound))
 
 
@@ -351,13 +354,12 @@ def fuzzycmedoids(dmat, c=3, weights=None, nPasses=1, maxIter=1000, initInds=Non
     if initInds is None:
         initInds = np.arange(N)
 
-    wdmat2 = precomputeWeightedSqDmat(dmat, weights)
+    wdmat = precomputeWeightedSqDmat(dmat, weights, squared=False)
 
     if not potentialMedoidInds is None:
-        potentialMedoidSet = set(potentialMedoidInds)
-        initInds = np.array([i for i in potentialMedoidSet.intersection(set(initInds))], dtype=int)
+        initInds = np.array([i for i in initInds if i in potentialMedoidInds], dtype=int)
     else:
-        potentialMedoidSet = np.arange(N)
+        potentialMedoidInds = np.arange(N)
 
     if len(initInds) == 0:
         print 'No possible initInds provided.'
@@ -367,22 +369,23 @@ def fuzzycmedoids(dmat, c=3, weights=None, nPasses=1, maxIter=1000, initInds=Non
     for passi in range(nPasses):
         """Pick c random medoids"""
         currMedoids = np.random.permutation(initInds)[:c]
-        newMedoids = np.zeros(c, dtype=np.int32)
-        membership = np.zeros((N, c))
+        newMedoids = np.zeros(c, dtype=int)
         for i in range(maxIter):
-            """(Re)compute memberships"""
-            membership = recomputeMembership(dmat, currMedoids)
+            """(Re)compute memberships [N x c]"""
+            membership = computeMembership(dmat, currMedoids)
             
             """Choose new medoid for each cluster, minimizing fuzzy objective function"""
-            newMedoids = None #WORKING HERE
             totInertia = 0
             for medi,med in enumerate(currMedoids):
-                clusterInd = where(labels==med)[0]
-                """Limit medoids to those specified by indexing axis=0 with the intersection of potential medoids and all points in the cluster"""
-                potentialInds = array([i for i in potentialMedoidSet.intersection(set(clusterInd))])
-                """Inertia is the sum of the squared distances (vec is shape (len(clusterInd))"""
-                inertiaVec = (wdmat2[potentialInds,:][:,clusterInd]).sum(axis=1)
-                mnInd = argmin(inertiaVec)
+                """Within each cluster find the new medoid
+                by minimizing the dissimilarities,
+                weighted by membership to the cluster"""
+
+                """Inertia is the sum of the membership times the distance matrix over all points.
+                (membership for cluster medi [a column vector] is applied across the columns of wdmat
+                [and broadcast to all row vectors] before summing)"""
+                inertiaVec = (membership[:,medi][:,None].T * wdmat[potentialMedoidInds,:]).sum(axis=1)
+                mnInd = np.argmin(inertiaVec)
                 newMedoids[medi] = potentialInds[mnInd]
                 """Add inertia of this new medoid to the running total"""
                 totInertia += inertiaVec[mnInd]
@@ -396,10 +399,57 @@ def fuzzycmedoids(dmat, c=3, weights=None, nPasses=1, maxIter=1000, initInds=Non
             """For multiple passes, see if this pass was better than the others"""
             bestInertia = totInertia
             bestMedoids = currMedoids.copy()
-            bestLabels = labels.copy()
+            bestMembership = membership.copy()
             bestNIter = i
     
     """nfound is the number of unique solutions (each row is a solution)"""
     nfound = len(unique_rows(allMedoids)[:])
     """Return the results from the best pass"""
     return bestMedoids, bestMembership, bestNIter, nfound
+
+def computeMembership(dmat, medoids, param=2, method='FCM'):
+    """Compute membership of each instance in each cluster,
+    defined by the provided medoids.
+
+    Possible methods come from the manuscript by Krishnapuram et al.
+    and may include an additional parameter (typically a "fuzzifier")
+
+    Parameters
+    ----------
+    dmat : ndarray shape[N x N]
+        Pairwise distance matrix (unweighted).
+    medoids : ndarray shape[c]
+        Index into points/dmat that specifies the c current medoids.
+    method : str
+        Method for computing memberships:
+            "FCM" (from fuzzy c-means)
+            Equations from Krishnapuram et al. (2, 3, 4 or 5)
+    param : float
+        Additional parameter required by the method.
+        Note: param must be shape[c,] for methods 4 or 5
+
+    Returns
+    -------
+    membership : ndarray shape[N x c]
+        New labels such that unique(labels) equals currMedoids."""
+
+    N = dmat.shape[0]
+    c = len(medoids)
+
+    r = dmat[:,medoids]
+
+    if method in ['FCM', 2, '2']:
+        assert param >= 1
+        tmp = (1 / r)**(1 / (param - 1))
+    elif method in [3, '3']:
+        assert param > 0
+        tmp = np.exp(-param * r)
+    elif method in [4, '4']:
+        assert param.shape == (c,)
+        tmp = 1/(1 + r/param[:,None])
+    elif method in [5, '5']:
+        assert param.shape == (c,)
+        tmp = np.exp(-r/param[:,None])
+
+    membership = tmp / tmp.sum(axis=1, keepdims=True)
+    return membership
