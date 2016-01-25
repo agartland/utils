@@ -5,7 +5,8 @@ __all__ = ['kmedoids',
            'fuzzycmedoids',
            'precomputeWeightedSqDmat',
            'reassignClusters',
-           'computeInertia']
+           'computeInertia',
+           'computeMembership']
 
 def kmedoids(dmat, k=3, weights=None, nPasses=1, maxIter=1000, initInds=None, potentialMedoidInds=None):
     """Identify the k points that minimize all intra-cluster distances.
@@ -240,72 +241,6 @@ def computeInertia(wdmat2, labels, currMedoids):
         totInertia += wdmat2[med,clusterInd].sum()
     return totInertia
 
-def _rangenorm(vec, mx=1, mn=0):
-    """Normazlize values of vec in-place to [mn, mx] interval"""
-    vec = vec - np.nanmin(vec)
-    vec = vec / np.nanmax(vec)
-    vec = vec * (mx-mn) + mn
-    return vec
-
-def _test_kmedoids(nPasses=20):
-    from sklearn import neighbors, datasets
-    import brewer2mpl
-    from Bio.Cluster import kmedoids as biokmedoids
-    import time
-    import matplotlib.pyplot as plt
-
-    iris = datasets.load_iris()
-    obs = iris['data']
-
-    dmat = neighbors.DistanceMetric.get_metric('euclidean').pairwise(obs)
-    weights = np.random.rand(obs.shape[0])
-    k = 3
-
-    cmap = palettable.colorbrewer.qualitative.Set1_9.mpl_colors
-    #cmap = brewer2mpl.get_map('set1','qualitative',min([max([3,k]),9])).mpl_colors
-
-    plt.figure(2)
-    plt.clf()
-    plt.subplot(2,2,1)
-    startTime = time.time()
-    medoids,labels,inertia,niter,nfound = kmedoids(dmat, k=k, maxIter=1000, nPasses=nPasses)
-    et = time.time() - startTime
-    for medi,med in enumerate(medoids):
-        plt.scatter(obs[labels==med,0],obs[labels==med,1],color=cmap[medi])
-        plt.plot(obs[med,0],obs[med,1],'sk',markersize=10,color=cmap[medi], alpha=0.5)
-    plt.title('K-medoids (%1.3f sec, %d iterations, %d solns)' % (et,niter,nfound))
-
-    plt.subplot(2,2,3)
-    startTime = time.time()
-    medoids,labels,inertia,niter,nfound = kmedoids(dmat, k=k, maxIter=1000, nPasses=nPasses, weights=weights)
-    et = time.time() - startTime
-    for medi,med in enumerate(medoids):
-        nWeights = _rangenorm(weights,mn=10,mx=200)
-        plt.scatter(obs[labels==med,0], obs[labels==med,1], color=cmap[medi], s=nWeights, edgecolor='black', alpha=0.5)
-        plt.plot(obs[med,0], obs[med,1], 'sk', markersize=10, color=cmap[medi])
-    plt.title('Weighted K-medoids (%1.3f sec, %d iterations, %d solns)' % (et,niter,nfound))
-
-    subplot(2,2,2)
-    startTime = time.time()
-    biolabels, bioerror, bionfound = biokmedoids(dmat, nclusters=k, npass=nPasses)
-    biomedoids = np.unique(biolabels)
-    bioet = time.time() - startTime
-    for medi,med in enumerate(biomedoids):
-        plt.scatter(obs[biolabels==med,0], obs[biolabels==med,1], color=cmap[medi])
-        plt.plot(obs[med,0], obs[med,1],'sk', color=cmap[medi], markersize=10, alpha = 0.5)
-    plt.title('Bio.Cluster K-medoids (%1.3f sec, %d solns)' % (bioet,bionfound))
-
-    plt.subplot(2,2,4)
-    startTime = time.time()
-    medoids,membership,niter,nfound = fuzzycmedoids(dmat, c=k, maxIter=1000, nPasses=nPasses)
-    labels = medoids[np.argmax(membership, axis=0)]
-    et = time.time() - startTime
-    for medi,med in enumerate(medoids):
-        plt.scatter(obs[labels==med,0], obs[labels==med,1], color=cmap[medi])
-        plt.plot(obs[med,0], obs[med,1], 'sk', markersize=10, color=cmap[medi], alpha=0.5)
-    plt.title('Fuzzy c-medoids (%1.3f sec, %d iterations, %d solns)' % (et,niter,nfound))
-
-
 def fuzzycmedoids(dmat, c=3, weights=None, nPasses=1, maxIter=1000, initInds=None, potentialMedoidInds=None):
     """Implementation of fuzz c-medoids (FCMdd)
 
@@ -453,3 +388,68 @@ def computeMembership(dmat, medoids, param=2, method='FCM'):
 
     membership = tmp / tmp.sum(axis=1, keepdims=True)
     return membership
+
+def _rangenorm(vec, mx=1, mn=0):
+    """Normazlize values of vec in-place to [mn, mx] interval"""
+    vec = vec - np.nanmin(vec)
+    vec = vec / np.nanmax(vec)
+    vec = vec * (mx-mn) + mn
+    return vec
+
+def _test_kmedoids(nPasses=20):
+    from sklearn import neighbors, datasets
+    import brewer2mpl
+    from Bio.Cluster import kmedoids as biokmedoids
+    import time
+    import matplotlib.pyplot as plt
+
+    iris = datasets.load_iris()
+    obs = iris['data']
+
+    dmat = neighbors.DistanceMetric.get_metric('euclidean').pairwise(obs)
+    weights = np.random.rand(obs.shape[0])
+    k = 3
+
+    cmap = palettable.colorbrewer.qualitative.Set1_9.mpl_colors
+    #cmap = brewer2mpl.get_map('set1','qualitative',min([max([3,k]),9])).mpl_colors
+
+    plt.figure(2)
+    plt.clf()
+    plt.subplot(2,2,1)
+    startTime = time.time()
+    medoids,labels,inertia,niter,nfound = kmedoids(dmat, k=k, maxIter=1000, nPasses=nPasses)
+    et = time.time() - startTime
+    for medi,med in enumerate(medoids):
+        plt.scatter(obs[labels==med,0],obs[labels==med,1],color=cmap[medi])
+        plt.plot(obs[med,0],obs[med,1],'sk',markersize=10,color=cmap[medi], alpha=0.5)
+    plt.title('K-medoids (%1.3f sec, %d iterations, %d solns)' % (et,niter,nfound))
+
+    plt.subplot(2,2,3)
+    startTime = time.time()
+    medoids,labels,inertia,niter,nfound = kmedoids(dmat, k=k, maxIter=1000, nPasses=nPasses, weights=weights)
+    et = time.time() - startTime
+    for medi,med in enumerate(medoids):
+        nWeights = _rangenorm(weights,mn=10,mx=200)
+        plt.scatter(obs[labels==med,0], obs[labels==med,1], color=cmap[medi], s=nWeights, edgecolor='black', alpha=0.5)
+        plt.plot(obs[med,0], obs[med,1], 'sk', markersize=10, color=cmap[medi])
+    plt.title('Weighted K-medoids (%1.3f sec, %d iterations, %d solns)' % (et,niter,nfound))
+
+    subplot(2,2,2)
+    startTime = time.time()
+    biolabels, bioerror, bionfound = biokmedoids(dmat, nclusters=k, npass=nPasses)
+    biomedoids = np.unique(biolabels)
+    bioet = time.time() - startTime
+    for medi,med in enumerate(biomedoids):
+        plt.scatter(obs[biolabels==med,0], obs[biolabels==med,1], color=cmap[medi])
+        plt.plot(obs[med,0], obs[med,1],'sk', color=cmap[medi], markersize=10, alpha = 0.5)
+    plt.title('Bio.Cluster K-medoids (%1.3f sec, %d solns)' % (bioet,bionfound))
+
+    plt.subplot(2,2,4)
+    startTime = time.time()
+    medoids,membership,niter,nfound = fuzzycmedoids(dmat, c=k, maxIter=1000, nPasses=nPasses)
+    labels = medoids[np.argmax(membership, axis=0)]
+    et = time.time() - startTime
+    for medi,med in enumerate(medoids):
+        plt.scatter(obs[labels==med,0], obs[labels==med,1], color=cmap[medi])
+        plt.plot(obs[med,0], obs[med,1], 'sk', markersize=10, color=cmap[medi], alpha=0.5)
+    plt.title('Fuzzy c-medoids (%1.3f sec, %d iterations, %d solns)' % (et,niter,nfound))
