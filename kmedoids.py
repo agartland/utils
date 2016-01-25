@@ -102,7 +102,7 @@ def kmedoids(dmat, k=3, weights=None, nPasses=1, maxIter=1000, initInds=None, po
             for medi,med in enumerate(currMedoids):
                 clusterInd = np.where(labels == med)[0]
                 """Limit medoids to those specified by indexing axis=0 with the intersection of potential medoids and all points in the cluster"""
-                potentialInds = np.array([i for i in potentialMedoidSet.intersection(set(clusterInd))])
+                potentialInds = np.array([poti for poti in potentialMedoidSet.intersection(set(clusterInd))])
                 """Inertia is the sum of the squared distances (vec is shape (len(clusterInd))"""
                 inertiaVec = (wdmat2[potentialInds,:][:,clusterInd]).sum(axis=1)
                 mnInd = np.argmin(inertiaVec)
@@ -120,7 +120,7 @@ def kmedoids(dmat, k=3, weights=None, nPasses=1, maxIter=1000, initInds=None, po
             bestInertia = totInertia
             bestMedoids = currMedoids.copy()
             bestLabels = labels.copy()
-            bestNIter = i
+            bestNIter = i + 1
     
     """nfound is the number of unique solutions (each row is a solution)"""
     nfound = len(unique_rows(allMedoids)[:])
@@ -241,7 +241,7 @@ def computeInertia(wdmat2, labels, currMedoids):
         totInertia += wdmat2[med,clusterInd].sum()
     return totInertia
 
-def fuzzycmedoids(dmat, c=3, weights=None, nPasses=1, maxIter=1000, initInds=None, potentialMedoidInds=None):
+def fuzzycmedoids(dmat, c, membershipMethod=('FCM',2), weights=None, nPasses=1, maxIter=1000, initInds=None, potentialMedoidInds=None):
     """Implementation of fuzz c-medoids (FCMdd)
 
     Krishnapuram, Raghu, Anupam Joshi, Liyu Yi, Computer Sciences, and Baltimore County.
@@ -262,6 +262,8 @@ def fuzzycmedoids(dmat, c=3, weights=None, nPasses=1, maxIter=1000, initInds=Non
         Relative weights for each observation in inertia computation.
     c : int
         The number of clusters to form as well as the number of medoids to generate.
+    membershipMethod : tuple of (method str/int, param)
+        Method for computing membership matrix.
     nPasses : int
         Number of times the algorithm is restarted with random medoid initializations.
         The best solution is returned.
@@ -308,7 +310,7 @@ def fuzzycmedoids(dmat, c=3, weights=None, nPasses=1, maxIter=1000, initInds=Non
         newMedoids = np.zeros(c, dtype=int)
         for i in range(maxIter):
             """(Re)compute memberships [N x c]"""
-            membership = computeMembership(dmat, currMedoids)
+            membership = computeMembership(dmat, currMedoids, method=membershipMethod[0], param=membershipMethod[1])
             
             """Choose new medoid for each cluster, minimizing fuzzy objective function"""
             totInertia = 0
@@ -336,14 +338,14 @@ def fuzzycmedoids(dmat, c=3, weights=None, nPasses=1, maxIter=1000, initInds=Non
             bestInertia = totInertia
             bestMedoids = currMedoids.copy()
             bestMembership = membership.copy()
-            bestNIter = i
+            bestNIter = i + 1
     
     """nfound is the number of unique solutions (each row is a solution)"""
     nfound = len(unique_rows(allMedoids)[:])
     """Return the results from the best pass"""
     return bestMedoids, bestMembership, bestNIter, nfound
 
-def computeMembership(dmat, medoids, param=2, method='FCM'):
+def computeMembership(dmat, medoids, method='FCM', param=2):
     """Compute membership of each instance in each cluster,
     defined by the provided medoids.
 
@@ -388,6 +390,9 @@ def computeMembership(dmat, medoids, param=2, method='FCM'):
         tmp = np.exp(-r/param[:,None])
 
     membership = tmp / tmp.sum(axis=1, keepdims=True)
+    for medi,med in enumerate(medoids):
+        membership[med,:] = 0.
+        membership[med,medi] = 1.
     return membership
 
 def _rangenorm(vec, mx=1, mn=0):
@@ -397,29 +402,27 @@ def _rangenorm(vec, mx=1, mn=0):
     vec = vec * (mx-mn) + mn
     return vec
 
-def _test_kmedoids(nPasses=20):
+def _test_plot(k=3, nPasses=20, maxIter=1000):
     from sklearn import neighbors, datasets
-    import brewer2mpl
     from Bio.Cluster import kmedoids as biokmedoids
     import time
     import matplotlib.pyplot as plt
     import palettable
+    import seaborn as sns
+    sns.set(style='darkgrid', palette='muted', font_scale=1.3)
+    cmap = palettable.colorbrewer.qualitative.Set1_9.mpl_colors
 
     iris = datasets.load_iris()
     obs = iris['data']
-
     dmat = neighbors.DistanceMetric.get_metric('euclidean').pairwise(obs)
+    np.random.seed(110820)
     weights = np.random.rand(obs.shape[0])
-    k = 3
-
-    cmap = palettable.colorbrewer.qualitative.Set1_9.mpl_colors
-    #cmap = brewer2mpl.get_map('set1','qualitative',min([max([3,k]),9])).mpl_colors
 
     plt.figure(2)
     plt.clf()
     plt.subplot(2,2,1)
     startTime = time.time()
-    medoids,labels,inertia,niter,nfound = kmedoids(dmat, k=k, maxIter=1000, nPasses=nPasses)
+    medoids,labels,inertia,niter,nfound = kmedoids(dmat, k=k, maxIter=maxIter, nPasses=nPasses)
     et = time.time() - startTime
     for medi,med in enumerate(medoids):
         plt.scatter(obs[labels==med,0],obs[labels==med,1],color=cmap[medi])
@@ -428,10 +431,10 @@ def _test_kmedoids(nPasses=20):
 
     plt.subplot(2,2,3)
     startTime = time.time()
-    medoids,labels,inertia,niter,nfound = kmedoids(dmat, k=k, maxIter=1000, nPasses=nPasses, weights=weights)
+    medoids,labels,inertia,niter,nfound = kmedoids(dmat, k=k, maxIter=maxIter, nPasses=nPasses, weights=weights)
     et = time.time() - startTime
     for medi,med in enumerate(medoids):
-        nWeights = _rangenorm(weights,mn=10,mx=200)
+        nWeights = _rangenorm(weights, mn=10, mx=200)
         plt.scatter(obs[labels==med,0], obs[labels==med,1], color=cmap[medi], s=nWeights, edgecolor='black', alpha=0.5)
         plt.plot(obs[med,0], obs[med,1], 'sk', markersize=10, color=cmap[medi])
     plt.title('Weighted K-medoids (%1.3f sec, %d iterations, %d solns)' % (et,niter,nfound))
@@ -448,12 +451,29 @@ def _test_kmedoids(nPasses=20):
 
     plt.subplot(2,2,4)
     startTime = time.time()
-    medoids,membership,niter,nfound = fuzzycmedoids(dmat, c=k, maxIter=1000, nPasses=nPasses)
+    medoids,membership,niter,nfound = fuzzycmedoids(dmat, c=k, maxIter=maxIter, nPasses=nPasses)
     labels = medoids[np.argmax(membership, axis=1)]
     et = time.time() - startTime
     
     for medi,med in enumerate(medoids):
-        plt.scatter(obs[labels==med,0], obs[labels==med,1], color=cmap[medi])
-        plt.plot(obs[med,0], obs[med,1], 'sk', markersize=10, color=cmap[medi], alpha=0.5)
+        ind = labels == med
+        sz = _rangenorm(membership[:,medi][ind], mn=10, mx=100)
+        sz[np.argmax(sz)] = 0.
+        plt.scatter(obs[ind,0], obs[ind,1], color=cmap[medi], s=sz, alpha=0.5)
+        plt.plot(obs[med,0], obs[med,1], 'sk', markersize=10, color=cmap[medi])
     plt.title('Fuzzy c-medoids (%1.3f sec, %d iterations, %d solns)' % (et,niter,nfound))
 
+def _test_kmedoids(nPasses=20, k=3, maxIter=1000):
+    from sklearn import neighbors, datasets
+    iris = datasets.load_iris()
+    obs = iris['data']
+    dmat = neighbors.DistanceMetric.get_metric('euclidean').pairwise(obs)
+    return kmedoids(dmat, k=k, maxIter=maxIter, nPasses=nPasses)
+
+def _test_FCMdd(nPasses=20, c=3, maxIter=1000, membershipMethod=('FCM',2)):
+    from sklearn import neighbors, datasets
+    iris = datasets.load_iris()
+    obs = iris['data']
+    dmat = neighbors.DistanceMetric.get_metric('euclidean').pairwise(obs)
+    medoids, membership, niter, nfound = fuzzycmedoids(dmat, c=c, maxIter=maxIter, nPasses=nPasses, membershipMethod=membershipMethod)
+    return dmat, medoids, membership, niter, nfound
