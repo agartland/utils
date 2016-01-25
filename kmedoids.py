@@ -64,7 +64,7 @@ def kmedoids(dmat, k=3, weights=None, nPasses=1, maxIter=1000, initInds=None, po
         potentialMedoidSet = set(potentialMedoidInds)
         initInds = np.array([i for i in potentialMedoidSet.intersection(set(initInds))], dtype=int)
     else:
-        potentialMedoidSet = np.arange(N)
+        potentialMedoidSet = set(np.arange(N))
 
     if len(initInds)==0:
         print 'No possible initInds provided.'
@@ -301,6 +301,7 @@ def fuzzycmedoids(dmat, c=3, weights=None, nPasses=1, maxIter=1000, initInds=Non
         return
 
     allMedoids = np.zeros((nPasses, c))
+    bestInertia = None
     for passi in range(nPasses):
         """Pick c random medoids"""
         currMedoids = np.random.permutation(initInds)[:c]
@@ -321,7 +322,7 @@ def fuzzycmedoids(dmat, c=3, weights=None, nPasses=1, maxIter=1000, initInds=Non
                 [and broadcast to all row vectors] before summing)"""
                 inertiaVec = (membership[:,medi][:,None].T * wdmat[potentialMedoidInds,:]).sum(axis=1)
                 mnInd = np.argmin(inertiaVec)
-                newMedoids[medi] = potentialInds[mnInd]
+                newMedoids[medi] = potentialMedoidInds[mnInd]
                 """Add inertia of this new medoid to the running total"""
                 totInertia += inertiaVec[mnInd]
 
@@ -402,6 +403,7 @@ def _test_kmedoids(nPasses=20):
     from Bio.Cluster import kmedoids as biokmedoids
     import time
     import matplotlib.pyplot as plt
+    import palettable
 
     iris = datasets.load_iris()
     obs = iris['data']
@@ -434,7 +436,7 @@ def _test_kmedoids(nPasses=20):
         plt.plot(obs[med,0], obs[med,1], 'sk', markersize=10, color=cmap[medi])
     plt.title('Weighted K-medoids (%1.3f sec, %d iterations, %d solns)' % (et,niter,nfound))
 
-    subplot(2,2,2)
+    plt.subplot(2,2,2)
     startTime = time.time()
     biolabels, bioerror, bionfound = biokmedoids(dmat, nclusters=k, npass=nPasses)
     biomedoids = np.unique(biolabels)
@@ -447,9 +449,11 @@ def _test_kmedoids(nPasses=20):
     plt.subplot(2,2,4)
     startTime = time.time()
     medoids,membership,niter,nfound = fuzzycmedoids(dmat, c=k, maxIter=1000, nPasses=nPasses)
-    labels = medoids[np.argmax(membership, axis=0)]
+    labels = medoids[np.argmax(membership, axis=1)]
     et = time.time() - startTime
+    
     for medi,med in enumerate(medoids):
         plt.scatter(obs[labels==med,0], obs[labels==med,1], color=cmap[medi])
         plt.plot(obs[med,0], obs[med,1], 'sk', markersize=10, color=cmap[medi], alpha=0.5)
     plt.title('Fuzzy c-medoids (%1.3f sec, %d iterations, %d solns)' % (et,niter,nfound))
+
