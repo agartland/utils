@@ -6,7 +6,7 @@ __all__ = ['unique_rows',
             'mnmxi',
             'argsort_rows']
 
-def unique_rows(a, return_index = False, return_inverse = False, return_counts = False):
+def unique_rows(a, return_index=False, return_inverse=False, return_counts=False):
     """Performs np.unique on whole rows of matrix a using a "view".
     See http://stackoverflow.com/a/16971324/74616"""
     try:
@@ -24,7 +24,10 @@ def unique_rows(a, return_index = False, return_inverse = False, return_counts =
         for i in range(a.shape[0]):
             s.add(tuple(a[i,:].tolist()))
         out = [np.array([row for row in s])]
-    return tuple(out)
+    if len(out) == 1:
+        return out[0]
+    else:
+        return tuple(out)
 
 def argrank(vec):
     """Return the rank (0 based) of the elements in vec"""
