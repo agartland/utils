@@ -2,7 +2,6 @@ import numpy as np
 from vectools import unique_rows
 import scipy
 import itertools
-import time
 
 __all__ = ['kmedoids',
            'fuzzycmedoids',
@@ -560,7 +559,8 @@ def _test_kmedoids(nPasses=20, k=3, maxIter=1000):
     iris = datasets.load_iris()
     obs = iris['data']
     dmat = neighbors.DistanceMetric.get_metric('euclidean').pairwise(obs)
-    return kmedoids(dmat, k=k, maxIter=maxIter, nPasses=nPasses)
+    results = kmedoids(dmat, k=k, maxIter=maxIter, nPasses=nPasses)
+    return (dmat,) + results
 
 def _test_FCMdd(nPasses=20, c=3, maxIter=1000, membershipMethod=('FCM',2)):
     from sklearn import neighbors, datasets
