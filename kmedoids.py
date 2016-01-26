@@ -345,6 +345,27 @@ def fuzzycmedoids(dmat, c, membershipMethod=('FCM',2), weights=None, nPasses=1, 
     """Return the results from the best pass"""
     return bestMedoids, bestMembership, bestNIter, nfound
 
+def fuzzyPartitionCoef(membership):
+    """Fuzzy partition coefficient `fpc` relative to fuzzy c-partitioned
+    matrix membership. Measures 'fuzziness' in partitioned clustering.
+
+    Copied from from sckit-fuzzy:
+    https://github.com/scikit-fuzzy/scikit-fuzzy
+    
+    Parameters
+    ----------
+    membership : 2d array (C, N)
+        Fuzzy c-partitioned matrix; N = number of data points and C = number
+        of clusters.
+    
+    Returns
+    -------
+    fpc : float
+        Fuzzy partition coefficient."""
+    n = membership.shape[1]
+
+    return np.trace(membership.dot(membership.T)) / float(n)
+
 def computeMembership(dmat, medoids, method='FCM', param=2):
     """Compute membership of each instance in each cluster,
     defined by the provided medoids.
