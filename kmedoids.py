@@ -4,14 +4,6 @@ import scipy
 import itertools
 import time
 
-try:
-    from multiprocessing import Pool
-    import parmap
-    importParmap = True
-except ImportError:
-    importParmap = False
-    print 'Failed to import parmap: no support for parallel processing.'
-
 __all__ = ['kmedoids',
            'fuzzycmedoids',
            'tryallmedoids',
@@ -431,7 +423,7 @@ def computeMembership(dmat, medoids, method='FCM', param=2):
         membership[med,medi] = 1.
     return membership
 
-def tryallmedoids(dmat, c, weights=None, potentialMedoidInds=None, fuzzy=True, fuzzyParams=('FCM',2), nCPUs=1):
+def tryallmedoids(dmat, c, weights=None, potentialMedoidInds=None, fuzzy=True, fuzzyParams=('FCM',2)):
     """Brute force optimization of k-medoids or fuzzy c-medoids clustering.
 
     To apply to points in euclidean space pass dmat using:
@@ -461,10 +453,6 @@ def tryallmedoids(dmat, c, weights=None, potentialMedoidInds=None, fuzzy=True, f
         Each row contains the membership of a point to each of the clusters
         OR with hard clusters, the medoid/cluster index of each point."""
 
-    if not importParmap:
-        nCPUs = 1
-        print 'No support for multiple CPUs: parmat not found.'
-
     if fuzzy:
         wdmat = precomputeWeightedSqDmat(dmat, weights, squared=False)
     else:
@@ -479,13 +467,6 @@ def tryallmedoids(dmat, c, weights=None, potentialMedoidInds=None, fuzzy=True, f
     if combinations > 1e7:
         print "Too many combinations to try: %1.1g > 10M" % combinations
 
-    """
-    if cpus > 1:
-        result = parmap.map(_predictOneHLA, hlas, method, peptides, verbose, pool=Pool(processes=cpus))
-    else:
-        result = parmap.map(_predictOneHLA, hlas, method, peptides, verbose, parallel=False)
-    """
-    
     bestInertia = None
     for medInds in itertools.combinations(range(len(potentialMedoidInds)), c):
         medoids = potentialMedoidInds[np.array(medInds)]
@@ -494,7 +475,7 @@ def tryallmedoids(dmat, c, weights=None, potentialMedoidInds=None, fuzzy=True, f
             membership = computeMembership(dmat, medoids, method=fuzzyParams[0], param=fuzzyParams[1])
         else:
             membership = np.zeros((N,c))
-            membership[np.arange(N), np.argmin(dmat, axis=1)] = 1.
+            membership[np.arange(N), np.argmin(dmat[:,medoids], axis=1)] = 1.
         inertia = (wdmat[:,medoids] * membership).sum()
 
         if bestInertia is None or inertia < bestInertia:
