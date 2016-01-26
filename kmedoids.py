@@ -123,7 +123,7 @@ def kmedoids(dmat, k=3, weights=None, nPasses=1, maxIter=1000, initInds=None, po
             bestNIter = i + 1
     
     """nfound is the number of unique solutions (each row is a solution)"""
-    nfound = len(unique_rows(allMedoids)[:])
+    nfound = unique_rows(allMedoids).shape[0]
     """Return the results from the best pass"""
     return bestMedoids, bestLabels, bestInertia, bestNIter, nfound
 
@@ -304,6 +304,7 @@ def fuzzycmedoids(dmat, c, membershipMethod=('FCM',2), weights=None, nPasses=1, 
 
     allMedoids = np.zeros((nPasses, c))
     bestInertia = None
+    foundSame = 0
     for passi in range(nPasses):
         """Pick c random medoids"""
         currMedoids = np.random.permutation(initInds)[:c]
@@ -322,7 +323,8 @@ def fuzzycmedoids(dmat, c, membershipMethod=('FCM',2), weights=None, nPasses=1, 
                 """Inertia is the sum of the membership times the distance matrix over all points.
                 (membership for cluster medi [a column vector] is applied across the columns of wdmat
                 [and broadcast to all row vectors] before summing)"""
-                inertiaVec = (membership[:,medi][:,None].T * wdmat[potentialMedoidInds,:]).sum(axis=1)
+                inertiaMat = np.tile(membership[:,medi][:,None].T, (len(potentialMedoidInds),1)) * wdmat[potentialMedoidInds,:]
+                inertiaVec = inertiaMat.sum(axis=1)
                 mnInd = np.argmin(inertiaVec)
                 newMedoids[medi] = potentialMedoidInds[mnInd]
                 """Add inertia of this new medoid to the running total"""
@@ -333,6 +335,7 @@ def fuzzycmedoids(dmat, c, membershipMethod=('FCM',2), weights=None, nPasses=1, 
                 allMedoids[passi,:] = sorted(currMedoids)
                 break
             currMedoids = newMedoids.copy()
+            
         if bestInertia is None or totInertia < bestInertia:
             """For multiple passes, see if this pass was better than the others"""
             bestInertia = totInertia
@@ -341,9 +344,9 @@ def fuzzycmedoids(dmat, c, membershipMethod=('FCM',2), weights=None, nPasses=1, 
             bestNIter = i + 1
     
     """nfound is the number of unique solutions (each row is a solution)"""
-    nfound = len(unique_rows(allMedoids)[:])
+    nfound = unique_rows(allMedoids).shape[0]
     """Return the results from the best pass"""
-    return bestMedoids, bestMembership, bestNIter, nfound
+    return bestMedoids, bestMembership, bestNIter, nfound#, allMedoids
 
 def fuzzyPartitionCoef(membership):
     """Fuzzy partition coefficient `fpc` relative to fuzzy c-partitioned
@@ -496,5 +499,5 @@ def _test_FCMdd(nPasses=20, c=3, maxIter=1000, membershipMethod=('FCM',2)):
     iris = datasets.load_iris()
     obs = iris['data']
     dmat = neighbors.DistanceMetric.get_metric('euclidean').pairwise(obs)
-    medoids, membership, niter, nfound = fuzzycmedoids(dmat, c=c, maxIter=maxIter, nPasses=nPasses, membershipMethod=membershipMethod)
-    return dmat, medoids, membership, niter, nfound
+    results = fuzzycmedoids(dmat, c=c, maxIter=maxIter, nPasses=nPasses, membershipMethod=membershipMethod)
+    return (dmat,) + results
