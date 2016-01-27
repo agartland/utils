@@ -257,7 +257,7 @@ def _computePCA(df, method='pca', n_components=2, labels=None, standardize=False
             ppca = PCA(n_components=int(df.shape[0]/1.5))
             normed = ppca.fit_transform(df)
 
-        pca = LDA(solver='eigen', shrinkage='auto', n_components=n_components).fit(normed, labels.values)
+        pca = LDA(solver='eigen', shrinkage=None, n_components=n_components).fit(normed, labels.values)
         xy = pca.transform(normed)
     return xy, pca
 
@@ -339,13 +339,23 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0,1], plotV
                             ha='center',
                             va='center')
     for i,v in enumerate(df.columns):
+        mxx = max(xy[:,plotDims[0]])
+        mxy = max(xy[:,plotDims[1]])
         if v in plotVars and method == 'pca':
-            mxx = max(xy[:,plotDims[0]])
-            mxy = max(xy[:,plotDims[1]])
             arrowx = pca.components_[plotDims[0],i] * mxx
             arrowy = pca.components_[plotDims[1],i] * mxy
             if (np.abs(arrowx) > varThresh*mxx) or (np.abs(arrowy) > varThresh*mxy):
                 axh.annotate(v, xytext=(arrowx,arrowy), **annotationParams)
+        """Use projection of unit vector to get back the components?"""
+        """unitvec = np.zeros((1,df.shape[1]))
+        unitvec[i] = 1.
+        arrowxy = pca.transform(unitvec)
+        arrowx *= arrowxy[0] * mxx
+        arrowy *= arrowxy[1] * mxy
+
+        if (np.abs(arrowx) > varThresh*mxx) or (np.abs(arrowy) > varThresh*mxy):
+                axh.annotate(v, xytext=(arrowx,arrowy), color='red')"""
+
     if method in ['kpca', 'pca']:
         plt.xlabel('%s%d (%1.1f%%)' % (method.upper(), plotDims[0] + 1,pca.explained_variance_ratio_[plotDims[0]] * 100))
         plt.ylabel('%s%d (%1.1f%%)' % (method.upper(), plotDims[1] + 1,pca.explained_variance_ratio_[plotDims[1]] * 100))
