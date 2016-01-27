@@ -1,10 +1,13 @@
 import numpy as np
 from vectools import unique_rows
+import scipy
+import itertools
 
 __all__ = ['kmedoids',
            'fuzzycmedoids',
+           'tryallmedoids',
            'precomputeWeightedSqDmat',
-           'reassignClusters',
+           'assignClusters',
            'computeInertia',
            'computeMembership']
 
@@ -80,7 +83,7 @@ def kmedoids(dmat, k=3, weights=None, nPasses=1, maxIter=1000, initInds=None, po
         for i in range(maxIter):
             """Assign each point to the closest cluster,
             but don't reassign a point if the distance isn't an improvement."""
-            labels = reassignClusters(dmat, currMedoids, oldLabels=labels)
+            labels = assignClusters(dmat, currMedoids, oldLabels=labels)
             
             """If clusters are lost during (re)assignment step, pick random points
             as new medoids and reassign until we have k clusters again"""
@@ -91,7 +94,7 @@ def kmedoids(dmat, k=3, weights=None, nPasses=1, maxIter=1000, initInds=None, po
                         choices = list(set(initInds).difference(set(uLabels)))
                         currMedoids[medi] = choices[np.random.randint(len(choices))]
                         
-                        labels = reassignClusters(dmat, currMedoids, oldLabels=labels)
+                        labels = assignClusters(dmat, currMedoids, oldLabels=labels)
                         uLabels = np.unique(labels[potentialMedoidInds])
                         break
 
@@ -158,7 +161,7 @@ def precomputeWeightedDmat(dmat, weights):
     else:
         return dmat * weights[None,:]
 
-def reassignClusters(dmat, currMedoids, oldLabels=None):
+def assignClusters(dmat, currMedoids, oldLabels=None):
     """Assigns/reassigns points to clusters based on the minimum (unweighted) distance.
     
     Note: if oldLabels are specified then only reassigns points that
@@ -211,7 +214,7 @@ def computeInertia(wdmat, labels, currMedoids):
     wdmat : ndarray shape[N x N]
         Weighted distance matrix, ready for computing inertia.
     labels : ndarray shape[N]
-        The cluster assignment (medoid index) of each point
+        Cluster assignment (medoid index) of each point
     currMedoids : ndarray shape[k]
         Index into points/dmat that specifies the k current medoids.
 
@@ -407,6 +410,70 @@ def computeMembership(dmat, medoids, method='FCM', param=2):
         membership[med,medi] = 1.
     return membership
 
+def tryallmedoids(dmat, c, weights=None, potentialMedoidInds=None, fuzzy=True, fuzzyParams=('FCM',2)):
+    """Brute force optimization of k-medoids or fuzzy c-medoids clustering.
+
+    To apply to points in euclidean space pass dmat using:
+    dmat = sklearn.neighbors.DistanceMetric.get_metric('euclidean').pairwise(points_array)
+    
+    Parameters
+    ----------
+    dmat : array-like of floats, shape (n_samples, n_samples)
+        Pairwise distance matrix of observations to cluster.
+    c : int
+        Number of clusters to form as well as the number of medoids to generate.
+    weights : array-like of floats, shape (n_samples)
+        Relative weights for each observation in inertia computation.
+    potentialMedoidInds : array of indices
+        If specified, then medoids are constrained to be chosen from this array.
+    fuzzy : boolean
+        If True, use fuzzy inertia function,
+        otherwis use crisp cluster definition.
+    fuzzyParams : tuple of (method str/int, param)
+        Method and parameter for computing fuzzy membership matrix.
+    
+    Returns
+    -------
+    medoids : float ndarray with shape (c)
+        Indices into dmat that indicate optimal medoids.
+    membership or labels: float ndarray with shape (n_samples, c) or shape (n_samples,)
+        Each row contains the membership of a point to each of the clusters
+        OR with hard clusters, the medoid/cluster index of each point."""
+
+    if fuzzy:
+        wdmat = precomputeWeightedSqDmat(dmat, weights, squared=False)
+    else:
+        wdmat = precomputeWeightedSqDmat(dmat, weights)
+
+    N = dmat.shape[0]
+
+    if potentialMedoidInds is None:
+        potentialMedoidInds = np.arange(N)
+
+    combinations = scipy.misc.comb(len(potentialMedoidInds), c)
+    if combinations > 1e7:
+        print "Too many combinations to try: %1.1g > 10M" % combinations
+
+    bestInertia = None
+    for medInds in itertools.combinations(range(len(potentialMedoidInds)), c):
+        medoids = potentialMedoidInds[np.array(medInds)]
+
+        if fuzzy:
+            membership = computeMembership(dmat, medoids, method=fuzzyParams[0], param=fuzzyParams[1])
+        else:
+            membership = np.zeros((N,c))
+            membership[np.arange(N), np.argmin(dmat[:,medoids], axis=1)] = 1.
+        inertia = (wdmat[:,medoids] * membership).sum()
+
+        if bestInertia is None or inertia < bestInertia:
+            bestMedoids = medoids
+            bestInertia = inertia
+            bestMembership = membership
+
+    if not fuzzy:
+        membership = np.argmax(membership, axis=1)
+    return medoids, membership
+
 def _rangenorm(vec, mx=1, mn=0):
     """Normazlize values of vec in-place to [mn, mx] interval"""
     vec = vec - np.nanmin(vec)
@@ -480,7 +547,8 @@ def _test_kmedoids(nPasses=20, k=3, maxIter=1000):
     iris = datasets.load_iris()
     obs = iris['data']
     dmat = neighbors.DistanceMetric.get_metric('euclidean').pairwise(obs)
-    return kmedoids(dmat, k=k, maxIter=maxIter, nPasses=nPasses)
+    results = kmedoids(dmat, k=k, maxIter=maxIter, nPasses=nPasses)
+    return (dmat,) + results
 
 def _test_FCMdd(nPasses=20, c=3, maxIter=1000, membershipMethod=('FCM',2)):
     from sklearn import neighbors, datasets
