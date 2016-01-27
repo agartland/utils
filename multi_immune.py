@@ -278,8 +278,7 @@ def screeplot(df, method='pca', n_components=10, standardize=False, dmatFunc=Non
     for compi in range(n_components):
         bottom = 0
         for dimi,col in zip(range(df.shape[1]), itertools.cycle(palettable.colorbrewer.qualitative.Set3_12.mpl_colors)):
-            height = np.abs(pca.components_[compi,dimi]) / np.abs(pca.components_[compi,:]).sum()
-            #height = np.abs(pca.components_[compi,dimi])
+            height = pca.components_[compi,dimi]**2 / (pca.components_[compi,:]**2).sum()
             axh2.bar(left=compi, bottom=bottom, height=height, align='center', color=col)
             if height > 0.1:
                 note = df.columns[dimi].replace(' ','\n')
