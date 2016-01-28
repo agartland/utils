@@ -2,6 +2,8 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
+"""Copied from:
+https://github.com/joferkington/oost_paper_code/blob/master/error_ellipse.py"""
 
 def plot_point_cov(points, nstd=2, ax=None, **kwargs):
     """
