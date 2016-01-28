@@ -48,7 +48,7 @@ def kmedoids(dmat, k=3, weights=None, nPasses=1, maxIter=1000, initInds=None, po
         label[i] is the code or index of the medoid the
         i'th observation is closest to.
     inertia : float
-        The final value of the inertia criterion (sum of distances to
+        The final value of the inertia criterion (sum of squared distances to
         the closest medoid for all observations).
     nIter : int
         Number of iterations run.
@@ -61,7 +61,7 @@ def kmedoids(dmat, k=3, weights=None, nPasses=1, maxIter=1000, initInds=None, po
     if initInds is None:
         initInds = np.arange(N)
 
-    wdmat = precomputeWeightedSqDmat(dmat, weights)
+    wdmat = precomputeWeightedSqDmat(dmat, weights, squared=True)
 
     if not potentialMedoidInds is None:
         potentialMedoidSet = set(potentialMedoidInds)
@@ -130,7 +130,7 @@ def kmedoids(dmat, k=3, weights=None, nPasses=1, maxIter=1000, initInds=None, po
     """Return the results from the best pass"""
     return bestMedoids, bestLabels, bestInertia, bestNIter, nfound
 
-def precomputeWeightedDmat(dmat, weights):
+def precomputeWeightedDmat(dmat, weights, squared=False):
     """Compute the weighted distance matrix for kmedoids and FCMdd.
    
     Adding weight to a point increases its impact on inertia linearly,
@@ -155,6 +155,9 @@ def precomputeWeightedDmat(dmat, weights):
         Weighted distance matrix, ready for computing inertia."""
     
     assert weights.shape[0]==N
+
+    if squared:
+        dmat = dmat**2
 
     if weights is None:
         return dmat
@@ -201,7 +204,7 @@ def assignClusters(dmat, currMedoids, oldLabels=None):
     labels[reassignInds] = currMedoids[np.argmin(dmat[reassignInds,:][:,currMedoids], axis=1)]
     return labels
 
-def computeInertia(wdmat, labels, currMedoids):
+def computeInertia(wdmat2, labels, currMedoids):
     """Computes inertia for a set of clustered points using
     a precomputed weighted distance matrix.
     
@@ -212,7 +215,7 @@ def computeInertia(wdmat, labels, currMedoids):
     Parameters
     ----------
     wdmat : ndarray shape[N x N]
-        Weighted distance matrix, ready for computing inertia.
+        Weighted and squared distance matrix, ready for computing inertia.
     labels : ndarray shape[N]
         Cluster assignment (medoid index) of each point
     currMedoids : ndarray shape[k]
@@ -229,7 +232,7 @@ def computeInertia(wdmat, labels, currMedoids):
     for medi,med in enumerate(currMedoids):
         clusterInd = np.where(labels == med)[0]
         """Inertia is the sum of the distances"""
-        totInertia += wdmat[med,clusterInd].sum()
+        totInertia += wdmat2[med,clusterInd].sum()
     return totInertia
 
 def fuzzycmedoids(dmat, c, membershipMethod=('FCM',2), weights=None, nPasses=1, maxIter=1000, initInds=None, potentialMedoidInds=None):
