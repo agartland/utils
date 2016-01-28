@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import palettable
 from sklearn.decomposition import KernelPCA, PCA
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.preprocessing import Imputer, StandardScaler
 import itertools
 from functools import partial
@@ -14,6 +15,7 @@ from matplotlib import cm
 import scipy.cluster.hierarchy as sch
 
 from corrplots import validPairwiseCounts, partialcorr,combocorrplot
+from plot_ellipse import plot_point_cov
 import statsmodels.api as sm
 from scipy import stats
 import sklearn
@@ -241,23 +243,27 @@ def _computePCA(df, method='pca', n_components=2, labels=None, standardize=False
         pca.explained_variance_ratio_ = pca.lambdas_ / pca.lambdas_.sum()
     elif method == 'pca':
         if standardize:
-            normed = StandardScaler().fit_transform(df)
+            #normed = StandardScaler(with_std=True, with_mean=True).fit_transform(df)
+            normed = df.apply(lambda vec: (vec - vec.mean())/vec.std(), axis=0)
         else:
-            normed = df
+            #normed = StandardScaler(with_std=False, with_mean=True).fit_transform(df)
+            normed = df.apply(lambda vec: vec - vec.mean(), axis=0)
         pca = PCA(n_components=n_components)
         
         xy = pca.fit_transform(normed)
     elif method == 'lda' and not labels is None:
         if standardize:
-            normed = StandardScaler().fit_transform(df)
+            #normed = StandardScaler(with_std=True, with_mean=True).fit_transform(df)
+            normed = df.apply(lambda vec: (vec - vec.mean())/vec.std(), axis=0)
         else:
-            normed = df
+            #normed = StandardScaler(with_std=False, with_mean=True).fit_transform(df)
+            normed = df.apply(lambda vec: vec - vec.mean(), axis=0)
         """Pre-PCA step"""
         if df.shape[1] > df.shape[0]:
             ppca = PCA(n_components=int(df.shape[0]/1.5))
             normed = ppca.fit_transform(df)
 
-        pca = LDA(solver='eigen', shrinkage=None, n_components=n_components).fit(normed, labels.values)
+        pca = LinearDiscriminantAnalysis(solver='eigen', shrinkage=None, n_components=n_components).fit(normed, labels.values)
         xy = pca.transform(normed)
     return xy, pca
 
@@ -327,7 +333,10 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0,1], plotV
         col = colors[labi]
         ind = np.where(labels==lab)[0]
         axh.scatter(xy[ind, plotDims[0]], xy[ind, plotDims[1]], marker='o', s=50, alpha=alpha, c=col, label=lab)
-        axh.scatter(xy[ind, plotDims[0]].mean(axis=0), xy[ind, plotDims[1]].mean(axis=0), marker='o', s=300, alpha=alpha/1.5, c=col)
+        #axh.scatter(xy[ind, plotDims[0]].mean(axis=0), xy[ind, plotDims[1]].mean(axis=0), marker='o', s=300, alpha=alpha/1.5, c=col)
+        Xvar = xy[ind, :][:,plotDims]
+        if len(ind) > 2:
+            plot_point_cov(Xvar, ax=axh, color=col, alpha=0.2)
     arrowParams = dict(arrowstyle='<-',
                         connectionstyle='Arc3',
                         color='black',
@@ -346,17 +355,14 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0,1], plotV
             arrowy = pca.components_[plotDims[1],i] * mxy
             if (np.abs(arrowx) > varThresh*mxx) or (np.abs(arrowy) > varThresh*mxy):
                 axh.annotate(v, xytext=(arrowx,arrowy), **annotationParams)
-        """Use projection of unit vector to get back the components?"""
-        """unitvec = np.zeros((1,df.shape[1]))
-        unitvec[i] = 1.
-        arrowxy = pca.transform(unitvec)
-        arrowx *= arrowxy[0] * mxx
-        arrowy *= arrowxy[1] * mxy
+        elif v in plotVars and method =='lda':
+            """NOT WORKING
+            arrowx = pca.coef_[plotDims[0],i] #* mxx
+            arrowy = pca.coef_[plotDims[1],i] #* mxy
+            if (np.abs(arrowx) > varThresh*mxx) or (np.abs(arrowy) > varThresh*mxy):
+                axh.annotate(v, xytext=(arrowx,arrowy), **annotationParams)"""
 
-        if (np.abs(arrowx) > varThresh*mxx) or (np.abs(arrowy) > varThresh*mxy):
-                axh.annotate(v, xytext=(arrowx,arrowy), color='red')"""
-
-    if method in ['kpca', 'pca']:
+    if method in ['kpca', 'pca', 'lda']:
         plt.xlabel('%s%d (%1.1f%%)' % (method.upper(), plotDims[0] + 1,pca.explained_variance_ratio_[plotDims[0]] * 100))
         plt.ylabel('%s%d (%1.1f%%)' % (method.upper(), plotDims[1] + 1,pca.explained_variance_ratio_[plotDims[1]] * 100))
     elif method == 'lda':
@@ -368,3 +374,31 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0,1], plotV
     if len(uLabels) > 1:
         plt.legend(loc=0)
     plt.draw()
+
+def _plot_ellipse(splot, mean, cov, color):
+    v, w = linalg.eigh(cov)
+    u = w[0] / linalg.norm(w[0])
+    angle = np.arctan(u[1]/u[0])
+    angle = 180 * angle / np.pi # convert to degrees
+    # filled gaussian at 2 standard deviation
+    width = 2 * v[0] ** 0.5, 2 * v[1] ** 0.5
+    ell = mpl.patches.Ellipse(mean, width[0], width[1], 180 + angle, color=color)
+    print v[:]
+    ell.set_clip_box(splot.bbox)
+    ell.set_alpha(0.5)
+    splot.add_artist(ell)
+
+def _irisObj():
+    from sklearn import datasets
+    from sklearn.preprocessing import StandardScaler
+
+    iris = datasets.load_iris()
+    index = np.arange(150)+1
+    irisDf = pd.DataFrame(iris['data'], columns=iris['feature_names'], index=index)
+    labels = pd.Series(iris['target'], index=index)
+
+    xyPCA, pcaObj = _computePCA(irisDf, method='pca')
+    xyLDA, ldaObj = _computePCA(irisDf, labels=labels, method='lda')
+    return irisDf, labels, xyPCA, pcaObj, xyLDA, ldaObj
+irisDf, labels,  xyPCA, pcaObj, xyLDA, ldaObj = _irisObj()
+#biplot(irisDf, labels=labels, method='lda', plotLabels=False)
