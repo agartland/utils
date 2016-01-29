@@ -321,7 +321,7 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0,1], plotV
     colors = palettable.colorbrewer.get_map('Set1', 'qualitative', min(12,max(3,len(uLabels)))).mpl_colors
     plt.clf()
     figh = plt.gcf()
-    axh = figh.add_axes([0.1,0.1,0.8,0.8])
+    axh = figh.add_axes([0.1,0.1,0.8,0.8], aspect='equal')
     axh.axis('on')
     figh.set_facecolor('white')
     annotationParams = dict(xytext=(0,5), textcoords='offset points', size='medium')
@@ -348,29 +348,22 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0,1], plotV
                             ha='center',
                             va='center')
     for i,v in enumerate(df.columns):
-        mxx = max(xy[:,plotDims[0]])
-        mxy = max(xy[:,plotDims[1]])
-        if v in plotVars and method == 'pca':
-            arrowx = pca.components_[plotDims[0],i] * mxx
-            arrowy = pca.components_[plotDims[1],i] * mxy
-            if (np.abs(arrowx) > varThresh*mxx) or (np.abs(arrowy) > varThresh*mxy):
+        scalar = min(max(xy[:,plotDims[0]]),max(xy[:,plotDims[1]]))
+        if v in plotVars and method in ['pca','kpca','lda']:
+            """Project a unit vector for each feature, into the new space"""
+            unitvec = np.zeros((1,df.shape[1]))
+            unitvec[0,i] = 1.
+            arrowxy = pca.transform(unitvec)
+            arrowx = arrowxy[0,0] * scalar
+            arrowy = arrowxy[0,1] * scalar
+            if (np.abs(arrowx) > varThresh*scalar) or (np.abs(arrowy) > varThresh*scalar):
                 axh.annotate(v, xytext=(arrowx,arrowy), **annotationParams)
-        elif v in plotVars and method =='lda':
-            """NOT WORKING
-            arrowx = pca.coef_[plotDims[0],i] #* mxx
-            arrowy = pca.coef_[plotDims[1],i] #* mxy
-            if (np.abs(arrowx) > varThresh*mxx) or (np.abs(arrowy) > varThresh*mxy):
-                axh.annotate(v, xytext=(arrowx,arrowy), **annotationParams)"""
 
-    if method in ['kpca', 'pca', 'lda']:
-        plt.xlabel('%s%d (%1.1f%%)' % (method.upper(), plotDims[0] + 1,pca.explained_variance_ratio_[plotDims[0]] * 100))
-        plt.ylabel('%s%d (%1.1f%%)' % (method.upper(), plotDims[1] + 1,pca.explained_variance_ratio_[plotDims[1]] * 100))
-    elif method == 'lda':
-        plt.xlabel('%s%d' % (method.upper(), plotDims[0] + 1))
-        plt.ylabel('%s%d' % (method.upper(), plotDims[1] + 1))
+    plt.xlabel('%s%d (%1.1f%%)' % (method.upper(), plotDims[0] + 1,pca.explained_variance_ratio_[plotDims[0]] * 100))
+    plt.ylabel('%s%d (%1.1f%%)' % (method.upper(), plotDims[1] + 1,pca.explained_variance_ratio_[plotDims[1]] * 100))
 
-    plt.xticks([0])
-    plt.yticks([0])
+    #plt.xticks([0])
+    #plt.yticks([0])
     if len(uLabels) > 1:
         plt.legend(loc=0)
     plt.draw()
@@ -395,7 +388,7 @@ def _irisObj():
     iris = datasets.load_iris()
     index = np.arange(150)+1
     irisDf = pd.DataFrame(iris['data'], columns=iris['feature_names'], index=index)
-    labels = pd.Series(iris['target'], index=index)
+    labels = pd.Series(iris['target_names'][iris['target']], index=index)
 
     xyPCA, pcaObj = _computePCA(irisDf, method='pca')
     xyLDA, ldaObj = _computePCA(irisDf, labels=labels, method='lda')
