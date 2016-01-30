@@ -263,7 +263,7 @@ def _computePCA(df, method='pca', n_components=2, labels=None, standardize=False
             ppca = PCA(n_components=int(df.shape[0]/1.5))
             normed = ppca.fit_transform(df)
 
-        pca = LinearDiscriminantAnalysis(solver='eigen', shrinkage=None, n_components=n_components).fit(normed, labels.values)
+        pca = LinearDiscriminantAnalysis(solver='eigen', shrinkage='auto', n_components=n_components).fit(normed, labels.values)
         xy = pca.transform(normed)
     return xy, pca
 
@@ -347,17 +347,21 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0,1], plotV
                             arrowprops=arrowParams,
                             ha='center',
                             va='center')
-    for i,v in enumerate(df.columns):
-        scalar = min(max(xy[:,plotDims[0]]),max(xy[:,plotDims[1]]))
-        if v in plotVars and method in ['pca','kpca','lda']:
-            """Project a unit vector for each feature, into the new space"""
-            unitvec = np.zeros((1,df.shape[1]))
-            unitvec[0,i] = 1.
-            arrowxy = pca.transform(unitvec)
-            arrowx = arrowxy[0,0] * scalar
-            arrowy = arrowxy[0,1] * scalar
-            if (np.abs(arrowx) > varThresh*scalar) or (np.abs(arrowy) > varThresh*scalar):
-                axh.annotate(v, xytext=(arrowx,arrowy), **annotationParams)
+    mxx = max(xy[:,plotDims[0]])
+    mxy = max(xy[:,plotDims[1]])
+    scalar = min(mxx,mxy)
+    
+    """Project a unit vector for each feature, into the new space"""    
+    arrowxy = pca.transform(np.diag(np.ones(df.shape[1])))
+    """By using the squared transform the magnitude of the vector along each component
+    reflects the fraction of variance explained by that feature along the component (e.g. PCA1)"""
+    arrowxy = (arrowxy**2) * np.sign(arrowxy)
+    for vi,v in enumerate(df.columns):
+        #arrowx, arrowy = arrowxy[vi,:] * scalar
+        arrowx = arrowxy[vi,0] * mxx
+        arrowy = arrowxy[vi,1] * mxy
+        if v in plotVars and np.any(np.abs(arrowxy[vi,:]) > varThresh):
+            axh.annotate(v, xytext=(arrowx, arrowy), **annotationParams)
 
     plt.xlabel('%s%d (%1.1f%%)' % (method.upper(), plotDims[0] + 1,pca.explained_variance_ratio_[plotDims[0]] * 100))
     plt.ylabel('%s%d (%1.1f%%)' % (method.upper(), plotDims[1] + 1,pca.explained_variance_ratio_[plotDims[1]] * 100))
