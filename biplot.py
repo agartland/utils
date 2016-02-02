@@ -119,6 +119,7 @@ def _dimReduce(df, method='pca', n_components=2, labels=None, standardize=False,
 
         lda = LinearDiscriminantAnalysis(solver='eigen', shrinkage=ldaShrinkage, n_components=n_components)
         lda.fit(normed, labels.values)
+        lda.explained_variance_ratio_ = np.abs(lda.explained_variance_ratio_) / np.abs(lda.explained_variance_ratio_).sum()
         xy = lda.transform(normed)
         return xy, lda
 
