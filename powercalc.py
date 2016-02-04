@@ -303,3 +303,31 @@ def sumAnyNBinom(p, anyN=1):
             tmp[np.find(event==0)] = 1 - p[np.find(event==0)]
             tot[eventi] = np.prod(tmp)
     return tot.sum()
+
+def RRCI(a, b, c, d, alpha=0.05):
+    """Compute relative-risk and confidence interval,
+    given counts in each square of a 2 x 2 table.
+
+    Assumes normal distribution of log-RR.
+
+    Parameters
+    ----------
+    a,b,c,d : int
+        Counts from a 2 x 2 table starting in upper-left and going clockwise.
+    alpha : float
+        Specifies the (1 - alpha)% confidence interval
+
+    Returns
+    -------
+    rr : float
+        Relative-risk
+    lb : float
+        Lower-bound
+    ub : float
+        Upper-bound"""
+    se = np.sqrt((1/a + 1/c) - (1/(a+b) + 1/(c+d)))
+    rr = a*(c+d)/(c*(a+b))
+    delta = stats.norm.ppf(1 - alpha/2) * se
+    ub = np.exp(np.log(rr) + delta)
+    lb = np.exp(np.log(rr) - delta)
+    return rr, lb, ub
