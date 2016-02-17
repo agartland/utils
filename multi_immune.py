@@ -83,7 +83,7 @@ def _clean_axis(ax):
     ax.grid(False)
     ax.set_axis_bgcolor('white')
 
-def plotHeatmap(df, labels=None, titleStr=None, vRange=None, tickSz='small', cmap=None, cmapLabel=''):
+def plotHeatmap(df, labels=None, titleStr=None, vRange=None, tickSz='small', cmap=None, cmapLabel='', annotation=False, xtickRot=90):
     """Display a heatmap with labels."""
     if vRange is None:
         vmin = np.min(np.ravel(df.values))
@@ -119,6 +119,11 @@ def plotHeatmap(df, labels=None, titleStr=None, vRange=None, tickSz='small', cma
     axi = heatmapAX.imshow(df.values, interpolation='nearest', aspect='auto', origin='lower', norm=my_norm, cmap=cmap)
     _clean_axis(heatmapAX)
 
+    if annotation:
+        for i,j in itertools.product(range(df.shape[0]), range(df.shape[1])):
+            v = df.values[i,j]
+            heatmapAX.annotate('%1.2f' % v, xy=(i,j), size='x-large', weight='bold', color='white',ha='center',va='center')
+
     """Column tick labels along the rows"""
     if tickSz is None:
         heatmapAX.set_yticks(())
@@ -131,7 +136,7 @@ def plotHeatmap(df, labels=None, titleStr=None, vRange=None, tickSz='small', cma
         """Column tick labels"""
         heatmapAX.set_xticks(np.arange(df.shape[1]))
         heatmapAX.xaxis.set_ticks_position('top')
-        xlabelsL = heatmapAX.set_xticklabels(df.columns, fontsize=tickSz, rotation=90, fontname='Consolas')
+        xlabelsL = heatmapAX.set_xticklabels(df.columns, fontsize=tickSz, rotation=xtickRot, fontname='Consolas')
 
         """Remove the tick lines"""
         for l in heatmapAX.get_xticklines() + heatmapAX.get_yticklines(): 
