@@ -12,7 +12,12 @@ def toPNG(df, outFn, titStr, float_format='%1.3g', dpi=200):
     toPDF(df, pdfFn, titStr, float_format=float_format)
     cmd = ['convert', '-density %d' % dpi, pdfFn, outFn]
     #print ' '.join(cmd)
-    subprocess.check_call(' '.join(cmd), shell=True)
+    
+    si = subprocess.STARTUPINFO()
+    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    #si.wShowWindow = subprocess.SW_HIDE # default
+
+    subprocess.check_call(' '.join(cmd), shell=True, startupinfo=si)
 
 def toPDF(df, outFn, titStr, float_format='%1.3g'):
     folder,fn = op.split(outFn)
@@ -44,6 +49,11 @@ def toPDF(df, outFn, titStr, float_format='%1.3g'):
         for f in footer:
             fh.write(f + '\n')
     cmd = ['latex', '-output-format=pdf', '-output-directory=%s' % folder, texFn]
-    subprocess.call(cmd)
+
+    si = subprocess.STARTUPINFO()
+    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    #si.wShowWindow = subprocess.SW_HIDE # default
+
+    subprocess.call(cmd, startupinfo=si)
     """Run latex twice to get the layout correct"""
-    subprocess.call(cmd)
+    subprocess.call(cmd, startupinfo=si)
