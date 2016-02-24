@@ -19,7 +19,8 @@ sns.set(style = 'darkgrid', palette = 'muted', font_scale = 1.75)
 __all__ = ['corrDmatFunc',
             'hierClusterFunc',
             'plotHierClust',
-            'combocorrplot']
+            'combocorrplot',
+            'plotHeatmap']
 
 def imputeNA(df, strategy='median', axis=0, copy=True):
     imp = Imputer(strategy=strategy, axis=axis, copy=copy)
@@ -152,6 +153,7 @@ def plotHeatmap(df, labels=None, titleStr=None, vRange=None, tickSz='small', cma
     """Add title as xaxis label"""
     if not titleStr is None:
         heatmapAX.set_xlabel(titleStr, size='x-large')
+    plt.show()
 
 def plotHierClust(dmatDf, Z, labels=None, titleStr=None, vRange=None, tickSz='small', cmap=None, cmapLabel=''):
     """Display a hierarchical clustering result."""
@@ -226,4 +228,5 @@ def plotHierClust(dmatDf, Z, labels=None, titleStr=None, vRange=None, tickSz='sm
     """Add title as xaxis label"""
     if not titleStr is None:
         heatmapAX.set_xlabel(titleStr,size='x-large')
+    plt.show()
 

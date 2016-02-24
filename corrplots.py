@@ -468,7 +468,7 @@ def corrheatmap(df, rowVars=None, colVars=None, adjust=[], annotation=None, cuto
     plt.annotate('%s correlation' % method,[0.98,0.5], xycoords='figure fraction', ha='right', va='center', rotation='vertical')
     return rho, pvalue, qvalue
 
-def scatterfit(x,y,method='pearson',adjustVars=[],labelLookup={},plotLine=True,annotateFit=True,returnModel=False,lc = 'gray', **kwargs):
+def scatterfit(x, y, method='pearson', adjustVars=[], labelLookup={}, plotLine=True, annotateFit=True, annotatePoints=False, returnModel=False, lc='gray', **kwargs):
     """Scatter plot of x vs. y with a fitted line overlaid.
 
     Expects x and y as pd.Series but will accept arrays.
@@ -485,6 +485,7 @@ def scatterfit(x,y,method='pearson',adjustVars=[],labelLookup={},plotLine=True,a
     labelLookup : dict
     plotLine : bool
     annotateFit : bool
+    annotatePoints : bool
     returnModel : bool
     kwargs : additional keyword arguments
         Passed to the plot function for the data points.
@@ -516,12 +517,12 @@ def scatterfit(x,y,method='pearson',adjustVars=[],labelLookup={},plotLine=True,a
         x.name = xlab
         y.name = ylab
 
-    tmpDf = pd.concat((x,y,),axis=1,join='inner')
+    tmpDf = pd.concat((x,y,), axis=1, join='inner')
     for av in adjustVars:
-        tmpDf = pd.concat((tmpDf,pd.DataFrame(av)),axis=1)
+        tmpDf = pd.concat((tmpDf,pd.DataFrame(av)), axis=1)
     
     """Drop any row with a nan in either column"""
-    tmpDf = tmpDf.dropna(axis = 0, how = 'any')
+    tmpDf = tmpDf.dropna(axis=0, how='any')
 
     plt.gca().set_xmargin(0.2)
     plt.gca().set_ymargin(0.2)
@@ -533,7 +534,7 @@ def scatterfit(x,y,method='pearson',adjustVars=[],labelLookup={},plotLine=True,a
     
     if method == 'spearman' and plotLine:
         #unrho,unp=stats.spearmanr(tmpDf[xlab],tmpDf[ylab])
-        if unrho>0:
+        if unrho > 0:
             plt.plot(sorted(tmpDf[xlab]),sorted(tmpDf[ylab]),'-',color=lc)
         else:
             plt.plot(sorted(tmpDf[xlab]),sorted(tmpDf[ylab],reverse=True),'-',color=lc)
@@ -548,6 +549,11 @@ def scatterfit(x,y,method='pearson',adjustVars=[],labelLookup={},plotLine=True,a
         plt.plot(tmpDf[xlab][mnmxi],results.fittedvalues[mnmxi],'-',color=lc)
     
     plt.plot(tmpDf[xlab],tmpDf[ylab],'o',**kwargs)
+
+    if annotatePoints:
+        annotationParams = dict(xytext=(0,5), textcoords='offset points', size='medium')
+        for x,y,lab in zip(tmpDf[xlab],tmpDf[ylab],tmpDf.index):
+            plt.annotate(lab, xy=(x, y), **annotationParams)
 
     if annotateFit:
         if unp>0.001:    
