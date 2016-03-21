@@ -5,11 +5,11 @@ import pandas as pd
 
 __all__ = ['toPNG', 'toPDF']
 
-def toPNG(df, outFn, titStr, float_format='%1.3g', dpi=200):
+def toPNG(df, outFn, dpi=200, **kwargs):
     assert outFn[-4:] == '.png'
     folder,fn = op.split(outFn)
     pdfFn = outFn.replace('.png', '.pdf')
-    toPDF(df, pdfFn, titStr, float_format=float_format)
+    toPDF(df, pdfFn, **kwargs)
     cmd = ['convert', '-density %d' % dpi, pdfFn, outFn]
     #print ' '.join(cmd)
     
@@ -19,10 +19,13 @@ def toPNG(df, outFn, titStr, float_format='%1.3g', dpi=200):
 
     subprocess.check_call(' '.join(cmd), shell=True, startupinfo=si)
 
-def toPDF(df, outFn, titStr, float_format='%1.3g'):
+def toPDF(df, outFn, titStr='', float_format='%1.3g', index=False, hideConsole=True):
+    repUnderscore = lambda s: s if not isinstance(s, basestring) else s.replace('_','-')
+
     folder,fn = op.split(outFn)
-    df = df.applymap(lambda s: s if not isinstance(s, basestring) else s.replace('_','-'))
-    df = df.rename_axis(lambda s: s.replace('_','-'), axis=1)
+    df = df.applymap(repUnderscore)
+    df = df.rename_axis(repUnderscore, axis=1)
+    df = df.rename_axis(repUnderscore, axis=0)
     texFn = outFn[:-3] + 'tex'
     header = ['\\documentclass[10pt]{article}',
               '\\usepackage{lmodern}',
@@ -41,19 +44,24 @@ def toPDF(df, outFn, titStr, float_format='%1.3g'):
               '\\begin{document}']
     
     footer = ['\\end{document}']
+
     with open(texFn,'w') as fh:
         for h in header:
             fh.write(h + '\n')
         fh.write(df.to_latex(float_format=lambda f: float_format % f,
-                             longtable=True, index=False, escape=False))
+                             longtable=True, index=index, escape=False))
         for f in footer:
             fh.write(f + '\n')
     cmd = ['latex', '-output-format=pdf', '-output-directory=%s' % folder, texFn]
 
-    si = subprocess.STARTUPINFO()
-    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-    #si.wShowWindow = subprocess.SW_HIDE # default
-
+    
+    if hideConsole:
+        si = subprocess.STARTUPINFO()
+        si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        # si.wShowWindow = subprocess.SW_HIDE # default
+    else:
+        si = None
+    
     subprocess.call(cmd, startupinfo=si)
     """Run latex twice to get the layout correct"""
     subprocess.call(cmd, startupinfo=si)
