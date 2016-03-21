@@ -186,7 +186,13 @@ def combocorrplot(data,method='spearman',axLimits='variable',axTicks=False,axTic
 
     plt.clf()
     fh = plt.gcf()
-    gs = GridSpec(n,n, left=border,bottom=border,right=1.-border-cbwidth,top=1.-border,wspace=pad,hspace=pad)
+    gs = GridSpec(n,n,
+                  left=border,
+                  bottom=border,
+                  right=1.-border-cbwidth,
+                  top=1.-border,
+                  wspace=pad,
+                  hspace=pad)
     #cbgs=GridSpec(1,1,left=1.-cbwidth,bottom=border,right=1.-border,top=1.-border,wspace=pad,hspace=pad)
     for r in range(n):
         for c in range(n):
@@ -218,19 +224,19 @@ def combocorrplot(data,method='spearman',axLimits='variable',axTicks=False,axTic
                     ar,br = polyfit(plotx,ploty,1)
                     xfit = np.array([min(plotx),max(plotx)])
                     yfit = polyval([ar,br],xfit)
-                    plt.plot(xfit,yfit,'-',lw=1,color='gray')
-                plt.plot(plotx, ploty, 'ok', ms = ms)
+                    plt.plot(xfit, yfit, '-', lw=1, color='gray')
+                plt.plot(plotx, ploty, 'ok', ms=ms)
                 
                 if axLimits == 'variable':
-                    rmax,rmin = max(plotx),min(plotx)
-                    cmax,cmin = max(ploty),min(ploty)
+                    rmax,rmin = max(plotx), min(plotx)
+                    cmax,cmin = max(ploty), min(ploty)
                 else:
                     rmax,cmax = mx,mx
                     rmin,cmin = mn,mn
 
                 plt.axis([rmin-0.1*(rmax-rmin), rmax+0.1*(rmax-rmin),cmin-0.1*(cmax-cmin), cmax+0.1*(cmax-cmin)])
             elif r < c:
-                axh[r,c] = fh.add_subplot(gs[r,c],yticklabels=[],xticklabels=[],xticks=[],yticks=[])
+                axh[r,c] = fh.add_subplot(gs[r,c], yticklabels=[], xticklabels=[], xticks=[], yticks=[])
                 val = coef[labels[r]][labels[c]]
                 plth[r,c] = plt.pcolor(np.ones((2,2))*val, cmap=_heatCmap, vmin=-1., vmax=1.)
                 plt.axis([0,1,0,1])
@@ -239,11 +245,23 @@ def combocorrplot(data,method='spearman',axLimits='variable',axTicks=False,axTic
                         txtcol = 'white'
                     else:
                         txtcol = 'black'
-                    plt.text(0.5,0.5,'%1.2f' % (val),ha='center',va='center',family='monospace',color=txtcol)
-    cbax = fh.add_axes([1.-cbwidth-border/2,border,cbwidth-border-0.02,1.-2*border])
+                    plt.text(0.5, 0.5, '%1.2f' % (val),
+                             ha='center',
+                             va='center',
+                             family='monospace',
+                             color=txtcol,
+                             weight='bold',
+                             size='large')
+    cbax = fh.add_axes([1.-cbwidth-border/2, border, cbwidth-border-0.02, 1.-2*border])
     cb = plt.colorbar(plth[0,0],cax=cbax)
     method = method[0].upper() + method[1:]
-    plt.annotate('%s correlation' % (method),[0.98,0.5],xycoords='figure fraction',ha='right',va='center',rotation='vertical')
+    plt.annotate('%s correlation' % (method),
+                 [0.98,0.5],
+                 xycoords='figure fraction',
+                 ha='right',
+                 va='center',
+                 rotation='vertical',
+                 size='large')
 
 def pwpartialcorr(df, rowVars=None, colVars=None, adjust=[], method='pearson', minN=0, adjMethod='fdr_bh'):
     """Pairwise partial correlation.
@@ -468,7 +486,7 @@ def corrheatmap(df, rowVars=None, colVars=None, adjust=[], annotation=None, cuto
     plt.annotate('%s correlation' % method,[0.98,0.5], xycoords='figure fraction', ha='right', va='center', rotation='vertical')
     return rho, pvalue, qvalue
 
-def scatterfit(x, y, method='pearson', adjustVars=[], labelLookup={}, plotLine=True, annotateFit=True, annotatePoints=False, returnModel=False, lc='gray', **kwargs):
+def scatterfit(x, y, method='pearson', adjustVars=[], labelLookup={}, plotLine=True, plotUnity=False, annotateFit=True, annotatePoints=False, returnModel=False, lc='gray', **kwargs):
     """Scatter plot of x vs. y with a fitted line overlaid.
 
     Expects x and y as pd.Series but will accept arrays.
@@ -547,6 +565,9 @@ def scatterfit(x, y, method='pearson', adjustVars=[], labelLookup={}, plotLine=T
         results = model.fit()
         mnmxi = np.array([tmpDf[xlab].idxmin(),tmpDf[xlab].idxmax()])
         plt.plot(tmpDf[xlab][mnmxi],results.fittedvalues[mnmxi],'-',color=lc)
+
+    if plotUnity:
+        plt.plot(tmpDf[xlab][mnmxi], tmpDf[xlab][mnmxi], '--', color='white')
     
     plt.plot(tmpDf[xlab],tmpDf[ylab],'o',**kwargs)
 
