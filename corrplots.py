@@ -235,10 +235,10 @@ def combocorrplot(data,method='spearman',axLimits='variable',axTicks=False,axTic
                 plth[r,c] = plt.pcolor(np.ones((2,2))*val, cmap=_heatCmap, vmin=-1., vmax=1.)
                 plt.axis([0,1,0,1])
                 if valueFlag:
-                    if val<0.5 and val>-0.5:
-                        txtcol = 'white'
-                    else:
+                    if val<0.75 and val>-0.75:
                         txtcol = 'black'
+                    else:
+                        txtcol = 'white'
                     plt.text(0.5,0.5,'%1.2f' % (val),ha='center',va='center',family='monospace',color=txtcol)
     cbax = fh.add_axes([1.-cbwidth-border/2,border,cbwidth-border-0.02,1.-2*border])
     cb = plt.colorbar(plth[0,0],cax=cbax)

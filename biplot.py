@@ -148,11 +148,13 @@ def screeplot(df, method='pca', n_components=10, standardize=False, smatFunc=Non
                 note += '(+)' if pca.components_[compi,dimi] >= 0 else '(-)'
                 axh2.annotate(note, xy=(compi, bottom+height/2), ha='center', va='center',size='small')
             bottom += height
-    plt.xticks(range(n_components),['PCA%d' % (i+1) for i in range(n_components)],rotation=90)
+    plt.xticks(range(n_components),['PC%d' % (i+1) for i in range(n_components)],rotation=90)
     plt.ylim([0,1])
     plt.ylabel('Fraction of\ncomponent variance')
 
-def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0,1], plotVars='all', standardize=False, smatFunc=None, varThresh=0.1, ldaShrinkage='auto', dropna=False):
+def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
+           plotVars='all', standardize=False, smatFunc=None, varThresh=0.1,
+           ldaShrinkage='auto', dropna=False, drawElipse=True):
     """Perform dimensionality reduction on columns of df using PCA, KPCA or LDA,
     then produce a biplot in two-dimensions.
     
@@ -181,6 +183,8 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0,1], plotV
         than the threshold then it is plotted.
     ldaShrinkage : str or None
         Passed to sklearn.discriminant_analysis.LinearDiscriminantAnalysis
+    drawElipse : bool
+        Draw elipse representing 80% CI, default True
 
     Returns
     -------
@@ -220,7 +224,7 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0,1], plotV
         axh.scatter(xy[ind, plotDims[0]], xy[ind, plotDims[1]], marker='o', s=50, alpha=alpha, c=col, label=lab)
         #axh.scatter(xy[ind, plotDims[0]].mean(axis=0), xy[ind, plotDims[1]].mean(axis=0), marker='o', s=300, alpha=alpha/1.5, c=col)
         Xvar = xy[ind, :][:,plotDims]
-        if len(ind) > 2:
+        if len(ind) > 2 and drawElipse:
             plot_point_cov(Xvar, ax=axh, color=col, alpha=0.2)
     arrowParams = dict(arrowstyle='<-',
                         connectionstyle='Arc3',
@@ -234,7 +238,7 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0,1], plotV
                             va='center')
     mxx = np.max(np.abs(xy[:,plotDims[0]]))
     mxy = np.max(np.abs(xy[:,plotDims[1]]))
-    scalar = min(mxx,mxy)
+    scalar = min(mxx,mxy) * 0.8
     
     if method in ['lda','pca']:
         """Project a unit vector for each feature, into the new space"""    
