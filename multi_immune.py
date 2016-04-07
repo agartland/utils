@@ -14,6 +14,7 @@ from corrplots import validPairwiseCounts, partialcorr,combocorrplot
 import statsmodels.api as sm
 from scipy import stats
 import seaborn as sns
+
 sns.set(style = 'darkgrid', palette = 'muted', font_scale = 1.75)
 
 __all__ = ['corrDmatFunc',
@@ -147,8 +148,8 @@ def plotHeatmap(df, labels=None, titleStr=None, vRange=None, tickSz='small', cma
     cb = fig.colorbar(axi,scale_cbAX) # note that we could pass the norm explicitly with norm=my_norm
     cb.set_label(cmapLabel)
     """Make colorbar labels smaller"""
-    for t in cb.ax.yaxis.get_ticklabels():
-        t.set_fontsize('small')
+    """for t in cb.ax.yaxis.get_ticklabels():
+        t.set_fontsize('small')"""
 
     """Add title as xaxis label"""
     if not titleStr is None:

@@ -10,7 +10,11 @@ def toPNG(df, outFn, dpi=200, **kwargs):
     folder,fn = op.split(outFn)
     pdfFn = outFn.replace('.png', '.pdf')
     toPDF(df, pdfFn, **kwargs)
-    cmd = ['convert', '-density %d' % dpi, pdfFn, outFn]
+    cmd = ['convert',
+           '-interaction=nonstopmode',
+           '-density %d' % dpi,
+           pdfFn,
+           outFn]
     #print ' '.join(cmd)
     
     si = subprocess.STARTUPINFO()
@@ -52,13 +56,16 @@ def toPDF(df, outFn, titStr='', float_format='%1.3g', index=False, hideConsole=T
                              longtable=True, index=index, escape=False))
         for f in footer:
             fh.write(f + '\n')
-    cmd = ['latex', '-output-format=pdf', '-output-directory=%s' % folder, texFn]
-
+    cmd = ['latex',
+           '-output-format=pdf',
+           '-output-directory=%s' % folder,
+           texFn]
     
     if hideConsole:
         si = subprocess.STARTUPINFO()
         si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         # si.wShowWindow = subprocess.SW_HIDE # default
+        cmd.insert(2,'-interaction=nonstopmode')
     else:
         si = None
     

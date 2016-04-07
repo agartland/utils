@@ -13,14 +13,13 @@ def compare_lr_test(model_result, restricted_result):
 
     Parameters
     ----------
+    model_result : Result instance
+
     restricted : Result instance
         The restricted model is assumed to be nested in the current model.
         The result instance of the restricted model is required to have two
-        attributes, residual sum of squares, `ssr`, residual degrees of
+        attributes, log-likelihood function, `llf`, and residual degrees of
         freedom, `df_resid`.
-    large_sample : bool
-        Flag indicating whether to use a heteroskedasticity robust version
-        of the LR test, which is a modified LM test.
     
     Returns
     -------

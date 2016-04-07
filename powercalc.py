@@ -331,3 +331,36 @@ def RRCI(a, b, c, d, alpha=0.05):
     ub = np.exp(np.log(rr) + delta)
     lb = np.exp(np.log(rr) - delta)
     return rr, lb, ub
+
+def computeRR(df, outcome, predictor, alpha=0.05):
+    """RR point-estimate, CI and p-value, without conditioning on the total number of events.
+
+    Derived inputs
+    --------------
+    nneg : int
+        Number of outcomes in the covariate negative group
+    Nneg : int
+        Total number of participants in the covariate negative group
+    npos : int
+        Number of outcomes in the covariate positive group
+    Npos : int
+        Total number of participants in the covariate positive group"""
+
+    tmp = df[[outcome, predictor]].dropna()
+    nneg = tmp[outcome].loc[tmp[predictor] == 0].sum()
+    Nneg = (tmp[predictor] == 0).sum()
+    npos = tmp[outcome].loc[tmp[predictor] == 1].sum()
+    Npos = (tmp[predictor] == 1).sum()
+
+    rr = (npos/(Npos)) / (nneg/(Nneg))
+
+    se = np.sqrt((Nneg-nneg)/(nneg*Nneg) + (Npos-npos)/(npos*Npos))
+
+    z = stats.norm.ppf(1 - alpha/2)
+
+    ci = np.exp(np.array([np.log(rr) - se*z, np.log(rr) + se*z]))
+    
+    """Wald CI"""
+    pvalue = stats.norm.cdf(np.log(rr)/se)
+
+    return  pd.Series([rr, ci[0], ci[1], pvalue], index=['RR','LL', 'UL','pvalue'])
