@@ -21,10 +21,11 @@ def colorLegend(colors, labels, alphas=None, edgecolor='black',loc='best', **leg
 
     if alphas is None:
         alphas = np.ones(len(colors))
-    lh = plt.legend((plt.Circle((0,0), fc = c, ec = edgecolor, alpha = a) for c,a in zip(colors,alphas)),
-               labels,
-               loc,
-               **legendKwargs)
+    circles = (plt.Circle((0,0), fc=c, ec=edgecolor, alpha=a) for c,a in zip(colors,alphas))
+    lh = plt.legend(circles,
+                    labels,
+                    loc=loc,
+                    **legendKwargs)
     return lh
 
 def symbolLegend(symbols, labels, facecolors=None, edgecolors=None, alphas=None,loc='best', **legendKwargs):
