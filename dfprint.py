@@ -10,8 +10,7 @@ def toPNG(df, outFn, dpi=200, **kwargs):
     folder,fn = op.split(outFn)
     pdfFn = outFn.replace('.png', '.pdf')
     toPDF(df, pdfFn, **kwargs)
-    cmd = ['convert',
-           '-interaction=nonstopmode',
+    cmd = ['convert',# '-interaction=nonstopmode',
            '-density %d' % dpi,
            pdfFn,
            outFn]

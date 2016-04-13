@@ -63,12 +63,13 @@ def computeROC(df, model, outcomeVar, predVars):
         auc = sklearn.metrics.auc(fpr, tpr)
         tpr[0], tpr[-1] = 0,1
     except sm.tools.sm_exceptions.PerfectSeparationError:
-        print 'PerfectSeparationError: %s' % (outcomeVar)
+        print 'PerfectSeparationError: %s (N = %d; %d predictors)' % (outcomeVar, tmp.shape[0], len(predVars))
         acc = 1.
-        fpr = np.nan * np.ones(5)
-        tpr = np.nan * np.ones(5)
-        prob = np.nan * np.ones(tmp.shape[0])
-        auc = np.nan
+        fpr = np.zeros(5)
+        tpr = np.ones(5)
+        tpr[0], tpr[-1] = 0,1
+        prob = tmp[outcomeVar].values.astype(float)
+        auc = 1.
         results = None
     return fpr, tpr, auc, acc, results, pd.Series(prob, index=tmp.index, name='Prob')
 
@@ -85,7 +86,7 @@ def computeCVROC(df, model, outcomeVar, predVars, LOO=False, nFolds=10):
     predVars : ndarray or list
         Predictor variables in the model.
     LOO : bool
-        Leave-one-out cross-vlaidation?
+        Leave-one-out cross-validation?
     nFolds : int
         N-fold cross-validation (not required for LOO)
 
@@ -129,7 +130,7 @@ def computeCVROC(df, model, outcomeVar, predVars, LOO=False, nFolds=10):
                                                                             model,
                                                                             outcomeVar,
                                                                             predVars)
-        if not np.isnan(trainFPR[0]):
+        if not res is None:
             counter += 1
             testProb = res.predict_proba(testDf[predVars])[:,1]
             testFPR, testTPR, _ = sklearn.metrics.roc_curve(testDf[outcomeVar].values, testProb)
@@ -148,12 +149,13 @@ def computeCVROC(df, model, outcomeVar, predVars, LOO=False, nFolds=10):
         probS = pd.concat(prob).groupby(level=0).agg(np.mean)
         probS.name = 'Prob'
     else:
-        meanTPR = np.nanmean(tpr, axis=1)
+        meanTPR = np.nan * fpr
         meanTPR[0], meanTPR[-1] = 0,1
         meanACC = np.nan
         meanAUC = np.nan
         """Compute mean probability over test predictions in CV"""
-        probS = pd.Series(np.ones(df.shape[0])*np.nan)
+        probS = np.nan
+
     return fpr, meanTPR, meanAUC, meanACC, results, probS
 
 def plotROC(df, model, outcomeVar, predictorsList, predictorLabels=None, rocFunc=computeCVROC, **rocKwargs):
@@ -307,7 +309,9 @@ def lassoVarSelect(df, outcomeVar, predVars, nFolds=10, alpha=None):
     prob : pd.Series
         Predicted probabilities with index from df
     varList : list
-        Variables with non-zero coefficients"""
+        Variables with non-zero coefficients
+    alpha : float
+        Optimal alpha value using coordinate descent path"""
     if not type(predVars) is list:
         predVars = list(predVars)
     tmp = df[[outcomeVar] + predVars].dropna()
@@ -322,9 +326,9 @@ def lassoVarSelect(df, outcomeVar, predVars, nFolds=10, alpha=None):
     results = model.fit(y=tmp[outcomeVar], X=tmp[predVars])
 
     if hasattr(model,'alpha_'):
-        print 'Alpha: %1.3f' % model.alpha_
+        optimalAlpha = model.alpha_
     else:
-        print 'Alpha: %1.3f' % model.alpha
+        optimalAlpha = model.alpha
     
     prob = results.predict(tmp[predVars])
     fpr, tpr, thresholds = sklearn.metrics.roc_curve(tmp[outcomeVar].values, prob)
@@ -332,7 +336,7 @@ def lassoVarSelect(df, outcomeVar, predVars, nFolds=10, alpha=None):
     auc = sklearn.metrics.auc(fpr, tpr)
     varList = np.array(predVars)[results.coef_ != 0].tolist()
     probS = pd.Series(prob, index=tmp.index, name='Prob')
-    return fpr, tpr, auc, acc, results, probS, varList
+    return fpr, tpr, auc, acc, results, probS, varList, optimalAlpha
 
 class smLogisticRegression(object):
     """A wrapper of statsmodels.GLM to use with sklearn interface"""
