@@ -16,7 +16,8 @@ __all__ = ['computeROC',
            'plotProb',
            'plot2Prob',
            'lassoVarSelect',
-           'smLogisticRegression']
+           'smLogisticRegression',
+           'rocStats']
 
 def computeROC(df, model, outcomeVar, predVars):
     """Apply model to df and return performance metrics.
@@ -149,12 +150,23 @@ def computeCVROC(df, model, outcomeVar, predVars, LOO=False, nFolds=10):
         probS = pd.concat(prob).groupby(level=0).agg(np.mean)
         probS.name = 'Prob'
     else:
+        """If we get all PerfectSeparation errors then just report model fit to all data"""
+        print "Returning metrics from fitting complete dataset"
+        testFPR, testTPR, meanAUC, meanACC, res, probS = computeROC(tmp,
+                                                                    model,
+                                                                    outcomeVar,
+                                                                    predVars)
+        meanTPR = np.interp(fpr, testFPR, testTPR)
+        meanTPR[0], meanTPR[-1] = 0,1
+        results = [res]
+        '''
         meanTPR = np.nan * fpr
         meanTPR[0], meanTPR[-1] = 0,1
         meanACC = np.nan
         meanAUC = np.nan
         """Compute mean probability over test predictions in CV"""
         probS = np.nan
+        '''
 
     return fpr, meanTPR, meanAUC, meanACC, results, probS
 
@@ -219,7 +231,7 @@ def plotProb(df, outcomeVar, prob, **kwargs):
     colors = palettable.colorbrewer.qualitative.Set1_3.mpl_colors
 
     tmp = df.join(prob, how='inner')
-    tmp = tmp.sort_values(by='Prob')
+    tmp = tmp.sort_values(by=[outcomeVar,'Prob'])
     tmp['x'] = np.arange(tmp.shape[0])
     
     plt.clf()
@@ -364,3 +376,50 @@ class smLogisticRegression(object):
             exog = X
         pred = self.res.predict(exog)
         return pred
+def rocStats(obs, pred):
+    """Compute stats for a 2x2 table derived from
+    observed and predicted data vectors
+
+    Parameters
+    ----------
+    obs,pred : np.ndarray or pd.Series of shape (n,)
+
+    Returns
+    -------
+    sens : float
+        Sensitivity (1 - false-negative rate)
+    spec : float
+        Specificity (1 - false-positive rate)
+    ppv : float
+        Positive predictive value (1 - false-discovery rate)
+    npv : float
+        Negative predictive value
+    acc : float
+        Accuracy
+    OR : float
+        Odds-ratio of the observed event in the two predicted groups.
+    rr : float
+        Relative rate of the observed event in the two predicted groups.
+    nnt : float
+        Number needed to treat, to prevent one case.
+        (assuming all predicted positives were "treated")"""
+
+    assert obs.shape[0] == pred.shape[0]
+    n = obs.shape
+    a = (obs & pred).sum()
+    b = (obs & (~pred)).sum()
+    c = ((~obs) & pred).sum()
+    d = ((~obs) & (~pred)).sum()
+
+    sens = a / (a+b)
+    spec = d / (c+d)
+    ppv = a / (a+c)
+    npv = d / (b+d)
+    nnt = 1 / (a/(a+c) - b/(b+d))
+    acc = (a + d)/n
+    rr = (a / (a+c)) / (b / (b+d))
+    OR = (a/b) / (c/d)
+    return sens, spec, ppv, npv, acc, OR, rr, nnt
+
+
+
