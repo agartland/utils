@@ -21,7 +21,8 @@ __all__ = ['partialcorr',
            'corrheatmap',
            'validPairwiseCounts',
            'removeNARC',
-           'permcorr']
+           'permcorr',
+           'labeledScatter']
 
 """Red --> Green colormap with 1024 interpolated values"""
 _cdict = {'green' : ((0, 1, 1), (0.5, 0, 0), (1, 0, 0)),
@@ -757,4 +758,29 @@ def permcorr(a,b,corrFunc, nperms = 10000):
         p = ((rhoShuff <= rho).sum() + 1)/(nperms + 1)
     return rho, p
 
+def labeledScatter(x, y, labels, **kwargs):
+    """Matplotlib scatter plot with added annotations for each point.
 
+    Parameters
+    ----------
+    x, y : Passed on to plt.scatter
+    labels : list
+        Strings to annotate each point in x/y
+    kwargs : Passed on to plt.scatter
+
+    Returns
+    -------
+    scatterH : handles from plt.scatter
+    annotateH : handles from plt.annotate"""
+    
+    axh = plt.scatter(x, y, **kwargs)
+    labh = []
+    for xx, yy, lab in zip(x,y, labels):        
+        h = plt.annotate(lab, xy=(xx,yy),
+                             xytext=(3,3),
+                             ha='left',
+                             va='bottom',
+                             textcoords='offset points',
+                             size='small')
+        labh.append(h)
+    return axh, labh
