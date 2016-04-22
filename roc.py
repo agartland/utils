@@ -13,6 +13,7 @@ sns.set(style='darkgrid', palette='muted', font_scale=1.5)
 __all__ = ['computeROC',
            'computeCVROC',
            'plotROC',
+           'plotCVROC',
            'plotProb',
            'plot2Prob',
            'lassoVarSelect',
@@ -69,7 +70,7 @@ def computeROC(df, model, outcomeVar, predVars):
         fpr = np.zeros(5)
         tpr = np.ones(5)
         tpr[0], tpr[-1] = 0,1
-        prob = tmp[outcomeVar].values.astype(float)
+        prob = df[outcomeVar].values.astype(float)
         auc = 1.
         results = None
     assert acc <= 1
@@ -142,7 +143,7 @@ def computeCVROC(df, model, outcomeVar, predVars, LOO=False, nFolds=10):
             acc += sklearn.metrics.accuracy_score(testDf[outcomeVar].values, np.round(testProb), normalize=True)
             results.append(res)
             prob.append(pd.Series(testProb, index=testDf.index))
-
+    
     if counter == nFolds:
         meanTPR = np.nanmean(tpr, axis=1)
         meanTPR[0], meanTPR[-1] = 0,1
@@ -177,7 +178,7 @@ def computeCVROC(df, model, outcomeVar, predVars, LOO=False, nFolds=10):
     assert meanACC <= 1
     return fpr, meanTPR, meanAUC, meanACC, results, probS, success
 
-def plotROC(df, model, outcomeVar, predictorsList, predictorLabels=None, rocFunc=computeCVROC, **rocKwargs):
+def plotCVROC(df, model, outcomeVar, predictorsList, predictorLabels=None, rocFunc=computeCVROC, **rocKwargs):
     """Plot of multiple ROC curves using same model and same outcomeVar with
     different sets of predictors.
 
@@ -204,8 +205,8 @@ def plotROC(df, model, outcomeVar, predictorsList, predictorLabels=None, rocFunc
     
     colors = palettable.colorbrewer.qualitative.Set1_8.mpl_colors
 
-    plt.clf()
-    plt.gca().set_aspect('equal')
+    fprList, tprList, labelList = [],[],[]
+
     for predVarsi,predVars in enumerate(predictorsList):
         fpr, tpr, auc, acc, res, probS, sucess = rocFunc(df,
                                                          model,
@@ -217,8 +218,22 @@ def plotROC(df, model, outcomeVar, predictorsList, predictorLabels=None, rocFunc
             label = '%s (AUC = %0.2f; ACC = %0.2f)' % (predictorLabels[predVarsi], auc, acc)
         else:
             label = '%s (AUC* = %0.2f; ACC* = %0.2f)' % (predictorLabels[predVarsi], auc, acc)
-        plt.plot(fpr, tpr, color=colors[predVarsi], lw=2, label=label)
+        labelList.append(label)
+        fprList.append(fpr)
+        tprList.append(tpr)
+    plotROC(fprList, tprList, labelList)
 
+def plotROC(fprL, tprL, aucL=None, accL=None, labelL=None):
+    if labelL is None and auc is None and acc is None:
+        labelL = ['Model %d' % i for i in range(len(fprL))]
+    else:
+        labelL = ['%s (AUC = %0.2f; ACC = %0.2f)' % (label, auc, acc) for label,auc,acc in zip(labelL, aucL, accL)]
+    colors = palettable.colorbrewer.qualitative.Set1_8.mpl_colors
+
+    plt.clf()
+    plt.gca().set_aspect('equal')
+    for i, (fpr, tpr, label) in enumerate(zip(fprL, tprL, labelL)):
+        plt.plot(fpr, tpr, color=colors[i], lw=2, label=label)
     plt.plot([0, 1], [0, 1], '--', color='gray', label='Chance')
     plt.xlim([-0.05, 1.05])
     plt.ylim([-0.05, 1.05])
