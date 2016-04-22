@@ -52,15 +52,15 @@ def computeROC(df, model, outcomeVar, predVars):
     tmp = df[[outcomeVar] + predVars].dropna()
 
     try:
-        results = model.fit(X=tmp[predVars], y=tmp[outcomeVar])
+        results = model.fit(X=tmp[predVars].astype(float), y=tmp[outcomeVar].astype(float))
         if hasattr(results, 'predict_proba'):
-            prob = results.predict_proba(tmp[predVars])[:,1]
+            prob = results.predict_proba(tmp[predVars].astype(float))[:,1]
         else:
-            prob = results.predict(tmp[predVars])
+            prob = results.predict(tmp[predVars].astype(float))
             results.predict_proba = results.predict
         fpr, tpr, thresholds = sklearn.metrics.roc_curve(tmp[outcomeVar].values, prob)
 
-        acc = sklearn.metrics.accuracy_score(tmp[outcomeVar].values, np.round(prob))
+        acc = sklearn.metrics.accuracy_score(tmp[outcomeVar].values, np.round(prob), normalize=True)
         auc = sklearn.metrics.auc(fpr, tpr)
         tpr[0], tpr[-1] = 0,1
     except sm.tools.sm_exceptions.PerfectSeparationError:
@@ -72,6 +72,7 @@ def computeROC(df, model, outcomeVar, predVars):
         prob = tmp[outcomeVar].values.astype(float)
         auc = 1.
         results = None
+    assert acc <= 1
     return fpr, tpr, auc, acc, results, pd.Series(prob, index=tmp.index, name='Prob')
 
 def computeCVROC(df, model, outcomeVar, predVars, LOO=False, nFolds=10):
@@ -105,7 +106,9 @@ def computeCVROC(df, model, outcomeVar, predVars, LOO=False, nFolds=10):
     results : returned by model.fit()
         Training model results object for each fold
     prob : pd.Series
-        Mean predicted probabilities on test data with index from df"""
+        Mean predicted probabilities on test data with index from df
+    success : bool
+        An indicator of whether the cross-validation was completed."""
 
     if not type(predVars) is list:
         predVars = list(predVars)
@@ -133,10 +136,10 @@ def computeCVROC(df, model, outcomeVar, predVars, LOO=False, nFolds=10):
                                                                             predVars)
         if not res is None:
             counter += 1
-            testProb = res.predict_proba(testDf[predVars])[:,1]
+            testProb = res.predict_proba(testDf[predVars].astype(float))[:,1]
             testFPR, testTPR, _ = sklearn.metrics.roc_curve(testDf[outcomeVar].values, testProb)
             tpr[:,i] = np.interp(fpr, testFPR, testTPR)
-            acc += sklearn.metrics.accuracy_score(testDf[outcomeVar].values, np.round(testProb))
+            acc += sklearn.metrics.accuracy_score(testDf[outcomeVar].values, np.round(testProb), normalize=True)
             results.append(res)
             prob.append(pd.Series(testProb, index=testDf.index))
 
@@ -148,10 +151,13 @@ def computeCVROC(df, model, outcomeVar, predVars, LOO=False, nFolds=10):
         """Compute mean probability over test predictions in CV"""
         probS = pd.concat(prob).groupby(level=0).agg(np.mean)
         probS.name = 'Prob'
+        assert probS.shape[0] == tmp.shape[0]
+        success = True
     else:
         print 'ROC: did not finish all folds (%d of %d)' % (counter, nFolds)
-        """If we get all PerfectSeparation errors then just report model fit to all data"""
-        print "Returning metrics from fitting complete dataset"
+        """If we get a PerfectSeparation error on one fold then report model fit to all data"""
+        print "Returning metrics from fitting complete dataset (no CV)"
+
         testFPR, testTPR, meanAUC, meanACC, res, probS = computeROC(tmp,
                                                                     model,
                                                                     outcomeVar,
@@ -159,6 +165,7 @@ def computeCVROC(df, model, outcomeVar, predVars, LOO=False, nFolds=10):
         meanTPR = np.interp(fpr, testFPR, testTPR)
         meanTPR[0], meanTPR[-1] = 0,1
         results = [res]
+        success = False
         '''
         meanTPR = np.nan * fpr
         meanTPR[0], meanTPR[-1] = 0,1
@@ -167,8 +174,8 @@ def computeCVROC(df, model, outcomeVar, predVars, LOO=False, nFolds=10):
         """Compute mean probability over test predictions in CV"""
         probS = np.nan
         '''
-
-    return fpr, meanTPR, meanAUC, meanACC, results, probS
+    assert meanACC <= 1
+    return fpr, meanTPR, meanAUC, meanACC, results, probS, success
 
 def plotROC(df, model, outcomeVar, predictorsList, predictorLabels=None, rocFunc=computeCVROC, **rocKwargs):
     """Plot of multiple ROC curves using same model and same outcomeVar with
@@ -200,14 +207,18 @@ def plotROC(df, model, outcomeVar, predictorsList, predictorLabels=None, rocFunc
     plt.clf()
     plt.gca().set_aspect('equal')
     for predVarsi,predVars in enumerate(predictorsList):
-        fpr, tpr, auc, acc, res, probS = rocFunc(df,
-                                                 model,
-                                                 outcomeVar,
-                                                 predVars,
-                                                 **rocKwargs)
+        fpr, tpr, auc, acc, res, probS, sucess = rocFunc(df,
+                                                         model,
+                                                         outcomeVar,
+                                                         predVars,
+                                                         **rocKwargs)
 
-        label = '%s (AUC = %0.2f; ACC = %0.2f)' % (predictorLabels[predVarsi], auc, acc)
+        if success:
+            label = '%s (AUC = %0.2f; ACC = %0.2f)' % (predictorLabels[predVarsi], auc, acc)
+        else:
+            label = '%s (AUC* = %0.2f; ACC* = %0.2f)' % (predictorLabels[predVarsi], auc, acc)
         plt.plot(fpr, tpr, color=colors[predVarsi], lw=2, label=label)
+
     plt.plot([0, 1], [0, 1], '--', color='gray', label='Chance')
     plt.xlim([-0.05, 1.05])
     plt.ylim([-0.05, 1.05])
@@ -335,16 +346,16 @@ def lassoVarSelect(df, outcomeVar, predVars, nFolds=10, alpha=None):
         model = sklearn.linear_model.Lasso(alpha=alpha)
     else:
         model = sklearn.linear_model.LassoCV(cv=nFolds)# , alphas=np.linspace(0.001,0.1,50))
-    results = model.fit(y=tmp[outcomeVar], X=tmp[predVars])
+    results = model.fit(y=tmp[outcomeVar].astype(float), X=tmp[predVars].astype(float))
 
     if hasattr(model,'alpha_'):
         optimalAlpha = model.alpha_
     else:
         optimalAlpha = model.alpha
     
-    prob = results.predict(tmp[predVars])
+    prob = results.predict(tmp[predVars].astype(float))
     fpr, tpr, thresholds = sklearn.metrics.roc_curve(tmp[outcomeVar].values, prob)
-    acc = sklearn.metrics.accuracy_score(tmp[outcomeVar].values, np.round(prob))
+    acc = sklearn.metrics.accuracy_score(tmp[outcomeVar].values, np.round(prob), normalize=True)
     auc = sklearn.metrics.auc(fpr, tpr)
     varList = np.array(predVars)[results.coef_ != 0].tolist()
     probS = pd.Series(prob, index=tmp.index, name='Prob')
@@ -376,13 +387,15 @@ class smLogisticRegression(object):
             exog = X
         pred = self.res.predict(exog)
         return pred
-def rocStats(obs, pred):
+def rocStats(obs, pred, returnSeries=True):
     """Compute stats for a 2x2 table derived from
     observed and predicted data vectors
 
     Parameters
     ----------
     obs,pred : np.ndarray or pd.Series of shape (n,)
+
+    Optionally return a series with quantities labeled.
 
     Returns
     -------
@@ -405,11 +418,12 @@ def rocStats(obs, pred):
         (assuming all predicted positives were "treated")"""
 
     assert obs.shape[0] == pred.shape[0]
-    n = obs.shape
-    a = (obs * pred).sum()
-    b = (obs * (1 - pred)).sum()
-    c = ((1 - obs) * pred).sum()
-    d = ((1 - obs) * (1 - pred)).sum()
+
+    n = obs.shape[0]
+    a = (obs.astype(bool) & pred.astype(bool)).sum()
+    b = (obs.astype(bool) & (~pred.astype(bool))).sum()
+    c = ((~obs.astype(bool)) & pred.astype(bool)).sum()
+    d = ((~obs.astype(bool)) & (~pred.astype(bool))).sum()
 
     sens = a / (a+b)
     spec = d / (c+d)
@@ -419,7 +433,13 @@ def rocStats(obs, pred):
     acc = (a + d)/n
     rr = (a / (a+c)) / (b / (b+d))
     OR = (a/b) / (c/d)
-    return sens, spec, ppv, npv, acc, OR, rr, nnt
+
+    if returnSeries:
+        vec = [sens, spec, ppv, npv, nnt, acc, rr, OR]
+        out = pd.Series(vec, name='ROC', index=['Sensitivity', 'Specificity', 'PPV', 'NPV', 'NNT', 'ACC', 'RR', 'OR'])
+    else:
+        out = (sens, spec, ppv, npv, nnt, acc, rr, OR)
+    return out
 
 
 
