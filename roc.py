@@ -139,9 +139,8 @@ def computeCVROC(df, model, outcomeVar, predVars, LOO=False, nFolds=10):
             acc += sklearn.metrics.accuracy_score(testDf[outcomeVar].values, np.round(testProb))
             results.append(res)
             prob.append(pd.Series(testProb, index=testDf.index))
-    if counter != nFolds:
-        print 'ROC: did not finish all folds (%d of %d)' % (counter, nFolds)
-    if counter >=1:
+
+    if counter == nFolds:
         meanTPR = np.nanmean(tpr, axis=1)
         meanTPR[0], meanTPR[-1] = 0,1
         meanACC = acc / counter
@@ -150,6 +149,7 @@ def computeCVROC(df, model, outcomeVar, predVars, LOO=False, nFolds=10):
         probS = pd.concat(prob).groupby(level=0).agg(np.mean)
         probS.name = 'Prob'
     else:
+        print 'ROC: did not finish all folds (%d of %d)' % (counter, nFolds)
         """If we get all PerfectSeparation errors then just report model fit to all data"""
         print "Returning metrics from fitting complete dataset"
         testFPR, testTPR, meanAUC, meanACC, res, probS = computeROC(tmp,
@@ -406,10 +406,10 @@ def rocStats(obs, pred):
 
     assert obs.shape[0] == pred.shape[0]
     n = obs.shape
-    a = (obs & pred).sum()
-    b = (obs & (~pred)).sum()
-    c = ((~obs) & pred).sum()
-    d = ((~obs) & (~pred)).sum()
+    a = (obs * pred).sum()
+    b = (obs * (1 - pred)).sum()
+    c = ((1 - obs) * pred).sum()
+    d = ((1 - obs) * (1 - pred)).sum()
 
     sens = a / (a+b)
     spec = d / (c+d)
