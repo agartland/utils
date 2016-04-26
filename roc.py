@@ -76,7 +76,7 @@ def computeROC(df, model, outcomeVar, predVars):
     assert acc <= 1
     return fpr, tpr, auc, acc, results, pd.Series(prob, index=tmp.index, name='Prob')
 
-def computeCVROC(df, model, outcomeVar, predVars, LOO=False, nFolds=10):
+def computeCVROC(df, model, outcomeVar, predVars, nFolds=10):
     """Apply model to df and return performance metrics in a cross-validation framework.
 
     Parameters
@@ -88,8 +88,6 @@ def computeCVROC(df, model, outcomeVar, predVars, LOO=False, nFolds=10):
     outcomeVar : str
     predVars : ndarray or list
         Predictor variables in the model.
-    LOO : bool
-        Leave-one-out cross-validation?
     nFolds : int
         N-fold cross-validation (not required for LOO)
 
@@ -114,14 +112,10 @@ def computeCVROC(df, model, outcomeVar, predVars, LOO=False, nFolds=10):
     if not type(predVars) is list:
         predVars = list(predVars)
     tmp = df[[outcomeVar] + predVars].dropna()
-    if LOO:
-        cv = sklearn.cross_validation.LeaveOneOut(n=tmp.shape[0])
-        nFolds = tmp.shape[0]
-    else:
-        cv = sklearn.cross_validation.KFold(n=tmp.shape[0],
-                                            n_folds=nFolds,
-                                            shuffle=True,
-                                            random_state=110820)
+    cv = sklearn.cross_validation.KFold(n=tmp.shape[0],
+                                        n_folds=nFolds,
+                                        shuffle=True,
+                                        random_state=110820)
     fpr = np.linspace(0, 1, 100)
     tpr = np.nan * np.zeros((fpr.shape[0], nFolds))
     acc = 0
@@ -178,7 +172,103 @@ def computeCVROC(df, model, outcomeVar, predVars, LOO=False, nFolds=10):
     assert meanACC <= 1
     return fpr, meanTPR, meanAUC, meanACC, results, probS, success
 
-def plotCVROC(df, model, outcomeVar, predictorsList, predictorLabels=None, rocFunc=computeCVROC, **rocKwargs):
+def computeLOOROC(df, model, outcomeVar, predVars):
+    """Apply model to df and return performance metrics in a cross-validation framework.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Must contain outcome and predictor variables.
+    model : sklearn or other model
+        Model must have fit and predict methods.
+    outcomeVar : str
+    predVars : ndarray or list
+        Predictor variables in the model.
+
+    Returns
+    -------
+    fpr : np.ndarray
+        Pre-specified vector of FPR thresholds for interpolation
+        fpr = np.linspace(0, 1, 100)
+    tpr : np.ndarray
+        Mean true-positive rate in test fraction.
+    auc : float
+        Area under the mean ROC curve.
+    acc : float
+        Mean accuracy score in test fraction.
+    results : returned by model.fit()
+        Training model results object for each fold
+    prob : pd.Series
+        Mean predicted probabilities on test data with index from df
+    success : bool
+        An indicator of whether the cross-validation was completed."""
+
+    if not type(predVars) is list:
+        predVars = list(predVars)
+    tmp = df[[outcomeVar] + predVars].dropna()
+
+    cv = sklearn.cross_validation.LeaveOneOut(n=tmp.shape[0])
+    nFolds = tmp.shape[0]
+
+    fpr = np.linspace(0, 1, 100)
+    prob = np.nan * np.ones(tmp.shape[0])
+    outcome = np.nan * np.ones(tmp.shape[0])
+    ids = []
+    results = []
+    
+    """Fit model to all the data for use in cases when there is perfect separation"""
+    try:
+        wholeRes = model.fit(X=tmp[predVars].astype(float), y=tmp[outcomeVar].astype(float))
+        if not hasattr(wholeRes, 'predict_proba'):
+            wholeRes.predict_proba = wholeRes.predict
+        wholeProb = wholeRes.predict_proba(tmp[predVars].astype(float))[:,1]
+    except sm.tools.sm_exceptions.PerfectSeparationError:
+        print 'PerfectSeparationError on complete dataset: %s (N = %d; %d predictors)' % (outcomeVar, tmp.shape[0], len(predVars))
+        outcome = tmp[outcomeVar]
+        prob = outcome
+        results = [None] * tmp.shape[0]
+
+        testFPR, testTPR, thresholds = sklearn.metrics.roc_curve(outcome, prob)
+        tpr = np.interp(fpr, testFPR, testTPR)
+        acc = 1
+        auc = 1
+        tpr[0], tpr[-1] = 0,1
+
+        probS = pd.Series(prob, index=tmp.index)
+        probS.name = 'Prob'
+        assert probS.shape[0] == tmp.shape[0]
+        success = False
+        return fpr, tpr, auc, acc, results, probS, success
+
+    for i, (trainInd, testInd) in enumerate(cv):
+        trainDf = tmp.iloc[trainInd]
+        testDf = tmp.iloc[testInd]
+        outcome[i] = testDf[outcomeVar].astype(float).iloc[0]
+        ids.append(tmp.index[testInd[0]])
+        try:
+            res = model.fit(X=trainDf[predVars].astype(float), y=trainDf[outcomeVar].astype(float))
+            results.append(res)
+            if not hasattr(res, 'predict_proba'):
+                res.predict_proba = res.predict
+            prob[i] = res.predict_proba(testDf[predVars].astype(float))[0,1]
+        except sm.tools.sm_exceptions.PerfectSeparationError:
+            print 'PerfectSeparationError: %s (N = %d; %d predictors)' % (outcomeVar, tmp.shape[0], len(predVars))
+            prob[i] = wholeProb[i]
+            results.append(None)
+    
+    testFPR, testTPR, thresholds = sklearn.metrics.roc_curve(outcome, prob)
+    tpr = np.interp(fpr, testFPR, testTPR)
+    acc = sklearn.metrics.accuracy_score(outcome, np.round(prob), normalize=True)
+    auc = sklearn.metrics.auc(testFPR, testTPR)
+    tpr[0], tpr[-1] = 0,1
+
+    probS = pd.Series(prob, index=ids)
+    probS.name = 'Prob'
+    assert probS.shape[0] == tmp.shape[0]
+    success = True
+    return fpr, tpr, auc, acc, results, probS, success
+
+def plotCVROC(df, model, outcomeVar, predictorsList, predictorLabels=None, rocFunc=computeLOOROC, **rocKwargs):
     """Plot of multiple ROC curves using same model and same outcomeVar with
     different sets of predictors.
 
@@ -193,9 +283,7 @@ def plotCVROC(df, model, outcomeVar, predictorsList, predictorLabels=None, rocFu
         List of lists of predictor variables for each model.
     predictorLabels : list
         List of labels for the models (optional)
-    LOO : bool
-        Leave-one-out cross-vlaidation?
-    rocFunc : computeCVROC or computeROC
+    rocFunc : computeCVROC or computeROC or computeLOOROC
         Function for computing the ROC
     rocKwargs : kwargs
         Additional arguments for rocFunc"""
@@ -221,13 +309,14 @@ def plotCVROC(df, model, outcomeVar, predictorsList, predictorLabels=None, rocFu
         labelList.append(label)
         fprList.append(fpr)
         tprList.append(tpr)
-    plotROC(fprList, tprList, labelList)
+    plotROC(fprList, tprList, labelL=labelList)
 
 def plotROC(fprL, tprL, aucL=None, accL=None, labelL=None):
-    if labelL is None and auc is None and acc is None:
+    if labelL is None and aucL is None and accL is None:
         labelL = ['Model %d' % i for i in range(len(fprL))]
-    else:
+    elif labelL is None:
         labelL = ['%s (AUC = %0.2f; ACC = %0.2f)' % (label, auc, acc) for label,auc,acc in zip(labelL, aucL, accL)]
+
     colors = palettable.colorbrewer.qualitative.Set1_8.mpl_colors
 
     plt.clf()
@@ -310,7 +399,7 @@ def plot2Prob(df, outcomeVar, prob, **kwargs):
     plt.xlabel('Predicted Pr(%s)' % outcomeVar[0])
     plt.show()
 
-def lassoVarSelect(df, outcomeVar, predVars, nFolds=10, alpha=None):
+def lassoVarSelect(df, outcomeVar, predVars, nFolds=10, LOO=False, alpha=None):
     """Apply LASSO to df and return performance metrics,
     optionally in a cross-validation framework to select alpha.
 
@@ -325,6 +414,8 @@ def lassoVarSelect(df, outcomeVar, predVars, nFolds=10, alpha=None):
         Predictor variables in the model.
     nFolds : int
         N-fold cross-validation (not required for LOO)
+    LOO : bool
+        Use leave-one-out cross validation instead of n-fold
     alpha : float
         Constant that multiplies the L1 term (aka lambda)
         Defaults to 1.0
@@ -360,7 +451,11 @@ def lassoVarSelect(df, outcomeVar, predVars, nFolds=10, alpha=None):
             alpha = np.abs(tmp[predVars].T.dot(tmp[outcomeVar])).max() / tmp.shape[0]
         model = sklearn.linear_model.Lasso(alpha=alpha)
     else:
-        model = sklearn.linear_model.LassoCV(cv=nFolds)# , alphas=np.linspace(0.001,0.1,50))
+        if LOO:
+            cv = sklearn.cross_validation.LeaveOneOut(n=tmp.shape[0])
+        else:
+            cv = nFolds
+        model = sklearn.linear_model.LassoCV(cv=cv)# , alphas=np.linspace(0.001,0.1,50))
     results = model.fit(y=tmp[outcomeVar].astype(float), X=tmp[predVars].astype(float))
 
     if hasattr(model,'alpha_'):
