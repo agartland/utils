@@ -154,7 +154,7 @@ def screeplot(df, method='pca', n_components=10, standardize=False, smatFunc=Non
 
 def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
            plotVars='all', standardize=False, smatFunc=None, varThresh=0.1,
-           ldaShrinkage='auto', dropna=False, drawElipse=True):
+           ldaShrinkage='auto', dropna=False, plotElipse=True):
     """Perform dimensionality reduction on columns of df using PCA, KPCA or LDA,
     then produce a biplot in two-dimensions.
     
@@ -183,7 +183,7 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
         than the threshold then it is plotted.
     ldaShrinkage : str or None
         Passed to sklearn.discriminant_analysis.LinearDiscriminantAnalysis
-    drawElipse : bool
+    plotElipse : bool
         Draw elipse representing 80% CI, default True
 
     Returns
@@ -224,7 +224,7 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
         axh.scatter(xy[ind, plotDims[0]], xy[ind, plotDims[1]], marker='o', s=50, alpha=alpha, c=col, label=lab)
         #axh.scatter(xy[ind, plotDims[0]].mean(axis=0), xy[ind, plotDims[1]].mean(axis=0), marker='o', s=300, alpha=alpha/1.5, c=col)
         Xvar = xy[ind, :][:,plotDims]
-        if len(ind) > 2 and drawElipse:
+        if len(ind) > 2 and plotElipse:
             plot_point_cov(Xvar, ax=axh, color=col, alpha=0.2)
     arrowParams = dict(arrowstyle='<-',
                         connectionstyle='Arc3',
