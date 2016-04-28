@@ -296,7 +296,7 @@ def plotCVROC(df, model, outcomeVar, predictorsList, predictorLabels=None, rocFu
     fprList, tprList, labelList = [],[],[]
 
     for predVarsi,predVars in enumerate(predictorsList):
-        fpr, tpr, auc, acc, res, probS, sucess = rocFunc(df,
+        fpr, tpr, auc, acc, res, probS, success = rocFunc(df,
                                                          model,
                                                          outcomeVar,
                                                          predVars,
@@ -311,7 +311,7 @@ def plotCVROC(df, model, outcomeVar, predictorsList, predictorLabels=None, rocFu
         tprList.append(tpr)
     plotROC(fprList, tprList, labelL=labelList)
 
-def plotROC(fprL, tprL, aucL=None, accL=None, labelL=None):
+def plotROC(fprL, tprL, aucL=None, accL=None, labelL=None, outcomeVar=''):
     if labelL is None and aucL is None and accL is None:
         labelL = ['Model %d' % i for i in range(len(fprL))]
     elif labelL is None:
@@ -328,7 +328,10 @@ def plotROC(fprL, tprL, aucL=None, accL=None, labelL=None):
     plt.ylim([-0.05, 1.05])
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
-    plt.title('ROC for %s' % outcomeVar)
+    if outcomeVar == '':
+        plt.title('ROC')
+    else:
+        plt.title('ROC for %s' % outcomeVar)
     plt.legend(loc="lower right")
     plt.show()
 
@@ -379,22 +382,23 @@ def plot2Prob(df, outcomeVar, prob, **kwargs):
               (1,1):'Both',
               (0,1):'%s only' % outcomeVar[1],
               (1,0):'%s only' % outcomeVar[0]}
+    markers = ['o','s','^','x']
     colors = palettable.colorbrewer.qualitative.Set1_5.mpl_colors
     tmp = df.join(prob[0], how='inner').join(prob[1], how='inner', rsuffix='_Y')
 
     plt.clf()
     plt.gca().set_aspect('equal')
     prodIter = itertools.product(tmp[outcomeVar[0]].unique(), tmp[outcomeVar[1]].unique())
-    for color,val in zip(colors, prodIter):
+    for color,m,val in zip(colors, markers, prodIter):
         valx, valy = val
         ind = (tmp[outcomeVar[0]] == valx) & (tmp[outcomeVar[1]] == valy)
         lab = labels[val] + ' (%d)' % ind.sum()
-        plt.scatter(tmp.Prob.loc[ind], tmp.Prob_Y.loc[ind], label=lab, color=color, **kwargs)
+        plt.scatter(tmp.Prob.loc[ind], tmp.Prob_Y.loc[ind], label=lab, color=color, m=m, **kwargs)
     plt.plot([0.5,0.5], [0,1], 'k--', lw=1)
     plt.plot([0,1], [0.5,0.5], 'k--', lw=1)
     plt.ylim((-0.05, 1.05))
     plt.xlim((-0.05, 1.05))
-    plt.legend(loc=0)
+    plt.legend(loc='upper left')
     plt.ylabel('Predicted Pr(%s)' % outcomeVar[1])
     plt.xlabel('Predicted Pr(%s)' % outcomeVar[0])
     plt.show()
