@@ -314,7 +314,7 @@ def plotCVROC(df, model, outcomeVar, predictorsList, predictorLabels=None, rocFu
 def plotROC(fprL, tprL, aucL=None, accL=None, labelL=None, outcomeVar=''):
     if labelL is None and aucL is None and accL is None:
         labelL = ['Model %d' % i for i in range(len(fprL))]
-    elif labelL is None:
+    else:
         labelL = ['%s (AUC = %0.2f; ACC = %0.2f)' % (label, auc, acc) for label,auc,acc in zip(labelL, aucL, accL)]
 
     colors = palettable.colorbrewer.qualitative.Set1_8.mpl_colors
@@ -335,31 +335,29 @@ def plotROC(fprL, tprL, aucL=None, accL=None, labelL=None, outcomeVar=''):
     plt.legend(loc="lower right")
     plt.show()
 
-def plotProb(df, outcomeVar, prob, **kwargs):
+def plotProb(outcome, prob, **kwargs):
     """Scatter plot of probabilities for one ourcome.
 
     Parameters
     ----------
-    df : pd.DataFrame
-        Must contain outcome and predictor variables.
-    outcomeVar : str
+    outcome : pd.Series
     prob : pd.Series
         Predicted probabilities returned from computeROC or computeCVROC"""
 
     colors = palettable.colorbrewer.qualitative.Set1_3.mpl_colors
 
-    tmp = df.join(prob, how='inner')
-    tmp = tmp.sort_values(by=[outcomeVar,'Prob'])
+    tmp = pd.concat((outcome, prob), join='inner', axis=1)
+    tmp = tmp.sort_values(by=[outcome.name,'Prob'])
     tmp['x'] = np.arange(tmp.shape[0])
     
     plt.clf()
-    for color,val in zip(colors, tmp[outcomeVar].unique()):
-        ind = tmp[outcomeVar] == val
-        lab = '%s = %1.0f (%d)' % (outcomeVar, val, ind.sum())
+    for color,val in zip(colors, tmp[outcome.name].unique()):
+        ind = tmp[outcome.name] == val
+        lab = '%s = %1.0f (%d)' % (outcome.name, val, ind.sum())
         plt.scatter(tmp.x.loc[ind], tmp.Prob.loc[ind], label=lab, color=color, **kwargs)
     plt.plot([0,tmp.shape[0]],[0.5, 0.5], 'k--', lw=1)
     plt.legend(loc='upper left')
-    plt.ylabel('Predicted Pr(%s)' % outcomeVar)
+    plt.ylabel('Predicted Pr(%s)' % outcome.name)
     plt.ylim((-0.05, 1.05))
     plt.xlim(-1, tmp.shape[0])
     plt.show()
@@ -370,7 +368,7 @@ def plot2Prob(df, outcomeVar, prob, **kwargs):
     Parameters
     ----------
     df : pd.DataFrame
-        Must contain outcome and predictor variables.
+        Must contain two outcome variables.
     model : sklearn or other model
         Model must have fit and predict methods.
     outcomeVar : list
@@ -384,7 +382,7 @@ def plot2Prob(df, outcomeVar, prob, **kwargs):
               (1,0):'%s only' % outcomeVar[0]}
     markers = ['o','s','^','x']
     colors = palettable.colorbrewer.qualitative.Set1_5.mpl_colors
-    tmp = df.join(prob[0], how='inner').join(prob[1], how='inner', rsuffix='_Y')
+    tmp = df[outcomeVar].join(prob[0], how='inner').join(prob[1], how='inner', rsuffix='_Y')
 
     plt.clf()
     plt.gca().set_aspect('equal')
@@ -393,7 +391,7 @@ def plot2Prob(df, outcomeVar, prob, **kwargs):
         valx, valy = val
         ind = (tmp[outcomeVar[0]] == valx) & (tmp[outcomeVar[1]] == valy)
         lab = labels[val] + ' (%d)' % ind.sum()
-        plt.scatter(tmp.Prob.loc[ind], tmp.Prob_Y.loc[ind], label=lab, color=color, m=m, **kwargs)
+        plt.scatter(tmp.Prob.loc[ind], tmp.Prob_Y.loc[ind], label=lab, color=color, marker=m, **kwargs)
     plt.plot([0.5,0.5], [0,1], 'k--', lw=1)
     plt.plot([0,1], [0.5,0.5], 'k--', lw=1)
     plt.ylim((-0.05, 1.05))

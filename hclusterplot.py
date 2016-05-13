@@ -94,7 +94,7 @@ def addColorbar(fig,cb_ax,data_ax,label='Correlation'):
     for t in cb.ax.yaxis.get_ticklabels():
         t.set_fontsize('small')
 
-def plotCorrHeatmap(df=None, metric='pearson', rowInd=None, colInd=None, col_labels=None, titleStr=None, vRange=None, tickSz='small', cmap=None, dmat=None, cbLabel='Correlation', minN=1):
+def plotCorrHeatmap(df=None, metric='pearson', rowInd=None, colInd=None, col_labels=None, titleStr=None, vRange=None, tickSz='medium', cmap=None, dmat=None, cbLabel='Correlation', minN=1):
     """Plot a heatmap of a column-wise distance matrix defined by metric (can be 'spearman' as well)
     Can provide dmat as a pd.DataFrame instead of df.
     Optionally supply a column index colInd to reorder the columns to match a previous clustering
@@ -181,7 +181,7 @@ def plotCorrHeatmap(df=None, metric='pearson', rowInd=None, colInd=None, col_lab
     if not titleStr is None:
         heatmapAX.set_xlabel(titleStr,size='x-large')
 
-def plotHColCluster(df=None, col_dmat=None, method='complete', metric='euclidean', col_labels=None, titleStr=None, vRange=None, tickSz='small', cmap=None,  minN=1, K=None, labelCmap=None, noColorBar=False, interactive=False):
+def plotHColCluster(df=None, col_dmat=None, method='complete', metric='euclidean', col_labels=None, titleStr=None, vRange=None, tickSz='medium', cmap=None,  minN=1, K=None, labelCmap=None, noColorBar=False, interactive=False):
     """Perform hierarchical clustering on df columns and plot square heatmap of pairwise distances"""
     if col_dmat is None and df is None:
         print 'Need to provide df or col_dmat'
