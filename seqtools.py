@@ -950,3 +950,38 @@ def overlappingKmers(s, k=15, overlap=11, includeFinalPeptide=True, returnStartI
         return mers, inds
     else:
         return mers
+
+def compSeq(s1, s2, lineL=50):
+    """Print two sequences showing mismatches.
+
+    Parameters
+    ----------
+    s1, s2 : str
+        Strings representing aligned AA or NT sequences
+    lineL : int
+        Wrap line at lineL"""
+    lineN = int(np.ceil(min(len(s1), len(s2))/lineL))
+    count = 0
+    samecount = 0
+    outStr = ''
+    for linei in range(lineN):
+        if (linei+1) * lineL < min(len(s1), len(s2)):
+            end = (linei+1) * lineL
+        else:
+            end = min(len(s1), len(s2))
+        outStr += 'Pos %d - %d\n' % (linei*lineL+1, end-1+1)
+        for sitei in range(linei*lineL, end):
+            outStr += s1[sitei]
+        outStr += '\n'
+        for sitei in range(linei*lineL, end):
+            out = ' ' if s1[sitei] == s2[sitei] else '|'
+            outStr += out
+            count += 1
+            samecount += 1 if s1[sitei]==s2[sitei] else 0
+        outStr += '\n'
+        for sitei in range(linei*lineL, end):
+            out = '.' if s1[sitei] == s2[sitei] else s2[sitei]
+            outStr += s2[sitei]
+        outStr += '\n\n'
+    outStr += 'Seq1 (%d) and Seq2 (%d) are %1.1f%% similar\n\n' % (len(s1),len(s2),1e2*samecount/count)
+    print outStr
