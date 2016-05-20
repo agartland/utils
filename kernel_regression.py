@@ -52,12 +52,10 @@ def kreg_perm(y, Ks, X=None, binary=True, nperms=10000, seed=110820):
         family = sm.families.Gaussian()
 
     if X is None:
-        X = np.ones(y.shape)
+        X = np.ones(y.shape, dtype=float)
 
     model = sm.GLM(endog=y.astype(float), exog=sm.add_constant(X.astype(float)), family=family)
     result = model.fit()
-    # mu = result.predict(sm.add_constant(X.astype(float)))
-    # resid = y - mu
     resid = result.resid_response
 
     """Squared standard error of the parameters (i.e. Beta_se)"""
