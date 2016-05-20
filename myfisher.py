@@ -8,12 +8,12 @@ But falls back to the scipy test if it cannot be found
 from __future__ import division
 import numpy as np
 
-__all__ = ['fisherTest','fisherTestVec']
+__all__ = ['fisherTest','fisherTestVec','fisherPD']
 
 try:
     """Attempt to use the fisher library (cython) if available (100x speedup)"""
     import fisher
-    def fisherTest(tab,alternative='two-sided'):
+    def fisherTest(tab, alternative='two-sided'):
         """Fisher's exact test on a 2x2 contingency table.
 
         Wrapper around fisher.pvalue found in:
@@ -114,5 +114,36 @@ except ImportError:
             Vector of p-values asspciated with each test and the alternative hypothesis"""
         
         OR = (a*d)/(b*c)
-        p = np.asarray([fisherTest([[aa,bb],[cc,dd]],alternative=alternative)[1] for aa,bb,cc,dd in zip(a,b,c,d)])
+        p = np.asarray([fisherTest([[aa,bb],[cc,dd]], alternative=alternative)[1] for aa,bb,cc,dd in zip(a,b,c,d)])
         return OR, p
+
+def fisherPD(df, cols, alternative='two-sided'):
+    """Test the association between two columns of observations
+    stored in a pandas DataFrame. This is meant to be a quick way to discover
+    possible associations. For a closer look use:
+
+    df[cols].groupby(cols[0]).count()
+    df[cols].groupby(cols[1]).count()
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+    cols : tuple or list of strings
+        Two column names
+
+    Returns
+    -------
+    OR : float
+    p : float"""
+
+    df = deepcopy(df[cols]).dropna()
+    uCols = [np.unique(df[c]) for c in cols]
+    assert len(uCols[0]) == 2
+    assert len(uCols[1]) == 2
+
+    a = ((df[cols[0]] == uCols[0][0]) & (df[cols[1]] == uCols[1][0])).sum()
+    b = ((df[cols[0]] == uCols[0][0]) & (df[cols[1]] == uCols[1][1])).sum()
+    c = ((df[cols[0]] == uCols[0][1]) & (df[cols[1]] == uCols[1][0])).sum()
+    d = ((df[cols[0]] == uCols[0][1]) & (df[cols[1]] == uCols[1][1])).sum()
+    
+    return fisherTest([[a,b],[c,d]], alternative=alternative)
