@@ -165,6 +165,31 @@ def bootstrapCI(data, statFunc=None, alpha=0.05, nPerms=10000, output='lowhigh')
         out = np.reshape(out, shp)
     return out
 
+"""Experiments in parallelism
+from joblib import Parallel, delayed
+Parallel(n_jobs=2)(delayed(sqrt)(i ** 2) for i in range(10))
 
+def testStatFunc(data, ind):
+    half = int(np.floor(len(ind)/2.))
+    return np.mean(data[ind[:half]]) - np.mean(data[ind[half:]])
 
+def parPermTest(data, statFunc, nperms=100, seed=110820, n_jobs=1):
+    n = data.shape[0]
+    tmpFunc = partial(statFunc, data)
+    obs = tmpFunc(range(n))
+    
+    np.random.seed(seed)
+    
+    if ncpus == 1:
+        robs = np.zeros(nperms)
+        for i in range(nperms):
+            robs[i] = tmpFunc(np.random.permutation(n))
+    else:
+        robs = Parallel(n_jobs=n_jobs)(delayed(tmpFunc)(np.random.permutation(n)) for i in range(nperms))
+    
+    pvalue = 2 * ((robs >= obs).sum() + 1) / (nperms + 1)
+    return pvalue, obs, robs
 
+data = np.concatenate(())
+
+"""

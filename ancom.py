@@ -154,7 +154,7 @@ def otuLogRatios(otuDf):
     logRatio = pd.DataFrame(logRatio, index=otuDf.index, columns=cols)
     return logRatio
 
-def globalLRPermTest(otuDf, labels, statfunc=_sumDmeanStat, nperms=10000):
+def globalLRPermTest(otuDf, labels, statfunc=_sumDmeanStat, nperms=10000, seed=110820):
     """Calculates pairwise log ratios between all OTUs and performs global
     permutation tests to determine if there is a significant difference
     over all log-ratios, with respect to the label variable of interest.
@@ -171,6 +171,8 @@ def globalLRPermTest(otuDf, labels, statfunc=_sumDmeanStat, nperms=10000):
         returns a float summarizing over k.
     nperms : int
         Number of iterations for the permutation test.
+    seed :int
+        Seed for random permutation generation.
     
     Returns:
     --------
@@ -194,16 +196,18 @@ def globalLRPermTest(otuDf, labels, statfunc=_sumDmeanStat, nperms=10000):
 
     logRatio = otuLogRatios(otuDf)
     
+    np.random.seed(seed)
     samples = np.zeros(nperms)
     obs = statfunc(logRatio.values, labelBool)
     for permi in range(nperms):
         rind = np.random.permutation(nSamples)
         samples[permi] = statfunc(logRatio.values, labelBool[rind])
+    """Since test is based on the abs statistic it is inherently two-sided"""
     pvalue = ((np.abs(samples) >= np.abs(obs)).sum() + 1) / (nperms + 1)
     
     return pvalue, obs
 
-def LRPermTest(otuDf, labels, statfunc=_dmeanStat, nperms=10000, adjMethod='fdr_bh'):
+def LRPermTest(otuDf, labels, statfunc=_dmeanStat, nperms=10000, adjMethod='fdr_bh', seed=110820):
     """Calculates pairwise log ratios between all OTUs and performs
     permutation tests to determine if there is a significant difference
     in OTU ratios with respect to the label variable of interest.
@@ -223,6 +227,8 @@ def LRPermTest(otuDf, labels, statfunc=_dmeanStat, nperms=10000, adjMethod='fdr_
     adjMethod : string
         Passed to sm.stats.multipletests for p-value multiplicity adjustment.
         If value is None then no adjustment is made.
+    seed :int
+        Seed for random permutation generation.
     
     Returns:
     --------
@@ -245,6 +251,7 @@ def LRPermTest(otuDf, labels, statfunc=_dmeanStat, nperms=10000, adjMethod='fdr_
 
     logRatio = otuLogRatios(otuDf)
     
+    np.random.seed(seed)
     samples = np.zeros((nperms, nRatios))
     obs = statfunc(logRatio.values, labelBool)
     for permi in range(nperms):
@@ -263,7 +270,7 @@ def LRPermTest(otuDf, labels, statfunc=_dmeanStat, nperms=10000, adjMethod='fdr_
     
     return qvalues, observed
 
-def ancom(otuDf, labels, alpha=0.2, statfunc=_dmeanStat, nperms=0, adjMethod='fdr_bh'):
+def ancom(otuDf, labels, alpha=0.2, statfunc=_dmeanStat, nperms=0, adjMethod='fdr_bh', seed=110820):
     """Calculates pairwise log ratios between all OTUs and performs
     permutation tests to determine if there is a significant difference
     in OTU ratios with respect to the label variable of interest.
@@ -293,6 +300,8 @@ def ancom(otuDf, labels, alpha=0.2, statfunc=_dmeanStat, nperms=0, adjMethod='fd
     adjMethod : string
         Passed to sm.stats.multipletests for p-value multiplicity adjustment.
         If value is None then no adjustment is made.
+    seed :int
+        Seed for random permutation generation (if nperms > 0)
     
     Returns:
     --------
@@ -320,6 +329,7 @@ def ancom(otuDf, labels, alpha=0.2, statfunc=_dmeanStat, nperms=0, adjMethod='fd
     logRatio = otuLogRatios(otuDf)
     
     if nperms > 0:
+        np.random.seed(seed)
         samples = np.zeros((nperms, nRatios))
         obs = statfunc(logRatio.values, labelBool)
         for permi in range(nperms):
