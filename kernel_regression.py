@@ -9,7 +9,7 @@ __all__ = ['kreg_perm',
 """Tested one kernel, logistic regression.
 Multiple kernels and continuous outcome should be tested."""
 
-def kreg_perm(y, Ks, X=None, binary=True, nperms=10000, seed=110820):
+def kreg_perm(y, Ks, X=None, binary=True, nperms=9999, seed=110820, returnPerms=False):
     """Kernel regression of Y adjusting for covariates in X
     Implemented the permutation method from:
     
@@ -32,6 +32,9 @@ def kreg_perm(y, Ks, X=None, binary=True, nperms=10000, seed=110820):
         Use True for logistic regression.
     nperms : int
         Number of permutations for the test.
+    returnPerms : bool
+        If True and Ks is a single kernel,
+        return the observed and permuted Q-statistics.
 
     Returns
     -------
@@ -75,10 +78,10 @@ def kreg_perm(y, Ks, X=None, binary=True, nperms=10000, seed=110820):
         Qall = np.concatenate((obsQ, randQ), axis=0)
         pall = np.zeros(Qall.shape)
         for qi in range(len(Ks)):
-            pall[:, qi] = 1 - argrank(Qall[:, qi]) / (nperms + 1)
+            pall[:, qi] = 1 - argrank(Qall[:, qi]) / (nperms + 1.)
         pIndivid = pall[0,:]
         minPall= pall.min(axis=1)
-        pGlobal = argrank(minPall)[0] / (nperms + 1)
+        pGlobal = argrank(minPall)[0] / (nperms + 1.)
         return pGlobal, pIndivid
     else:
         if type(Ks) is pd.DataFrame:
@@ -89,8 +92,58 @@ def kreg_perm(y, Ks, X=None, binary=True, nperms=10000, seed=110820):
         for permi in range(nperms):
             rind = np.random.permutation(n)
             randQ[permi] = computeQ(Ks[:, rind][rind, :], resid, s2)
-        pvalue = (np.sum(randQ > obsQ) + 1) / (nperms + 1)
-        return pvalue
+        pvalue = (np.sum(randQ > obsQ) + 1) / (nperms + 1.)
+        if returnPerms:
+            return pvalue, obsQ, randQ
+        else:
+            return pvalue
+
+def computeKregStat(y, Ks, X=None, binary=True):
+    """Compute the statistic that is subjected to permutation testing
+    in kernel regression of Y adjusting for covariates in X.
+
+    Parameters
+    ----------
+    y : pd.Series or np.ndarray shape (n,1)
+        Endogenous/outcome variable.
+        Can be continuous or binary (use binary=True)
+    K : pd.DataFrame or np.ndaray shape (n,n)
+        Kernel (square, symetric and positive semi-definite)
+    X : pd.DataFrame OR np.ndarray shape (n,i)
+        Matrix of covariates for adjustment.
+    binary : bool
+        Use True for logistic regression.
+
+    Returns
+    -------
+    Q : float
+        Regression coefficient for K
+    pIndivid : ndarray shape (k)
+        Optionally returns vector of p-values, one
+        for each kernel provided."""
+
+    n = len(y)
+    if binary:
+        family = sm.families.Binomial()
+    else:
+        family = sm.families.Gaussian()
+
+    if X is None:
+        X = np.ones(y.shape, dtype=float)
+
+    model = sm.GLM(endog=y.astype(float), exog=sm.add_constant(X.astype(float)), family=family)
+    result = model.fit()
+    resid = result.resid_response
+
+    """Squared standard error of the parameters (i.e. Beta_se)"""
+    s2 = float(result.bse**2)
+
+    if type(K) is pd.DataFrame:
+        K = K.values
+
+    Q = np.linalg.multi_dot((resid/s2, K, resid))
+    return Q
+
 
 def argrank(vec):
     """Return the ascending rank (0-based) of the elements in vec
@@ -128,7 +181,7 @@ def dist2kernel(dmat):
     n = dmat.shape[0]
     I = np.identity(n)
     """m = I - dot(1,1')/n"""
-    m = I - np.ones((n,n))/n
+    m = I - np.ones((n,n))/float(n)
     kern = -0.5 * np.linalg.multi_dot((m, dmat**2, m))
 
     if type(dmat) is pd.DataFrame:

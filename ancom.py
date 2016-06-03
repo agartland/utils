@@ -12,16 +12,26 @@ __all__ = ['otuLogRatios',
            'globalLRPermTest',
            'LRPermTest',
            'ratios2otumat',
-           'loadAbundance']
+           'loadAbundance',
+           '_dmeanStat',
+           '_sumDmeanStat',
+           '_maxDmeanStat',
+           '_tStat',
+           '_sumTStat',
+           '_maxTStat']
 
 def _dmeanStat(mat, boolInd, axis=0):
     return mat[boolInd, :].mean(axis=axis) - mat[~boolInd, :].mean(axis=axis)
-def _tStat(mat, boolInd, axis=0):
-    return tstatistic(mat[boolInd, :], mat[~boolInd, :], axis=axis, equal_var=True)
 def _sumDmeanStat(mat, boolInd):
     return (_dmeanStat(mat, boolInd)**2).sum()
 def _maxDmeanStat(mat, boolInd):
     return (_dmeanStat(mat, boolInd)**2).max()
+def _tStat(mat, boolInd, axis=0):
+    return tstatistic(mat[boolInd, :], mat[~boolInd, :], axis=axis, equal_var=True)
+def _sumTStat(mat, boolInd, axis=0):
+    return np.abs(_tStat(mat, boolInd)).sum()
+def _maxTStat(mat, boolInd, axis=0):
+    return np.abs(_tStat(mat, boolInd)).max()
 
 def loadAbundance(filename, compositionNorm=True, truncate=True):
     """Load OTU counts file (phylum, genus or species level)
@@ -154,7 +164,7 @@ def otuLogRatios(otuDf):
     logRatio = pd.DataFrame(logRatio, index=otuDf.index, columns=cols)
     return logRatio
 
-def globalLRPermTest(otuDf, labels, statfunc=_sumDmeanStat, nperms=10000, seed=110820):
+def globalLRPermTest(otuDf, labels, statfunc=_sumTStat, nperms=999, seed=110820):
     """Calculates pairwise log ratios between all OTUs and performs global
     permutation tests to determine if there is a significant difference
     over all log-ratios, with respect to the label variable of interest.
@@ -207,7 +217,7 @@ def globalLRPermTest(otuDf, labels, statfunc=_sumDmeanStat, nperms=10000, seed=1
     
     return pvalue, obs
 
-def LRPermTest(otuDf, labels, statfunc=_dmeanStat, nperms=10000, adjMethod='fdr_bh', seed=110820):
+def LRPermTest(otuDf, labels, statfunc=_dmeanStat, nperms=999, adjMethod='fdr_bh', seed=110820):
     """Calculates pairwise log ratios between all OTUs and performs
     permutation tests to determine if there is a significant difference
     in OTU ratios with respect to the label variable of interest.

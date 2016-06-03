@@ -497,13 +497,13 @@ def plotHCluster(df, method='complete', metric='euclidean', clusterBool=[True,Tr
     handles = dict(cb=cb, heatmapAX=heatmapAX, fig=fig,xlabelsL=xlabelsL,ylabelsL=ylabelsL,heatmapGS=heatmapGS)
     return rowInd,colInd,handles
 
-def plotBicluster(df, n_clusters):
+def plotBicluster(df, n_clusters, col_labels=None):
     model = SpectralBiclustering(n_clusters=n_clusters, method='log', random_state=0)
     model.fit(df)
     
     fitDf = df.iloc[np.argsort(model.row_labels_), :]
     fitDf = fitDf.iloc[:, np.argsort(model.column_labels_)]
-    plotCorrHeatmap(dmat=fitDf)
+    plotCorrHeatmap(dmat=fitDf, col_labels=col_labels)
     return fitDf
 
 def normalizeAxis(df,axis=0,useMedian=False):
