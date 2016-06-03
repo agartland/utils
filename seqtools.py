@@ -853,28 +853,6 @@ def pepComp(align,useConsensus=True):
         out.append(''.join([aa.upper() if aa.upper()==refaa.upper() else aa.lower() for aa,refaa in zip(seq,ref)]))
     return out
 
-
-def assembleOverlappingPeptides(pepArr,overlap=11):
-    """This is a work in progress, but the idea was
-    to be able to rebuild the sequence from the set of
-    overlapping 15mers..."""
-    assembled = [pep for pep in pepArr]
-    while len(assembled)>1:
-        for pepi1,pepi2 in itertools.combinations(arange(len(assembled)),2):
-            pep1,pep2 = assembled[pepi1],assembled[pepi2]
-            res = pairwise2.align.globalxs(pep2,pep1,-4,0)[0]
-            #print res[2]
-            if res[2]>=overlap-8:
-                #print res[0]
-                #print res[1]
-
-                _ = assembled.pop(pepi2)
-                assembled[pepi1] = ''.join([aa1 if not aa1=='-' else aa2 for aa1,aa2 in zip(res[0],res[1])])
-                #print assembled[pepi1]
-                #print
-                break
-    return assembled[0]
-
 def tree2pwdist(tree):
     """Compute pairwise distances between every leaf on the phylogenetic tree.
 

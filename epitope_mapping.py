@@ -23,8 +23,9 @@ __all__ = ['responseClass',
             'findpeptide']
 
 class responseClass(object):
-    def __init__(self, protein, pepID, seq, start, end):
+    def __init__(self, protein, peptideset, pepID, seq, start, end):
         self.protein = protein
+        self.peptideset = peptideset
         self.pepID = pepID
         self.seq = seq
         self.start = start
@@ -53,11 +54,12 @@ class responseClass(object):
                     L=self.L)
 
 class epitopeClass(responseClass):
-    def __init__(self, parents, seq, start, hlas=[]):
+    def __init__(self, parents, seq, start, end, hlas=[]):
         self.parents = list(parents)
         self.protein = self.parents[0].protein
         self.seq = seq
         self.start = start
+        self.end = end
         self.L = len(seq)
         self.hlas = hlas
     def __key__(self):
@@ -75,10 +77,12 @@ def hamming(str1, str2):
 
 def overlap(response1, response2):
     """Any overlap between two responses?"""
-    coord2 = response2.coords
-    for i in response1.coords:
-        if i in coord2:
-            return True
+    if response1.protein == response2.protein:
+        coord2 = response2.coords
+        for i in response1.coords:
+            if i in coord2:
+                return True
+
     return False
 
 def sharedCoords(island):
@@ -178,7 +182,7 @@ def identicalRule(island):
     s = set(island)
     if len(s) == 1:
         """If there's just one response"""
-        ep = epitopeClass(parents=[island[0]], seq=island[0].seq, start=island[0].start)
+        ep = epitopeClass(parents=[island[0]], seq=island[0].seq, start=island[0].start, end=island[0].end)
         return True, ep
     else:
         return False, None
@@ -191,32 +195,25 @@ def overlapRule(island, minOverlap=8, minSharedAA=6):
     """Find the shared peptide for responses"""
     sharedInds = sharedCoords(island)
 
-    if len(sharedInds) >= minOverlap:
-        nMatching = 0
-        seq = ''
-        for si in sharedInds:
-            try:
-                aas = {resp.seq[si - resp.start] for resp in island}
-            except IndexError:
-                print sharedInds
-                for respi, resp in enumerate(island):
-                    print respi, resp, resp.start, si, si - resp.start
-
-                aas = 'XY'
+    nOverlap = 0
+    nMatching = 0
+    seq = ''
+    for si in sharedInds:
+        aas = {resp.seq[si - resp.start] for resp in island}
+        if '-' in aas:
+            seq += '-'
+        else:
+            nOverlap += 1
             if len(aas) == 1:
                 nMatching += 1
                 seq += list(aas)[0]
             else:
                 seq += 'X'
-        if nMatching >= minSharedAA:
-            prot = island[0].protein
-            ep = epitopeClass(parents=island, seq=seq, start=sharedInds[0])
-            return True, ep
-        else:
-            return False, None
+    if nOverlap >= minOverlap and nMatching >= minSharedAA:
+        ep = epitopeClass(parents=island, seq=seq, start=sharedInds[0], end=sharedInds[-1])
+        return True, ep
     else:
         return False, None
-
 
 def hlaRule(island, hlaList, ba, topPct=0.1, nmer=[8, 9, 10]):
     """Determine overlap region common amongst all responses in the island
@@ -224,7 +221,9 @@ def hlaRule(island, hlaList, ba, topPct=0.1, nmer=[8, 9, 10]):
     For each mer (defined by start position and length),
         If there is a mer within the topPct for every response then the responses are shared
         Return the mer whose avg rank is best amongst all the responses
-    If none of the mers are ranked topPct in all responses then then return None"""
+    If none of the mers are ranked topPct in all responses then then return None
+
+    TODO: untested and wil need to handle gaps"""
     
     """Find the shared peptide for responses"""
     sharedInds = sharedCoords(island)
@@ -261,7 +260,7 @@ def hlaRule(island, hlaList, ba, topPct=0.1, nmer=[8, 9, 10]):
                 seq += list(aas)[0]
             else:
                 seq += 'X'
-        ep = epitopeClass(parents=island, seq=seq, start=epitopeInds[0], hlas=[hla])
+        ep = epitopeClass(parents=island, seq=seq, start=epitopeInds[0], hlas=[hla], end=epitopeInds[-1])
         return True, ep
     else:
         return False, None
@@ -287,6 +286,7 @@ def findpeptide(pep, seq):
         Start position (zero-indexed) of pep in seq or -1 if not found
     endPos : int
         Start position (zero-indexed) of pep in seq or -1 if not found"""
+
     ng = seq.replace('-','')
     ngInd = ng.find(pep)
     ngCount = 0
@@ -308,3 +308,4 @@ def findpeptide(pep, seq):
                 count += 1
             endPos += 1
     return startPos, endPos
+
