@@ -6,7 +6,7 @@ import itertools
 __all__ = ['kmedoids',
            'fuzzycmedoids',
            'tryallmedoids',
-           'precomputeWeightedSqDmat',
+           'precomputeWeightedDmat',
            'assignClusters',
            'computeInertia',
            'computeMembership']
@@ -61,7 +61,7 @@ def kmedoids(dmat, k=3, weights=None, nPasses=1, maxIter=1000, initInds=None, po
     if initInds is None:
         initInds = np.arange(N)
 
-    wdmat = precomputeWeightedSqDmat(dmat, weights, squared=True)
+    wdmat = precomputeWeightedDmat(dmat, weights, squared=True)
 
     if not potentialMedoidInds is None:
         potentialMedoidSet = set(potentialMedoidInds)
@@ -444,9 +444,9 @@ def tryallmedoids(dmat, c, weights=None, potentialMedoidInds=None, fuzzy=True, f
         OR with hard clusters, the medoid/cluster index of each point."""
 
     if fuzzy:
-        wdmat = precomputeWeightedSqDmat(dmat, weights, squared=False)
+        wdmat = precomputeWeightedDmat(dmat, weights, squared=False)
     else:
-        wdmat = precomputeWeightedSqDmat(dmat, weights)
+        wdmat = precomputeWeightedDmat(dmat, weights, squared=True)
 
     N = dmat.shape[0]
 
