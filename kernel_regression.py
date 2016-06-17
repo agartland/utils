@@ -57,13 +57,19 @@ def kreg_perm(y, Ks, X=None, binary=True, nperms=9999, seed=110820, returnPerms=
 
     if X is None:
         X = np.ones(y.shape, dtype=float)
+        p = 1
+    else:
+        if len(X.shape) == 1:
+            p = 2
+        else:
+            p = X.shape[1] + 1
 
     model = sm.GLM(endog=y.astype(float), exog=sm.add_constant(X.astype(float)), family=family)
     result = model.fit()
     resid = result.resid_response
 
     """Squared standard error of the parameters (i.e. Beta_se)"""
-    s2 = float(result.bse**2)
+    s2 = (1. / (n-p)) * np.sum(resid**2.)
 
     np.random.seed(seed)
     if type(Ks) is list:
@@ -93,7 +99,7 @@ def kreg_perm(y, Ks, X=None, binary=True, nperms=9999, seed=110820, returnPerms=
         for permi in range(nperms):
             rind = np.random.permutation(n)
             randQ[permi] = computeQ(Ks[:, rind][rind, :], resid, s2)
-        pvalue = (np.sum(randQ > obsQ) + 1) / (nperms + 1.)
+        pvalue = (np.sum(randQ > obsQ) + 1.) / (nperms + 1.)
         if returnPerms:
             return pvalue, obsQ, randQ
         else:
