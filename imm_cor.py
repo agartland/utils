@@ -201,7 +201,7 @@ def estCumTE(df, treatment_col='treated', duration_col='dx', event_col='disease'
     
     pvalues = np.nan * np.zeros(resDf.shape[0])
 
-    avarsa1, avarsa2
+    # avarsa1, avarsa2
     wald_stat = (asa1 - asa2) / np.sqrt(avarsa1 + avarsa2)
     wald_pvalue = 2 * stats.norm.cdf(-np.abs(wald_stat))
     resDf['pvalue'] = wald_pvalue

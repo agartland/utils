@@ -5,7 +5,8 @@ import statsmodels.api as sm
 __all__ = ['kreg_perm',
             'argrank',
             'dist2kernel',
-            'kernel2dist']
+            'kernel2dist',
+            'computePWDist']
 """Tested one kernel, logistic regression.
 Multiple kernels and continuous outcome should be tested."""
 
@@ -212,3 +213,36 @@ def posSDCorrection(kernel):
     matrix is positive semi-definite."""
     u, s, v = np.linalg.svd(kernel)
     return np.linalg.multi_dot((u, np.diag(np.abs(s)), v))
+
+def computePWDist(series1, series2, dfunc, symetric=True):
+    """Compute and assemble a pairwise distance matrix
+    given two pd.Series and a function to compare them.
+
+    Parameters
+    ----------
+    series1, series2 : pd.Series
+        Items for comparison. Will compute all pairs of distances
+        between items in series1 and series2.
+    dfunc : function
+        Function takes 2 parameters and returns a float
+    symetric : bool
+        If True, only compute half the distance matrix and duplicate.
+
+    Returns
+    -------
+    dmat : pd.DataFrame
+        Distance matrix with series1 along rows and
+        series 2 along the columns."""
+    nrows = series1.shape[0]
+    ncols = series2.shape[0]
+    dmat = np.zeros((nrows, ncols))
+    for i in range(nrows):
+        for j in range(ncols):
+            if symetric:
+                if i <= j:
+                    d = dfunc(series1.iloc[i], series2.iloc[j])
+                    dmat[i,j] = d
+                    dmat[j,i] = d
+            else:
+                dmat[i,j] = dfunc(series1.iloc[i], series2.iloc[j])
+    return pd.DataFrame(dmat, columns=series2.index, index=series1.index)

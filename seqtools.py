@@ -112,7 +112,7 @@ def _seq2vec(seq):
         vec[aai] = AA2CODE[aa]
     return vec
 
-def padAlignment(align,applyPadding = True):
+def padAlignment(align, applyPadding=True):
     """Given an iterator of sequences, convert to pd.Series
     Remove * or # from the end and pad sequences of different length with gaps
     There is a warning if gaps are used for padding
@@ -653,9 +653,10 @@ def pairwiseMutualInformation(align,nperms=1e4):
 def seqmat2align(smat,index=None):
     """Convert from an array of dtype=S1 to alignment"""
     if index is None:
-        index = arange(smat.shape[0])
-    return pd.Series([''.join(smat[seqi,:]) for seqi in arange(smat.shape[0])],name='seq',index=index)
-def align2mat(align,k=1,gapped=True):
+        index = np.arange(smat.shape[0])
+    return pd.Series([''.join(smat[seqi,:]) for seqi in np.arange(smat.shape[0])], name='seq', index=index)
+
+def align2mat(align, k=1, gapped=True):
     """Convert an alignment into a 2d numpy array of kmers [nSeqs x nSites/nKmers]
     If gapped is True, returns kmers with gaps included.
     If gapped is False, returns "non-gapped" kmers and each kmer starting with a gap is '-'*k 
@@ -666,50 +667,49 @@ def align2mat(align,k=1,gapped=True):
 
     if gapped:
         """Slightly faster, but not as flexible"""
-        out = array([[s[i:i+k] for i in range(Nkmers)] for s in tmp],dtype='S%d' % k)
+        out = np.array([[s[i:i+k] for i in range(Nkmers)] for s in tmp], dtype='S%d' % k)
     else:
-        out = empty((L,Nkmers),dtype = 'S%d' % k)
+        out = np.empty((L,Nkmers), dtype='S%d' % k)
         for seqi,seq in enumerate(tmp):
             for starti in range(Nkmers):
                 #out[seqi,starti] = seq[starti:starti+k]
-                full, ng = grabKmer(seq,starti,k=k)
+                full, ng = grabKmer(seq, starti, k=k)
                 if ng is None:
                     ng = '-'*k
                 out[seqi,starti] = ng
-    
     return out
 
 def align2aamat(align):
     """Convert an alignment into a 3d boolean numpy array [nSeqs x nSites x nAAs]"""
     for seq in align:
-        L=len(seq)
+        L = len(seq)
         break
-    aaMat=align2mat(align)
-    aaFeat=zeros((len(align),L,len(AALPHABET)))
-    for seqi,sitei in itertools.product(xrange(aaFeat.shape[0]),xrange(aaFeat.shape[1])):
+    aaMat = align2mat(align)
+    aaFeat = np.zeros((len(align), L, len(AALPHABET)))
+    for seqi,sitei in itertools.product(xrange(aaFeat.shape[0]), range(aaFeat.shape[1])):
         try:
-            aai=AALPHABET.index(aaMat[seqi,sitei])
-            aaFeat[seqi,sitei,aai]=1.
+            aai = AALPHABET.index(aaMat[seqi,sitei])
+            aaFeat[seqi,sitei,aai] = 1.
         except ValueError:
             """If AA is not in AALPHABET then it is ignored"""
             continue
     return aaFeat
 
-def condenseGappyAlignment(a,thresh=0.9):
+def condenseGappyAlignment(a, thresh=0.9):
     """Find sites with more than thresh percent gaps.
     Then remove any sequences with non-gaps at these sites
     and remove the sites from the alignment."""
 
-    a=padAlignment(a)
-    smat=align2mat(a)
-    gapSiteInd = mean(smat=='-',axis=0) > thresh
-    keepSeqInd = all(smat[:,gapSiteInd]=='-',axis=1)
+    a = padAlignment(a)
+    smat = align2mat(a)
+    gapSiteInd = mean(smat == '-', axis=0) >= thresh
+    keepSeqInd = np.all(smat[:,gapSiteInd] == '-', axis=1)
     print 'Removing %d of %d sites and %d of %d sequences from the alignment.' % (gapSiteInd.sum(),smat.shape[1],(~keepSeqInd).sum(),smat.shape[0])
 
-    smat=smat[keepSeqInd,:]
-    smat=smat[:,~gapSiteInd]
+    smat = smat[keepSeqInd,:]
+    smat = smat[:,~gapSiteInd]
     
-    return seqmat2align(smat,index=a.index[keepSeqInd])
+    return seqmat2align(smat, index=a.index[keepSeqInd])
 def nx2sif(fn,g):
     """Write Networkx Graph() to SIF file for BioFabric or Cytoscape visualization"""
     with open(fn,'w') as fh:
