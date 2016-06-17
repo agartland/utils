@@ -15,7 +15,7 @@ import statsmodels.api as sm
 from scipy import stats
 import seaborn as sns
 
-sns.set(style = 'darkgrid', palette = 'muted', font_scale = 1.75)
+sns.set(style='darkgrid', palette='muted', font_scale=1.75)
 
 __all__ = ['corrDmatFunc',
             'hierClusterFunc',
@@ -30,7 +30,7 @@ def imputeNA(df, strategy='median', axis=0, copy=True):
 def corrTDmatFunc(df, *args, **kwargs):
     return corrDmatFunc(df.T, *args, **kwargs)
 
-def corrDmatFunc(df, metric = 'pearson-signed', dfunc = None, minN = 10):
+def corrDmatFunc(df, metric='pearson-signed', dfunc=None, minN=10):
     if dfunc is None:
         if metric in ['spearman', 'pearson']:
             """Anti-correlations are also considered as high similarity and will cluster together"""
@@ -59,7 +59,7 @@ def corrDmatFunc(df, metric = 'pearson-signed', dfunc = None, minN = 10):
                     dmat[j,i] = d
     return pd.DataFrame(dmat, columns = df.columns, index = df.columns)
 
-def hierClusterFunc(dmatDf, K = 6, method = 'complete', returnLinkageMat = False):
+def hierClusterFunc(dmatDf, K=6, method='complete', returnLinkageMat=False):
     hclusters = sch.linkage(dmatDf.values, method = method)
     labelsVec = sch.fcluster(hclusters, K, criterion = 'maxclust')
     labels = pd.Series(labelsVec, index = dmatDf.columns)
@@ -68,7 +68,7 @@ def hierClusterFunc(dmatDf, K = 6, method = 'complete', returnLinkageMat = False
     else:
         return labels, hclusters
 
-def _colors2labels(labels, setStr = 'Set3', cmap = None):
+def _colors2labels(labels, setStr='Set1', cmap=None):
     """Return pd.Series of colors based on labels"""
     if cmap is None:
         N = max(3,min(12,len(np.unique(labels))))
@@ -183,7 +183,7 @@ def plotHierClust(dmatDf, Z, labels=None, titleStr=None, vRange=None, tickSz='sm
         heatmapAX = fig.add_subplot(GridSpec(1,1,left=0.2,bottom=0.05,right=0.78,top=0.85)[0,0])
         scale_cbAX = fig.add_subplot(GridSpec(1,1,left=0.87,bottom=0.05,right=0.93,top=0.85)[0,0])
 
-    my_norm = mpl.colors.Normalize(vmin = vmin, vmax = vmax)
+    my_norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
 
     """Dendrogaram along the rows"""
     plt.sca(denAX)
