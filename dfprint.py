@@ -15,10 +15,15 @@ def toPNG(df, outFn, dpi=200, **kwargs):
            pdfFn,
            outFn]
     #print ' '.join(cmd)
-    
-    si = subprocess.STARTUPINFO()
-    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-    #si.wShowWindow = subprocess.SW_HIDE # default
+    if 'hideConsole' in kwargs and kwargs['hideConsole']:
+        try:
+            si = subprocess.STARTUPINFO()
+            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            #si.wShowWindow = subprocess.SW_HIDE # default
+        except:
+            si = None
+    else:
+        si = None
 
     subprocess.check_call(' '.join(cmd), shell=True, startupinfo=si)
 
@@ -61,9 +66,13 @@ def toPDF(df, outFn, titStr='', float_format='%1.3g', index=False, hideConsole=T
            texFn]
     
     if hideConsole:
-        si = subprocess.STARTUPINFO()
-        si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        # si.wShowWindow = subprocess.SW_HIDE # default
+        try:
+            """This won't work in linux"""
+            si = subprocess.STARTUPINFO()
+            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            # si.wShowWindow = subprocess.SW_HIDE # default
+        except:
+            si = None
         cmd.insert(2,'-interaction=nonstopmode')
     else:
         si = None
