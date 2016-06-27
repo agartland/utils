@@ -69,6 +69,9 @@ class countdict(dict):
     def entropy(self,logFunc=np.log2):
         """Compute the entropy of the discrete distribution"""
         return -np.array([p*logFunc(p) for p in self.freq().values()]).sum()
+    def simpsons_index(self):
+        p = np.array([self.freq[k] for k in self.keys])
+        return (p * p).sum()
     def relative_entropy(self,reference,log_func=np.log2):
         """Compute the relative entropy between the frequencies
         in this countdict object and those in reference.
@@ -93,16 +96,25 @@ class countdict(dict):
         divergence = -p*log_func(p/q)
         return {k:v for k,v in zip(keys,divergence)}
         
-    def jensen_shannon(b):
+    def jensen_shannon_divergence(self, b):
         """Compute Jensen-Shannon divergence between self and b (also an objhist).
         If keys from self are missing in b assume 0 counts."""
 
         keys = np.unique(self.keys() + b.keys())
 
         avec = np.array([self[k] if k in self else 0 for k in keys])
-        bvec = np.array([b[k] if k in self else 0 for k in keys])
+        bvec = np.array([b[k] if k in b else 0 for k in keys])
 
         return _jensen_shannon_divergence(avec, bvec)
+
+    def morisita_horn_overlap(self, b):
+        keys = np.unique(self.keys() + b.keys())
+
+        avec = np.array([self[k] if k in self else 0 for k in keys])
+        bvec = np.array([b[k] if k in b else 0 for k in keys])
+
+        return _morisita_horn_index(avec, bvec)
+
 
     def uniqueness(self):
         return len(self)/self.sum()
@@ -223,19 +235,56 @@ def _jensen_shannon_divergence(a, b):
         possibly unnormalized distribution
     b : array-like
         possibly unnormalized distribution. Must be of same size as ``a``.
+    
     Returns
     -------
     j : float
-    See Also
-    --------
-    jsd_matrix : function
-        Computes all pair-wise distances for a set of measurements
     """
-    a = np.asanyarray(a, dtype=float)
-    b = np.asanyarray(b, dtype=float)
+    a = np.asanyarray(a, dtype=np.float)
+    b = np.asanyarray(b, dtype=np.float)
     a = a/a.sum()
     b = b/b.sum()
     m = (a + b)
     m /= 2.
     m = np.where(m,m,1.)
     return 0.5*np.sum(special.xlogy(a,a/m)+special.xlogy(b,b/m))
+
+def _morisita_horn_index(a, b):
+    """Compute the Morisita-Horn overlap index between two count vectors
+
+    https://en.wikipedia.org/wiki/Morisita%27s_overlap_index
+    http://www.ncbi.nlm.nih.gov/pmc/articles/PMC3543521/
+
+    Parameters
+    ----------
+    a : array-like
+        possibly unnormalized distribution
+    b : array-like
+        possibly unnormalized distribution. Must be of same size as ``a``.
+    
+    Returns
+    -------
+    j : float
+        
+    """
+    a = np.asanyarray(a, dtype=np.float)
+    b = np.asanyarray(b, dtype=np.float)
+
+    freqa = a/a.sum()
+    freqb = b/b.sum()
+
+    numer = 2 * (a*b).sum()
+    """From wikipedia, confirmed in multiple texts and mothur"""
+    denom = ( (a*a).sum()/(a.sum()**2) + (b*b).sum()/(b.sum()**2) ) * a.sum() * b.sum()
+    mh1 = numer/denom
+
+    """This is identical algebraically"""
+    '''numer2 = 2 * (freqa * freqb).sum()
+    denom2 = ((freqa*freqa).sum() + (freqb*freqb).sum())
+    mh2 = numer2/denom2'''
+
+    """Not sure where this is from but it gives a different answer..."""
+    # mh3 = np.sum(np.sqrt(freqa * freqb))
+   
+    return mh1
+
