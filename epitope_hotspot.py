@@ -13,7 +13,7 @@ except ImportError:
 
 
 import statsmodels.api as sm
-from HLAPredCache import grabKmer
+from HLAPredCache import grabKmer, convertHLAAsterisk
 from objhist import objhist
 
 __all__ = ['getBAMat',

@@ -155,11 +155,26 @@ def consensus(align, ignoreGaps = True):
             droppedGaps = counts.pop('-',0)
         cons += max(counts.keys(), key=counts.get)
     return cons
-def identifyMindist(align, ignoreGaps = True):
+
+def identifyMindist(align, ignoreGaps=True):
     """Compute a consensus sequence and return the sequence
-    in the alignment with the smallest (hamming) distance"""
-    cons = consensus(align,ignoreGaps)
-    dist = align.map(partial(hamming_distance,cons))
+    in the alignment with the smallest (hamming) distance
+
+    Parameters
+    ----------
+    align : list or pd.Series
+        Sequence alignment.
+    ignoreGaps : bool
+        Passed to consensus, specifies whether gap
+        characters are ignored for computing consensus.
+
+    Returns
+    -------
+    seq : str
+        One of the sequences in align."""
+    align = padAlignment(align)
+    cons = consensus(align, ignoreGaps)
+    dist = align.map(partial(hamming_distance, cons))
     return align[dist.argmin()]
 
 
@@ -259,7 +274,7 @@ def df2fasta(df,fn,sep='.',columns=None):
 
 def align2fasta(align, fn, applyPadding = True):
     """Write align to a FASTA file where align is a dict or pd.Series of sequences"""
-    align = padAlignment(align,applyPadding)
+    align = padAlignment(align, applyPadding)
 
     with open(fn,'w') as fh:
         for i in arange(align.shape[0]):
@@ -400,7 +415,7 @@ def generateAlignment(seqs):
     
     
     """Creates an align object or pd.Series() with indexing to preserve order but does not appyl padding"""
-    align = padAlignment(seqs,applyPadding=False)
+    align = padAlignment(seqs, applyPadding=False)
     """Put alignments in the tempfiles"""
     align2fasta(seqs,inFn,applyPadding=False)
 

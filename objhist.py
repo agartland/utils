@@ -64,14 +64,16 @@ class countdict(dict):
         return np.sum(self.values())
     def freq(self):
         """Return the fraction of the total counts for each category"""
-        tot = self.sum()
+        tot = float(self.sum())
         return {k:self.get(k)/tot for k in self.keys()}
     def entropy(self,logFunc=np.log2):
         """Compute the entropy of the discrete distribution"""
         return -np.array([p*logFunc(p) for p in self.freq().values()]).sum()
     def simpsons_index(self):
-        p = np.array([self.freq[k] for k in self.keys])
+        tot = float(self.sum())
+        p = np.array([self[k]/tot for k in self.keys()])
         return (p * p).sum()
+        
     def relative_entropy(self,reference,log_func=np.log2):
         """Compute the relative entropy between the frequencies
         in this countdict object and those in reference.
