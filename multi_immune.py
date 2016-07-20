@@ -70,11 +70,15 @@ def hierClusterFunc(dmatDf, K=6, method='complete', returnLinkageMat=False):
 
 def _colors2labels(labels, setStr='Set1', cmap=None):
     """Return pd.Series of colors based on labels"""
+    uLabels = sorted(np.unique(labels))
     if cmap is None:
-        N = max(3,min(12,len(np.unique(labels))))
+        N = max(3, min(12, len(uLabels)))
         cmap = palettable.colorbrewer.get_map(setStr,'Qualitative',N).mpl_colors
-    cmapLookup = {k:col for k,col in zip(sorted(np.unique(labels)),itertools.cycle(cmap))}
-    return labels.map(cmapLookup.get)
+    cmapLookup = {k:col for k,col in zip(uLabels, itertools.cycle(cmap))}
+    if type(labels) is pd.Series:
+        return labels.map(cmapLookup.get)
+    else:
+        return [cmapLookup[v] for v in labels]
 
 def _clean_axis(ax):
     """Remove ticks, tick labels, and frame from axis"""
@@ -156,7 +160,7 @@ def plotHeatmap(df, labels=None, titleStr=None, vRange=None, tickSz='small', cma
         heatmapAX.set_xlabel(titleStr, size='x-large')
     plt.show()
 
-def plotHierClust(dmatDf, Z, labels=None, titleStr=None, vRange=None, tickSz='small', cmap=None, cmapLabel=''):
+def plotHierClust(dmatDf, Z, labels=None, titleStr=None, vRange=None, tickSz='small', cmap=None, cmapLabel='', plotLegend=False):
     """Display a hierarchical clustering result."""
     if vRange is None:
         vmin = np.min(np.ravel(dmatDf.values))
@@ -194,8 +198,14 @@ def plotHierClust(dmatDf, Z, labels=None, titleStr=None, vRange=None, tickSz='sm
     if not labels is None:
         cbSE = _colors2labels(labels)
         axi = cbAX.imshow([[x] for x in cbSE.iloc[colInd].values],interpolation='nearest',aspect='auto',origin='lower')
-        
         _clean_axis(cbAX)
+        if plotLegend:
+            uLabels = np.unique(labels)
+            handles = [mpl.patches.Patch(facecolor=c, edgecolor='k') for c in _colors2labels(uLabels)]
+            # fig.legend(handles, uLabels, loc=(0, 0), title=labels.name)
+            # bbox = mpl.transforms.Bbox(((0,0),(1,1))).anchored('NE')
+            fig.legend(handles, uLabels, loc='upper left', title=labels.name)
+            
 
     """Heatmap plot"""
     axi = heatmapAX.imshow(dmatDf.values[colInd,:][:,colInd],interpolation='nearest',aspect='auto',origin='lower',norm=my_norm,cmap=cmap)
