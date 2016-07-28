@@ -75,12 +75,12 @@ def computePWDist(df, metric='pearson-signed', dfunc=None, minN=10):
     if dfunc is None:
         if metric in ['spearman', 'pearson']:
             """Anti-correlations are also considered as high similarity and will cluster together"""
-            dmat = 1 - df.T.corr(method=metric, min_periods=minN).values**2
-            dmat[np.isnan(dmat)] = 1
+            dmat = 1. - df.T.corr(method=metric, min_periods=minN).values**2
+            dmat[np.isnan(dmat)] = 1.
         elif metric in ['spearman-signed', 'pearson-signed']:
             """Anti-correlations are considered as dissimilar and will NOT cluster together"""
-            dmat = ((1 - df.T.corr(method=metric.replace('-signed',''), min_periods=minN).values) / 2)
-            dmat[np.isnan(dmat)] = 1
+            dmat = ((1 - df.T.corr(method=metric.replace('-signed',''), min_periods=minN).values) / 2.)
+            dmat[np.isnan(dmat)] = 1.
         else:
             try:
                 dvec = scipy.spatial.distance.pdist(df.values, metric=metric)
@@ -161,7 +161,7 @@ def plotEmbedding(dmatDf,
         annotationParams = dict(xytext=(0,5), textcoords='offset points', size=txtSize)
         for coli,col in enumerate(dmatDf.columns):
             if plotLabels:
-                axh.annotate(col, xy=(xyDf[col, plotDims[0]], xyDf[col, plotDims[1]]), **annotationParams)
+                axh.annotate(col, xy=(xyDf.loc[col, plotDims[0]], xyDf.loc[col, plotDims[1]]), **annotationParams)
 
     if len(uLabels) > 1:
         plt.legend(loc=0)
