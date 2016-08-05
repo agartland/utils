@@ -34,7 +34,7 @@ def adjustnonnan(pvalues, method='holm'):
     nanInd = np.isnan(p)
     
     """Drop the nans, calculate adjpvalues, copy to adjpvalues vector"""
-    rej,q,alphasidak,alphabon = sm.stats.multipletests(p[~nanInd], alpha=None, method=method)
+    rej,q,alphasidak,alphabon = sm.stats.multipletests(p[~nanInd], alpha=0.05, method=method)
     adjpvalues[~nanInd] = q
     
     """Reshape adjpvalues"""

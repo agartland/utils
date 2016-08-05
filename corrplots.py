@@ -12,6 +12,8 @@ import itertools
 import warnings
 import palettable
 
+from adjustwithin import adjustnonnan
+
 __all__ = ['partialcorr',
            'combocorrplot',
            'scatterfit',
