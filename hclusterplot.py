@@ -94,7 +94,7 @@ def addColorbar(fig,cb_ax,data_ax,label='Correlation'):
     for t in cb.ax.yaxis.get_ticklabels():
         t.set_fontsize('small')
 
-def plotCorrHeatmap(df=None, metric='pearson', rowInd=None, colInd=None, col_labels=None, titleStr=None, vRange=None, tickSz='medium', cmap=None, dmat=None, cbLabel='Correlation', minN=1):
+def plotCorrHeatmap(df=None, metric='pearson', rowInd=None, colInd=None, col_labels=None, titleStr=None, vRange=None, tickSz='large', cmap=None, dmat=None, cbLabel='Correlation', minN=1):
     """Plot a heatmap of a column-wise distance matrix defined by metric (can be 'spearman' as well)
     Can provide dmat as a pd.DataFrame instead of df.
     Optionally supply a column index colInd to reorder the columns to match a previous clustering

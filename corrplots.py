@@ -12,6 +12,8 @@ import itertools
 import warnings
 import palettable
 
+from adjustwithin import adjustnonnan
+
 __all__ = ['partialcorr',
            'combocorrplot',
            'scatterfit',
@@ -321,7 +323,7 @@ def pwpartialcorr(df, rowVars=None, colVars=None, adjust=[], method='pearson', m
             
     """Now only adjust using pvalues in the unique pair dict"""
     keys = pairedPvalues.keys()
-    qvalueTmp = _pvalueAdjust(np.array([pairedPvalues[k] for k in keys]), method=adjMethod)
+    qvalueTmp = adjustnonnan([pairedPvalues[k] for k in keys], method=adjMethod)
     """Build a unique qvalue dict from teh same unique keys"""
     pairedQvalues = {k:q for k,q in zip(keys,qvalueTmp)}
     
@@ -597,32 +599,6 @@ def scatterfit(x, y, method='pearson', adjustVars=[], labelLookup={}, plotLine=T
     plt.ylabel(labelLookup.get(ylab,ylab))
     if returnModel:
         return model
-
-def _pvalueAdjust(pvalues, method = 'fdr_bh'):
-    """Convenient function for doing p-value adjustment
-    Accepts any matrix shape and adjusts across the entire matrix
-    Ignores nans appropriately
-
-    1) Pvalues can be DataFrame or Series or array
-    2) Turn it into a one-dimensional vector
-    3) Qvalues intialized at p to copy nans in the right places
-    4) Drop the nans, calculate qvalues, copy to qvalues vector
-    5) Reshape qvalues
-    6) Return same type as pvalues
-    """
-    p = np.array(pvalues).flatten()
-    qvalues = deepcopy(p)
-    nanInd = np.isnan(p)
-    dummy,q,dummy,dummy = sm.stats.multipletests(p[~nanInd], alpha=0.2, method=method)
-    qvalues[~nanInd] = q
-    qvalues = qvalues.reshape(pvalues.shape)
-
-    if type(pvalues) is pd.core.frame.DataFrame:
-        return pd.DataFrame(qvalues,columns=[x+'_q' for x in pvalues.columns],index=pvalues.index)
-    elif type(pvalues) is pd.core.series.Series:
-        return pd.Series(qvalues,name=pvalues.name+'_q',index=pvalues.index)
-    else:
-        return qvalues
 
 def validPairwiseCounts(df, cols=None):
     """Count the number of non-NA data points for

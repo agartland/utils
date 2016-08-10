@@ -28,10 +28,11 @@ def unstackIR(df, uVars):
     return responseDf, magDf
 
 def _parseIR(fn, uVars, mag, subset={}, printUnique=False):
-    raw = pd.read_csv(fn, dtype = {'ptid':str,'Ptid':str}, skipinitialspace = True)
+    raw = pd.read_csv(fn, dtype={'ptid':str, 'Ptid':str}, skipinitialspace=True)
     raw = raw.rename_axis({'Ptid':'ptid'}, axis=1)
+    allCols = raw.columns.tolist()
     if uVars is None:
-        uVars = raw.columns.drop(['ptid','response',mag]).tolist()
+        uVars = raw.columns.drop(['ptid', 'response',mag]).tolist()
 
     if printUnique:
         for v in uVars:
@@ -42,16 +43,24 @@ def _parseIR(fn, uVars, mag, subset={}, printUnique=False):
                 print '%s: mean %1.2f' % (v, np.nanmean(raw[v]))
         return
 
-    cols = ['ptid','response','mag'] + uVars
+    cols = []        
+    for c in ['ptid','response','mag']:
+        if c in allCols and not c in uVars:
+            cols = cols + [c]
+    cols = cols + uVars
+    
     raw['mag'] = raw[mag]
 
+    """Keep rows that have one of the values in v for column k,
+    for every key/value in subset dict"""
     for k,v in subset.items():
         raw = raw.loc[raw[k].isin(v)]
     
+    ptids = raw['ptid'].unique().shape[0]
+    total = raw.shape[0]
     tmp = raw.set_index(uVars)
-    ptids = tmp['ptid'].unique().shape[0]
-    total = tmp.shape[0]
     conditions = tmp.index.unique().shape[0]
+    
     printTuple = (ptids*conditions - total, ptids, conditions, ptids*conditions, total)
     if total > (ptids * conditions):
         print 'uVars are not sufficiently unique (%d): expected %d PTIDs x %d conditions = %d assays, found %d' % printTuple
