@@ -22,6 +22,12 @@ __all__ = ['corrDmatFunc',
             'plotHierClust',
             'combocorrplot',
             'plotHeatmap']
+"""
+Example:
+dmatDf = corrDmatFunc(df, metric='pearson-signed', dfunc=None, minN=10)
+labels, Z = hierClusterFunc(dmatDf, K=6, method='complete', returnLinkageMat=True)
+plotHierClust(dmatDf, Z, labels=labels, titleStr=None, vRange=None, tickSz='small', cmap=None, cmapLabel='')
+"""
 
 def imputeNA(df, strategy='median', axis=0, copy=True):
     imp = Imputer(strategy=strategy, axis=axis, copy=copy)
