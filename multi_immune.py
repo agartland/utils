@@ -135,9 +135,9 @@ def plotHeatmap(df, labels=None, titleStr=None, vRange=None, tickSz='small', cma
         heatmapAX.set_yticks(())
         heatmapAX.set_xticks(())
     else:
-        heatmapAX.set_yticks(np.arange(df.shape[1]))
+        heatmapAX.set_yticks(np.arange(df.shape[0]))
         heatmapAX.yaxis.set_ticks_position('right')
-        heatmapAX.set_yticklabels(df.columns, fontsize=tickSz, fontname='Consolas')
+        heatmapAX.set_yticklabels(df.index, fontsize=tickSz, fontname='Consolas')
 
         """Column tick labels"""
         heatmapAX.set_xticks(np.arange(df.shape[1]))
