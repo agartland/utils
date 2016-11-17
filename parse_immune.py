@@ -44,11 +44,11 @@ def _parseIR(fn, uVars, mag, subset={}, printUnique=False):
         return
 
     cols = []        
-    for c in ['ptid','response','mag']:
+    for c in ['ptid','response']:
         if c in allCols and not c in uVars:
             cols = cols + [c]
-    cols = cols + uVars
-    
+    cols = cols + uVars + ['mag']
+
     raw['mag'] = raw[mag]
 
     """Keep rows that have one of the values in v for column k,

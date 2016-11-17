@@ -18,10 +18,12 @@ import seaborn as sns
 sns.set(style='darkgrid', palette='muted', font_scale=1.75)
 
 __all__ = ['corrDmatFunc',
+            'corrTDmatFunc',
             'hierClusterFunc',
             'plotHierClust',
             'combocorrplot',
-            'plotHeatmap']
+            'plotHeatmap',
+            'pivotDiagnostic']
 """
 Example:
 dmatDf = corrDmatFunc(df, metric='pearson-signed', dfunc=None, minN=10)
@@ -166,7 +168,7 @@ def plotHeatmap(df, labels=None, titleStr=None, vRange=None, tickSz='small', cma
         heatmapAX.set_xlabel(titleStr, size='x-large')
     plt.show()
 
-def plotHierClust(dmatDf, Z, labels=None, titleStr=None, vRange=None, tickSz='small', cmap=None, cmapLabel='', plotLegend=False):
+def plotHierClust(dmatDf, Z, labels=None, titleStr=None, vRange=None, tickSz='small', cmap=None, cmapLabel='', plotLegend=False, plotColorbar=True):
     """Display a hierarchical clustering result."""
     if vRange is None:
         vmin = np.min(np.ravel(dmatDf.values))
@@ -186,18 +188,19 @@ def plotHierClust(dmatDf, Z, labels=None, titleStr=None, vRange=None, tickSz='sm
     if labels is None:
         denAX = fig.add_subplot(GridSpec(1,1,left=0.05,bottom=0.05,right=0.15,top=0.85)[0,0])
         heatmapAX = fig.add_subplot(GridSpec(1,1,left=0.16,bottom=0.05,right=0.78,top=0.85)[0,0])
-        scale_cbAX = fig.add_subplot(GridSpec(1,1,left=0.87,bottom=0.05,right=0.93,top=0.85)[0,0])
     else:
         denAX = fig.add_subplot(GridSpec(1,1,left=0.05,bottom=0.05,right=0.15,top=0.85)[0,0])
         cbAX = fig.add_subplot(GridSpec(1,1,left=0.16,bottom=0.05,right=0.19,top=0.85)[0,0])
         heatmapAX = fig.add_subplot(GridSpec(1,1,left=0.2,bottom=0.05,right=0.78,top=0.85)[0,0])
+
+    if plotColorbar:
         scale_cbAX = fig.add_subplot(GridSpec(1,1,left=0.87,bottom=0.05,right=0.93,top=0.85)[0,0])
 
     my_norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
 
     """Dendrogaram along the rows"""
     plt.sca(denAX)
-    denD = sch.dendrogram(Z, color_threshold=np.inf, orientation='right')
+    denD = sch.dendrogram(Z, color_threshold=np.inf, orientation='left')
     colInd = denD['leaves']
     _clean_axis(denAX)
 
@@ -236,14 +239,52 @@ def plotHierClust(dmatDf, Z, labels=None, titleStr=None, vRange=None, tickSz='sm
             l.set_markersize(0)
 
     """Add a colorbar"""
-    cb = fig.colorbar(axi,scale_cbAX) # note that we could pass the norm explicitly with norm=my_norm
-    cb.set_label(cmapLabel)
-    """Make colorbar labels smaller"""
-    for t in cb.ax.yaxis.get_ticklabels():
-        t.set_fontsize('small')
+    if plotColorbar:
+        cb = fig.colorbar(axi,scale_cbAX) # note that we could pass the norm explicitly with norm=my_norm
+        cb.set_label(cmapLabel)
+        """Make colorbar labels smaller"""
+        for t in cb.ax.yaxis.get_ticklabels():
+            t.set_fontsize('small')
 
     """Add title as xaxis label"""
     if not titleStr is None:
         heatmapAX.set_xlabel(titleStr,size='x-large')
     plt.show()
 
+
+def pivotDiagnostic(df, index, columns, values):
+    """Attempt to pivot the DataFrame. If there are duplicate
+    entries in the pivot table then return a df of duplicates
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+    index : str
+    columns : str or list
+    values : str or list
+
+    Returns
+    -------
+    df :pd.DataFrame
+        If no exception then returns pivot table,
+        otherwise returns duplicate rows in df."""
+
+    try:
+        p = df.pivot(index=index, columns=columns, values=values)
+        print 'Pivot success: return pivoted df'
+        return p
+    except ValueError:
+        if type(columns) in [str, basestring]:
+            columns = [columns]
+        if not type(columns) is list:
+            columns = list(columns)
+
+        if type(values) in [str, basestring]:
+            values = [values]
+        if not type(values) is list:
+            values = list(values)
+
+        dupInd = df[[index] + columns].duplicated(keep=False)
+        print 'Index contains %d duplicate entries, cannot reshape' % dupInd.sum()
+        print 'Returning duplicate rows'
+        return df[[index] + columns + values].loc[dupInd].sort_values(by=[index] + columns + values) 

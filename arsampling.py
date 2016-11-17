@@ -25,15 +25,15 @@ def rejectionSampling(envPDF, envRV, targetPDF, n):
     acceptanceProbability : float
         Estimate for diagnosing the envelope distribution."""
     
-    i = 0
+    i = 0.
     arr = np.zeros(n)
-    acceptanceProbability = 1
+    acceptanceProbability = 1.
     allDraws = None
     while i < n:
         """Draw as many samples as we expect to need,
         based on the acceptance probability (initially 1)"""
         neededN = n-i
-        drawingN = int(np.ceil(neededN * (1/acceptanceProbability)))
+        drawingN = int(np.ceil(neededN * (1./acceptanceProbability)))
         
         samples = envRV(drawingN)
         envPr = envPDF(samples)

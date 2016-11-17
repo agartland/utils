@@ -6,7 +6,7 @@ http://wiki.scipy.org/Cookbook/Matplotlib/Interactive_Plotting
 """
 
 import math
-import pylab
+import matplotlib.pyplot as plt
 
 __all__ = ['AnnotationPicker',
            'linkPickers',
@@ -28,7 +28,7 @@ class AnnotationPicker:
         self.ydata=ydata
 
         if axis is None:
-            self.axis = pylab.gca()
+            self.axis = plt.gca()
         else:
             self.axis= axis
         self.fig=self.axis.figure
@@ -46,6 +46,7 @@ class AnnotationPicker:
     def drawOne(self,ind):
         x,y=self.xdata[ind],self.ydata[ind]
         note=self.notes[ind]
+        # print 'Drawing %s at (%s, %s)' % (note, x, y)
         if (x,y) in self.drawn.keys():
             markers = self.drawn[(x,y)]
             for m in markers:
@@ -98,7 +99,7 @@ class AnnoteFinder:
         self.xtol = xtol
         self.ytol = ytol
         if axis is None:
-            self.axis = pylab.gca()
+            self.axis = plt.gca()
         else:
             self.axis= axis
         self.drawnAnnotations = {}

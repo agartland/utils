@@ -9,7 +9,7 @@ __all__ = ['generateNormalCorr',
            'induceRankCorr',
            'generateBinVars']
 
-def generateNormalCorr(N,k,C,method = 'cholesky'):
+def generateNormalCorr(N, k, C, method='numpy'):
     """Induces correlation specified by covariance matrix Cstar
 
     From SciPy cookbook:
@@ -31,11 +31,14 @@ def generateNormalCorr(N,k,C,method = 'cholesky'):
 
     if method == 'cholesky':
         U = cholesky(C)
-    else:
-        evals, evecs = np.eigh(C)
+        R = np.dot(randn(N, k), U)
+    elif method == 'eigen':
+        evals, evecs = eigh(C)
         U = np.dot(evecs, np.diag(np.sqrt(evals)))
-
-    R = np.dot(randn(N,k),U)
+        R = np.dot(randn(N, k), U)
+    else:
+        R = np.random.multivariate_normal(np.zeros(k), C, N)
+   
     return R
 
 def induceRankCorr(R,Cstar):
