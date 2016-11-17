@@ -19,6 +19,8 @@ import sys
 import numpy as np
 import re
 
+from skbio.alignment import StripedSmithWaterman, make_identity_substitution_matrix
+
 from objhist import objhist
 
 from seqdistance import hamming_distance, seq_distance
@@ -68,7 +70,9 @@ __all__ = ['BADAA',
            'kmerConsensus',
            'pepComp',
            'tree2pwdist',
-           'overlappingKmers']
+           'overlappingKmers',
+           'getStartPos',
+           'getStartPosMapper']
 
 
 BADAA = '-*BX#Z'
@@ -978,3 +982,51 @@ def compSeq(s1, s2, lineL=50):
         outStr += '\n\n'
     outStr += 'Seq1 (%d) and Seq2 (%d) are %1.1f%% similar\n\n' % (len(s1),len(s2),1e2*samecount/count)
     print outStr
+
+def getStartPos(peptide, seq, subst=None):
+    """Align the peptide with seq using the supplied
+    substitution matrix and return the start position.
+
+    Start position is 0-based
+
+    Parameters
+    ----------
+    peptide : str
+        Peptide to align.
+    seq : str
+        AA sequence.
+    subst : dict of dicts
+        Scores for each pair of AAs in peptide and sequence.
+
+    Returns
+    -------
+    start : int
+        Start position 0-based."""
+    return getStartPosMapper(seq, subst)(peptide)
+
+def getStartPosMapper(seq, subst=None):
+    """Factory that returns a function to align peptides to seq.
+    Can be used as the mapping function for a peptide column
+    in a DataFrame, to align the column to a reference sequence
+
+    Parameters
+    ----------
+    seq : str
+        AA sequence.
+    subst : dict of dicts
+        Scores for each pair of AAs in peptide and sequence.
+
+    Returns
+    -------
+    findPos : function
+        Function with one argument: a peptide sequence to align."""
+    if subst is None:
+        subst = make_identity_substitution_matrix(1, -1, alphabet=AALPHABET)
+    def findPos(pep):
+        d = ssw(pep)
+        return int(d['query_begin'] - d['target_begin'])
+    
+    ssw = StripedSmithWaterman(query_sequence=seq,
+                               protein=True,
+                               substitution_matrix=subst)
+    return findPos
