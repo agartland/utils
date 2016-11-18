@@ -4,10 +4,7 @@ import matplotlib as mpl
 import networkx as nx
 import itertools
 import palettable
-import plotly.plotly as py
-import plotly.graph_objs as pygo
-"""TODO: remove dependency on this * import"""
-from pylab import *
+
 import pandas as pd
 import statsmodels.api as sm
 import numpy as np
@@ -18,6 +15,14 @@ from custom_legends import *
 
 from networkx.drawing.layout import spring_layout, spectral_layout
 
+try:
+    import plotly.plotly as py
+    import plotly.graph_objs as pygo
+    PLOTLY = True
+except ImportError:
+    PLOTLY = False
+
+
 __all__ = ['catcorr',
            'layouts',
            'generateTestData',
@@ -26,7 +31,45 @@ __all__ = ['catcorr',
 
 layouts = ['twopi', 'fdp','circo', 'neato', 'dot', 'spring', 'spectral']
 
-color2str = lambda col: 'rgb'+str(tuple((array(col)*256).round().astype(int)))
+color2str = lambda col: 'rgb'+str(tuple((np.array(col)*256).round().astype(int)))
+
+def computeGraph(df):
+    """Compute odds-ratios, p-values and FDR-adjusted q-values for each edge"""
+    edgeKeys = []
+    pvalueArr = []
+    tested = []
+    for col1,col2 in itertools.combinations(df.columns, 2):
+        for val1,val2 in itertools.product(df[col1].unique(), df[col2].unique()):
+            w = ((df[col1] == val1) & (df[col2] == val2)).sum()
+            pvalue = 1
+            if w>0 and testSig:
+                OR,pvalue = testEdge(df, (col1,val1), (col2,val2))
+                tested.append(True)
+            else:
+                tested.append(False)
+            edgeKeys.append(((col1,val1), (col2,val2)))
+            pvalueArr.append(pvalue)
+    pvalueArr,tested = np.array(pvalueArr), np.array(tested)
+    qvalueArr = np.ones(pvalueArr.shape)
+    qvalueArr[tested] = sm.stats.multipletests(pvalueArr[tested], method='fdr_bh')[1]
+
+    g = nx.Graph()
+    """Add a node for each unique value in each column with name: col_value"""
+    for col in df.columns:
+        for val in df[col].unique():
+            freq = (df[col] == val).sum() / df.shape[0]
+            g.add_node((col, val), freq=freq)
+    """Add edges for each unique pair of values
+    with edgewidth proportional to frequency of pairing"""
+    for col1,col2 in itertools.combinations(df.columns,2):
+        for val1,val2 in itertools.product(df[col1].unique(),df[col2].unique()):
+            w = ((df[col1]==val1) & (df[col2]==val2)).sum()
+            if w>0:
+                dat = dict(weight=w/df.shape[0])
+                dat['pvalue'] = pvalueArr[edgeKeys.index(((col1,val1),(col2,val2)))]
+                dat['qvalue'] = qvalueArr[edgeKeys.index(((col1,val1),(col2,val2)))]
+                g.add_edge((col1, val1), (col2, val2), **dat)
+    return g
 
 def catcorr(df, layout='spring', mode='mpl', titleStr='', testSig=0.2, sRange=(50,inf), wRange=(0.5,inf), labelThresh=0.05):
     """Make a network plot showing the correlations among the
@@ -77,56 +120,22 @@ def catcorr(df, layout='spring', mode='mpl', titleStr='', testSig=0.2, sRange=(5
     [Posts a catcorr plot to plot.ly]
 
     """
-
+    
     """Compute odds-ratios, p-values and FDR-adjusted q-values for each edge"""
-    edgeKeys = []
-    pvalueArr = []
-    tested = []
-    for col1,col2 in itertools.combinations(df.columns,2):
-        for val1,val2 in itertools.product(df[col1].unique(),df[col2].unique()):
-            w = ((df[col1]==val1) & (df[col2]==val2)).sum()
-            pvalue = 1
-            if w>0 and testSig:
-                OR,pvalue = testEdge(df,(col1,val1),(col2,val2))
-                tested.append(True)
-            else:
-                tested.append(False)
-            edgeKeys.append(((col1,val1),(col2,val2)))
-            pvalueArr.append(pvalue)
-    pvalueArr,tested = array(pvalueArr), array(tested)
-    qvalueArr = ones(pvalueArr.shape)
-    qvalueArr[tested] = sm.stats.multipletests(pvalueArr[tested],method='fdr_bh')[1]
-
-    g = nx.Graph()
-    """Add a node for each unique value in each column with name: col_value"""
-    for col in df.columns:
-        for val in df[col].unique():
-            freq = (df[col]==val).sum()/df.shape[0]
-            g.add_node((col,val),freq=freq)
-    """Add edges for each unique pair of values
-    with edgewidth proportional to frequency of pairing"""
-    for col1,col2 in itertools.combinations(df.columns,2):
-        for val1,val2 in itertools.product(df[col1].unique(),df[col2].unique()):
-            w = ((df[col1]==val1) & (df[col2]==val2)).sum()
-            if w>0:
-                dat = dict(weight = w/df.shape[0])
-                dat['pvalue'] = pvalueArr[edgeKeys.index(((col1,val1),(col2,val2)))]
-                dat['qvalue'] = qvalueArr[edgeKeys.index(((col1,val1),(col2,val2)))]
-                g.add_edge((col1,val1),(col2,val2),**dat)
-
+    g = computeGraph(df)
 
     """Compute attributes of edges and nodes"""
-    edgewidth = array([d['weight'] for n1,n2,d in g.edges(data=True)])
-    nodesize = array([d['freq'] for n,d in g.nodes(data=True)])
+    edgewidth = np.array([d['weight'] for n1,n2,d in g.edges(data=True)])
+    nodesize = np.array([d['freq'] for n,d in g.nodes(data=True)])
 
-    nColors = min(max(len(df.columns),3),9)
+    nColors = np.min(np.max(len(df.columns),3),9)
     colors = palettable.colorbrewer.get_map('Set1','Qualitative',nColors).mpl_colors
     cmap = {c:color for c,color in zip(df.columns, itertools.cycle(colors))}
     nodecolors = [cmap[n[0]] for n in g.nodes()]
     if layout == 'twopi':
         """If using this layout specify the most common node as the root"""
         freq = {n:d['freq'] for n,d in g.nodes(data=True)}
-        pos = nx.graphviz_layout(g,prog=layout, root=max(freq.keys(),key=freq.get))
+        pos = nx.graphviz_layout(g,prog=layout, root=np.max(freq.keys(),key=freq.get))
     elif layout == 'spring':
         pos = spring_layout(g)
     elif layout == 'spectral':
@@ -136,15 +145,15 @@ def catcorr(df, layout='spring', mode='mpl', titleStr='', testSig=0.2, sRange=(5
 
     """Use either matplotlib or plot.ly to plot the network"""
     if mode == 'mpl':
-        clf()
-        figh=gcf()
-        axh=figh.add_axes([0.04,0.04,0.92,0.92])
+        plt.clf()
+        figh = plt.gcf()
+        axh = figh.add_axes([0.04,0.04,0.92,0.92])
         axh.axis('off')
         figh.set_facecolor('white')
 
         #nx.draw_networkx_edges(g,pos,alpha=0.5,width=sznorm(edgewidth,mn=0.5,mx=10), edge_color='k')
         #nx.draw_networkx_nodes(g,pos,node_size=sznorm(nodesize,mn=500,mx=5000),node_color=nodecolors,alpha=1)
-        ew = szscale(edgewidth,mn=wRange[0],mx=wRange[1])
+        ew = szscale(edgewidth, mn=wRange[0], mx=wRange[1])
 
         for es,e in zip(ew,g.edges_iter()):
             x1,y1=pos[e[0]]
@@ -153,26 +162,26 @@ def catcorr(df, layout='spring', mode='mpl', titleStr='', testSig=0.2, sRange=(5
             if testSig and g[e[0]][e[1]]['qvalue'] < testSig:
                 props['color']='orange'
                 props['alpha']=0.8
-            plot([x1,x2],[y1,y2],'-',lw=es,**props)
+            plt.plot([x1,x2],[y1,y2],'-',lw=es,**props)
 
-        scatter(x=[pos[s][0] for s in g.nodes()],
-                y=[pos[s][1] for s in g.nodes()],
-                s=szscale(nodesize,mn=sRange[0],mx=sRange[1]), #Units for scatter is (size in points)**2
-                c=nodecolors,
-                alpha=1,zorder=2)
+        plt.scatter(x=[pos[s][0] for s in g.nodes()],
+                    y=[pos[s][1] for s in g.nodes()],
+                    s=szscale(nodesize,mn=sRange[0],mx=sRange[1]), #Units for scatter is (size in points)**2
+                    c=nodecolors,
+                    alpha=1,zorder=2)
         for n,d in g.nodes(data=True):
             if d['freq'] >= labelThresh:
-                annotate(n[1],
-                        xy=pos[n],
-                        fontname='Bitstream Vera Sans',
-                        size='medium',
-                        weight='bold',
-                        color='black',
-                        va='center',
-                        ha='center')
+                plt.annotate(n[1],
+                            xy=pos[n],
+                            fontname='Bitstream Vera Sans',
+                            size='medium',
+                            weight='bold',
+                            color='black',
+                            va='center',
+                            ha='center')
         colorLegend(labels=df.columns,colors = [c for x,c in zip(df.columns,colors)],loc=0)
-        title(titleStr)
-    else:
+        plt.title(titleStr)
+    elif PLOTLY:
         """Send the plot to plot.ly"""
         data = []
         for es,e in zip(szscale(edgewidth,mn=wRange[0],mx=wRange[1]),g.edges_iter()):
@@ -226,25 +235,25 @@ def generateTestData(nrows=100):
         testDf['ColC'].loc[i] = v[2]
     return testDf
 
-def sznorm(vec,mx=1,mn=0):
+def sznorm(vec, mx=1, mn=0):
     """Normalize values of vec to [mn, mx] interval"""
     vec-=nanmin(vec)
     vec=vec/nanmax(vec)
     vec=vec*(mx-mn)+mn
-    vec[isnan(vec)] = mn
+    vec[np.isnan(vec)] = mn
     vec[vec<mn] = mn
     return vec
 
-def szscale(vec,mx=inf,mn=1):
+def szscale(vec, mx=np.inf, mn=1):
     """Normalize values of vec to [mn, mx] interval
     such that sz ratios remain representative."""
-    factor = mn/nanmin(vec)
+    factor = mn/np.nanmin(vec)
     vec = vec*factor
     vec[vec>mx] = mx
-    vec[isnan(vec)] = mn
+    vec[np.isnan(vec)] = mn
     return vec    
 
-def cull_rows(df,cols,freq):
+def cull_rows(df, cols, freq):
     """Remove all rows from df that contain any column
     with a value that is less frequent than freq.
 
@@ -273,7 +282,7 @@ def cull_rows(df,cols,freq):
         outDf = outDf.loc[outDf[c].map(lambda v: v in keepers[c])]
     return outDf
 
-def testEdge(df,node1,node2,verbose=False):
+def testEdge(df, node1, node2, verbose=False):
     """Test if the occurence of nodeA paired with nodeB is more/less common than expected.
 
     Parameters
@@ -290,14 +299,14 @@ def testEdge(df,node1,node2,verbose=False):
     col1,val1 = node1
     col2,val2 = node2
     
-    tab = zeros((2,2))
+    tab = np.zeros((2,2))
     tab[0,0] = ((df[col1]!=val1) & (df[col2]!=val2)).sum()
     tab[0,1] = ((df[col1]!=val1) & (df[col2]==val2)).sum()
     tab[1,0] = ((df[col1]==val1) & (df[col2]!=val2)).sum()
     tab[1,1] = ((df[col1]==val1) & (df[col2]==val2)).sum()
 
     """Add 1 to cells with zero"""
-    if any(tab==0):
+    if np.any(tab==0):
         if verbose:
             print 'Adding one to %d cells with zero counts.' % (ind.sum())
             print
@@ -310,5 +319,5 @@ def testEdge(df,node1,node2,verbose=False):
         print 'Node2: %s, %s' % node2
         print
         print pd.DataFrame(tab,index=['Node1(-)','Node1(+)'],columns = ['Node2(-)','Node2(+)'])
-        print '\nOR: %1.2f\nP-value: %1.3f' % (OR,pvalue)
-    return OR,pvalue
+        print '\nOR: %1.2f\nP-value: %1.3f' % (OR, pvalue)
+    return OR, pvalue
