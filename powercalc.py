@@ -204,15 +204,15 @@ def probGTEX(x,N,prob):
     N trials and per trial probability prob"""
     return 1 - stats.binom.cdf(x-1, N, prob)
 
-def eventConfidenceInterval(countVec, N):
+def eventCI(countVec, N, alpha=0.05):
     """Return confidence interval on observing number of events in countVec
     given N trials (Agresti and Coull  2 sided 95% CI)
     Returns lower and upper confidence limits (lcl,ucl)"""
     p = countVec/N
-    z = stats.norm.ppf(0.975)
+    z = stats.norm.ppf(1.-alpha/2.)
     lcl= (p + (z**2)/(2*N) - z*np.sqrt((p*(1-p)+z**2/(4*N))/N)) / (1 + (z**2)/N)
     ucl= (p + (z**2)/(2*N) + z*np.sqrt((p*(1-p)+z**2/(4*N))/N)) / (1 + (z**2)/N)
-    return lcl,ucl
+    return lcl, ucl
 
 def correlationCI(N, rho=None, alpha=0.05, bootstraps=None):
     """Calculates the p-values and CIs associated with a range of Spearman's

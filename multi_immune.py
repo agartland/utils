@@ -14,6 +14,7 @@ from corrplots import validPairwiseCounts, partialcorr,combocorrplot
 import statsmodels.api as sm
 from scipy import stats
 import seaborn as sns
+from objhist import objhist
 
 sns.set(style='darkgrid', palette='muted', font_scale=1.75)
 
@@ -78,7 +79,8 @@ def hierClusterFunc(dmatDf, K=6, method='complete', returnLinkageMat=False):
 
 def _colors2labels(labels, setStr='Set1', cmap=None):
     """Return pd.Series of colors based on labels"""
-    uLabels = sorted(np.unique(labels))
+    oh = objhist(labels)
+    uLabels = sorted(np.unique(labels), key=oh.get, reverse=True)
     if cmap is None:
         N = max(3, min(12, len(uLabels)))
         cmap = palettable.colorbrewer.get_map(setStr,'Qualitative',N).mpl_colors

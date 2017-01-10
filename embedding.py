@@ -115,6 +115,7 @@ def plotEmbedding(dmatDf,
                   txtSize='large',
                   alpha=0.8,
                   sz=50,
+                  mxSz=500,
                   marker='o'):
     """Two-dimensional plot of embedded distance matrix, colored by labels"""
     
@@ -124,7 +125,7 @@ def plotEmbedding(dmatDf,
     if weights is None:
         sVec = sz
     else:
-        sVec = weights * 200 + 10
+        sVec = weights * mxSz + sz
     
     assert dmatDf.shape[0] == dmatDf.shape[1]
     assert labels.shape[0] == dmatDf.shape[0]
@@ -149,7 +150,7 @@ def plotEmbedding(dmatDf,
         plt.scatter(xyDf.loc[ind, plotDims[0]],
                     xyDf.loc[ind, plotDims[1]],
                     marker=marker,
-                    s=sVec,
+                    s=sVec.loc[ind],
                     alpha=alpha,
                     c=colors[vi],
                     label='%s (N=%d)' % (v, ind.sum()))

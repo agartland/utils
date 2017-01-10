@@ -71,6 +71,7 @@ def computeGraph(df):
                 g.add_edge((col1, val1), (col2, val2), **dat)
     return g
 
+
 def catcorr(df, layout='spring', mode='mpl', titleStr='', testSig=0.2, sRange=(50,inf), wRange=(0.5,inf), labelThresh=0.05):
     """Make a network plot showing the correlations among the
     categorical variables in the columns of df.

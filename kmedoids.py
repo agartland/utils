@@ -154,15 +154,14 @@ def precomputeWeightedDmat(dmat, weights, squared=False):
     wdmat : ndarray shape[N x N]
         Weighted distance matrix, ready for computing inertia."""
     
-    assert weights.shape[0]==N
-
     if squared:
         dmat = dmat**2
 
     if weights is None:
         return dmat
     else:
-        return dmat * weights[None,:]
+        assert weights.shape[0] == dmat.shape[0]
+        return dmat * weights[None,:].values
 
 def assignClusters(dmat, currMedoids, oldLabels=None):
     """Assigns/reassigns points to clusters based on the minimum (unweighted) distance.
