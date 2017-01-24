@@ -20,7 +20,8 @@ except ImportError:
 
 __all__ = [ 'embedDistanceMatrix',
             'computePWDist',
-            'plotEmbedding']
+            'plotEmbedding',
+            'clusteredScatter']
 
 def embedDistanceMatrix(dmatDf, method='kpca', n_components=2):
     """Two-dimensional embedding of sequence distances in dmatDf,
@@ -116,17 +117,13 @@ def plotEmbedding(dmatDf,
                   alpha=0.8,
                   sz=50,
                   mxSz=500,
-                  marker='o'):
+                  marker='o',
+                  plotLegend=True):
     """Two-dimensional plot of embedded distance matrix, colored by labels"""
     
     if labels is None:
         labels = np.zeros(dmatDf.shape[0])
 
-    if weights is None:
-        sVec = sz
-    else:
-        sVec = weights * mxSz + sz
-    
     assert dmatDf.shape[0] == dmatDf.shape[1]
     assert labels.shape[0] == dmatDf.shape[0]
 
@@ -135,9 +132,52 @@ def plotEmbedding(dmatDf,
     
     if xyDf is None:
         xyDf = embedDistanceMatrix(dmatDf, method=method, n_components=np.max(plotDims) + 1)
+    
+    clusteredScatter(xyDf,
+                     labels=labels,
+                     plotDims=plotDims,
+                     plotElipse=plotElipse,
+                     weights=weights,
+                     alpha=alpha,
+                     sz=sz,
+                     mxSz=mxSz,
+                     marker=marker)
+   
+    if plotLabels:
+        annotationParams = dict(xytext=(0,5), textcoords='offset points', size=txtSize)
+        for coli,col in enumerate(dmatDf.columns):
+            if plotLabels:
+                axh.annotate(col, xy=(xyDf.loc[col, plotDims[0]], xyDf.loc[col, plotDims[1]]), **annotationParams)
 
-    nColors = min(max(len(uLabels), 3), 9)
-    colors = palettable.colorbrewer.get_map('Set1', 'Qualitative', nColors).mpl_colors
+    if len(uLabels) > 1 and plotLegend:
+        plt.legend(loc=0)
+        # colorLegend(colors[:len(uLabels)], uLabels)
+    plt.show()
+    return xyDf
+
+def clusteredScatter(xyDf,
+                     labels=None,
+                     plotDims=[0, 1],
+                     plotElipse=False,
+                     weights=None,
+                     alpha=0.8,
+                     sz=50,
+                     mxSz=500,
+                     marker='o',
+                     colors=None):
+    if weights is None:
+        sVec = sz
+    else:
+        sVec = weights * mxSz + sz
+
+    oh = objhist(labels)
+    uLabels = sorted(np.unique(labels), key=oh.get, reverse=True)
+    
+    if colors is None:
+        nColors = min(max(len(uLabels), 3), 9)
+        colors = palettable.colorbrewer.get_map('Set1', 'Qualitative', nColors).mpl_colors
+    else:
+        colors = colors[uLabels].values
 
     figh = plt.gcf()
     plt.clf()
@@ -152,20 +192,10 @@ def plotEmbedding(dmatDf,
                     marker=marker,
                     s=sVec.loc[ind],
                     alpha=alpha,
-                    c=colors[vi],
+                    c=colors[vi % len(colors)],
                     label='%s (N=%d)' % (v, ind.sum()))
         if ind.sum() > 2 and plotElipse:
             Xvar = xyDf[plotDims].loc[ind].values
-            plot_point_cov(Xvar, ax=axh, color=colors[vi], alpha=0.2)
-    
-    if plotLabels:
-        annotationParams = dict(xytext=(0,5), textcoords='offset points', size=txtSize)
-        for coli,col in enumerate(dmatDf.columns):
-            if plotLabels:
-                axh.annotate(col, xy=(xyDf.loc[col, plotDims[0]], xyDf.loc[col, plotDims[1]]), **annotationParams)
-
-    if len(uLabels) > 1:
-        plt.legend(loc=0)
-        #colorLegend(colors[:len(uLabels)], uLabels)
+            plot_point_cov(Xvar, ax=axh, color=colors[vi % len(colors)], alpha=0.2)
     plt.show()
-    return xyDf
+    

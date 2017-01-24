@@ -517,36 +517,36 @@ def mynorm(vec,mx=1,mn=0):
     vec=vec*(mx-mn)+mn
     return vec
 
-def aalogoheights(aahistObj,N=20):
+def aalogoheights(aahistObj, N=20):
     """For a objhist of AA frequencies, compute the heights
     of each AA for a logo plot"""
-    aahistObj=deepcopy(aahistObj)
-    keys=aahistObj.keys()
+    aahistObj = deepcopy(aahistObj)
+    keys = aahistObj.keys()
     for aa in BADAA:
         if aa in keys:
-            dummy=aahistObj.pop(aa)
-    keys=[aa for aa in aahistObj.sortedKeys(reverse=False)]
-    freq=aahistObj.freq()
-    p=array([freq[k] for k in keys])
-    #err=(1/log(2))*((N-1)/(2*aahistObj.sum()))
-    #totEntropy=log2(N)-((-p*log2(p)).sum()+err)
-    totEntropy=log2(N)-((-p*log2(p)).sum())
-    heights=p*totEntropy
-    return keys,heights
+            dummy = aahistObj.pop(aa)
+    keys = [aa for aa in aahistObj.sortedKeys(reverse=False)]
+    freq = aahistObj.freq()
+    p = np.array([freq[k] for k in keys])
+    #err = (1/np.log(2))*((N-1) / (2*aahistObj.sum()))
+    #totEntropy = np.log2(N)-((-p*np.log2(p)).sum() + err)
+    totEntropy = np.log2(N)-((-p*np.log2(p)).sum())
+    heights = p * totEntropy
+    return keys, heights
 
-def computeAlignmentLogoHeights(fullAlign,region=None):
+def computeAlignmentLogoHeights(fullAlign, region=None):
     """Compute heights for a sequence logo plot of relative entropy
     Returns a vector of heights"""
-    fullAlign=padAlignment(fullAlign)
-    align=sliceAlign(fullAlign,region)
-    L=len(align[align.index[0]])
+    fullAlign = padAlignment(fullAlign)
+    align = sliceAlign(fullAlign, region)
+    L = len(align[align.index[0]])
     
-    tot=zeros(L)
+    tot = np.zeros(L)
 
-    for sitei in arange(L):
-        aaHist=objhist([seq[sitei] for seq in align])
-        aaKeys,entropy=aalogoheights(aaHist)
-        tot[sitei]=entropy.sum()
+    for sitei in np.arange(L):
+        aaHist = objhist([seq[sitei] for seq in align])
+        aaKeys, entropy = aalogoheights(aaHist)
+        tot[sitei] = entropy.sum()
     return tot
 
 def pairwiseDiversity(fullAlign,region=None,subst=None,bySite=True):

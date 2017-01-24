@@ -27,13 +27,36 @@ def toPNG(df, outFn, dpi=200, **kwargs):
 
     subprocess.check_call(' '.join(cmd), shell=True, startupinfo=si)
 
-def toPDF(df, outFn, titStr=u'', float_format=u'%1.3g', index=False, hideConsole=True):
-    repUnderscore = lambda s: s if not isinstance(s, basestring) else s.replace('_','-')
+def toPDF(df,
+          outFn,
+          titStr=u'',
+          float_format=u'%1.3g',
+          index=False,
+          hideConsole=True,
+          landscape=True,
+          legal=False,
+          margin=1):
+    if landscape:
+        orientation = 'landscape'
+    else:
+        orientation = 'portrait'
+
+    if not legal:
+        paper = 'letterpaper'
+    else:
+        paper = 'legalpaper'
 
     folder,fn = op.split(outFn)
-    df = df.applymap(repUnderscore)
-    df = df.rename_axis(repUnderscore, axis=1)
-    df = df.rename_axis(repUnderscore, axis=0)
+    
+    if type(df) is pd.Series:
+        df = pd.DataFrame(df)
+
+    if not df.empty:
+        repUnderscore = lambda s: s if not isinstance(s, basestring) else s.replace('_','-')
+        df = df.applymap(repUnderscore)
+        df = df.rename_axis(repUnderscore, axis=0)
+        df = df.rename_axis(repUnderscore, axis=1)
+
     texFn = outFn[:-3] + 'tex'
     header = [u'\\documentclass[10pt]{article}',
               u'\\usepackage{lmodern}',
@@ -43,7 +66,7 @@ def toPDF(df, outFn, titStr=u'', float_format=u'%1.3g', index=False, hideConsole
               u'\\usepackage[english]{babel}',
               u'\\usepackage[utf8]{inputenc}',
               u'\\usepackage{fancyhdr}',
-              u'\\geometry{letterpaper, landscape, margin=1in}',
+              u'\\geometry{%s, %s, margin=%1.1fin}' % (paper, orientation, margin),
               u'\\pagestyle{fancy}',
               u'\\fancyhf{}',
               u'\\rhead{%s}' % time.ctime(),
