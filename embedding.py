@@ -118,7 +118,8 @@ def plotEmbedding(dmatDf,
                   sz=50,
                   mxSz=500,
                   marker='o',
-                  plotLegend=True):
+                  plotLegend=True,
+                  colors=None):
     """Two-dimensional plot of embedded distance matrix, colored by labels"""
     
     if labels is None:
@@ -141,7 +142,8 @@ def plotEmbedding(dmatDf,
                      alpha=alpha,
                      sz=sz,
                      mxSz=mxSz,
-                     marker=marker)
+                     marker=marker,
+                     colors=colors)
    
     if plotLabels:
         annotationParams = dict(xytext=(0,5), textcoords='offset points', size=txtSize)
@@ -176,12 +178,12 @@ def clusteredScatter(xyDf,
     if colors is None:
         nColors = min(max(len(uLabels), 3), 9)
         colors = palettable.colorbrewer.get_map('Set1', 'Qualitative', nColors).mpl_colors
-    else:
+    elif type(colors) is pd.Series:
         colors = colors[uLabels].values
 
     figh = plt.gcf()
     plt.clf()
-    axh = figh.add_axes([0.02, 0.02, 0.96, 0.96])
+    axh = figh.add_axes([0.1, 0.1, 0.9, 0.9])
     axh.axis('off')
     figh.set_facecolor('white')
 

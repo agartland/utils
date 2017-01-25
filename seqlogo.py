@@ -88,7 +88,12 @@ def plotMotif(x, y, motif, axh=None, fontsize=30, aa_colors='shapely'):
     fontsize : float
         Pointsize of font passed to axh.text
     aa_colors : str
-        Either 'shapely' or a color to use for all symbols."""
+        Either 'shapely' or a color to use for all symbols.
+
+    Returns
+    -------
+    bbox : [[x0, y0], [x1, y1]]
+        Full extent of the logo in data coodinates."""
 
     if aa_colors == 'shapely':
         colorsDf = pd.read_csv(GIT_PATH+'utils/shapely_aa_colors.tsv', delimiter='\t')
@@ -101,7 +106,7 @@ def plotMotif(x, y, motif, axh=None, fontsize=30, aa_colors='shapely'):
     if axh is None:
         axh = plt.gca()
 
-
+    mxy = 0
     xshift = 0
     for xi in range(motif.shape[1]):
         scores = motif.iloc[:, xi].sort_values()
@@ -111,17 +116,21 @@ def plotMotif(x, y, motif, axh=None, fontsize=30, aa_colors='shapely'):
                 txt = axh.text(x + xshift,
                               y + yshift,
                               aa, 
-                              fontsize=30, 
+                              fontsize=fontsize, 
                               color=aa_colors[aa],
                               family='monospace')
-                window_ext = txt.get_window_extent(fig.canvas.get_renderer())
-                ext_data = ax.transData.inverted().transform(window_ext)
+                # axh.figure.canvas.draw()
+                # window_ext = txt.get_window_extent(txt._renderer)
+                window_ext = txt.get_window_extent(axh.figure.canvas.get_renderer())
+                ext_data = axh.transData.inverted().transform(window_ext)
 
                 baseW = (ext_data[1][0] - ext_data[0][0])
                 baseH = (ext_data[1][1] - ext_data[0][1])
 
                 txt.set_path_effects([Scale(1., score)])
                 yshift += baseH * score
-        xshift += baseW
+        if yshift > mxy:
+            mxy = yshift
+        xshift += baseW * 1.
     plt.show()
-
+    return np.array([[x, y], [xshift, mxy]])
