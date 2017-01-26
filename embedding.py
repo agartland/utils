@@ -168,7 +168,7 @@ def clusteredScatter(xyDf,
                      marker='o',
                      colors=None):
     if weights is None:
-        sVec = sz
+        sVec = sz * pd.Series(np.ones(xyDf.shape[0]), index=xyDf.index)
     else:
         sVec = weights * mxSz + sz
 
@@ -194,7 +194,7 @@ def clusteredScatter(xyDf,
                     marker=marker,
                     s=sVec.loc[ind],
                     alpha=alpha,
-                    c=colors[vi % len(colors)],
+                    c=[colors[vi % len(colors)], ] * ind.sum(),
                     label='%s (N=%d)' % (v, ind.sum()))
         if ind.sum() > 2 and plotElipse:
             Xvar = xyDf[plotDims].loc[ind].values

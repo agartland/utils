@@ -82,7 +82,7 @@ def _colors2labels(labels, setStr='Set1', cmap=None):
     oh = objhist(labels)
     uLabels = sorted(np.unique(labels), key=oh.get, reverse=True)
     if cmap is None:
-        N = max(3, min(12, len(uLabels)))
+        N = max(3, min(9, len(uLabels)))
         cmap = palettable.colorbrewer.get_map(setStr,'Qualitative',N).mpl_colors
     cmapLookup = {k:col for k,col in zip(uLabels, itertools.cycle(cmap))}
     if type(labels) is pd.Series:
