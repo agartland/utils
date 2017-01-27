@@ -47,16 +47,16 @@ def embedDistanceMatrix(dmatDf, method='kpca', n_components=2):
         rot = PCA(n_components=n_components)
         xy = rot.fit_transform(xy)
     elif method == 'pca':
-        pcaObj = PCA(n_components=n_components)
-        xy = pcaObj.fit_transform(dmat)
+        pcaObj = PCA(n_components=None)
+        xy = pcaObj.fit_transform(dmat)[:,:n_components]
     elif method == 'kpca':
-        pcaObj = KernelPCA(n_components=n_components, kernel='precomputed')
+        pcaObj = KernelPCA(n_components=dmat.shape[0], kernel='precomputed', eigen_solver='dense')
         try:
             gram = dist2kernel(dmat)
         except:
             print 'Could not convert dmat to kernel for KernelPCA; using 1 - dmat/dmat.max() instead'
             gram = 1 - dmat / dmat.max()
-        xy = pcaObj.fit_transform(gram)
+        xy = pcaObj.fit_transform(gram)[:,:n_components]
     elif method == 'lle':
         lle = manifold.LocallyLinearEmbedding(n_neighbors=30, n_components=n_components, method='standard')
         xy = lle.fit_transform(dist)
@@ -69,6 +69,10 @@ def embedDistanceMatrix(dmatDf, method='kpca', n_components=2):
 
     assert xy.shape[0] == dmatDf.shape[0]
     xyDf = pd.DataFrame(xy[:,:n_components], index=dmatDf.index, columns=np.arange(n_components))
+    if method == 'kpca':
+        """Not sure how negative eigenvalues should be handled here, but they are usually
+        small so it shouldn't make a big difference"""
+        xyDf.explained_variance_ = pcaObj.lambdas_[:n_components]/pcaObj.lambdas_[pcaObj.lambdas_>0].sum()
     return xyDf
 
 def computePWDist(df, metric='pearson-signed', dfunc=None, minN=10):
@@ -154,6 +158,8 @@ def plotEmbedding(dmatDf,
     if len(uLabels) > 1 and plotLegend:
         plt.legend(loc=0)
         # colorLegend(colors[:len(uLabels)], uLabels)
+    plt.xlabel('KPCA %1.0f (%1.0f%% variance explained)' % (plotDims[0]+1, 100*xyDf.explained_variance_[plotDims[0]]))
+    plt.ylabel('KPCA %1.0f (%1.0f%% variance explained)' % (plotDims[1]+1, 100*xyDf.explained_variance_[plotDims[1]]))
     plt.show()
     return xyDf
 
@@ -183,9 +189,10 @@ def clusteredScatter(xyDf,
 
     figh = plt.gcf()
     plt.clf()
-    axh = figh.add_axes([0.1, 0.1, 0.9, 0.9])
-    axh.axis('off')
-    figh.set_facecolor('white')
+    axh = figh.add_axes([0.05, 0.05, 0.9, 0.9])
+    axh.patch.set_facecolor('white')
+    # axh.axis('off')
+    figh.patch.set_facecolor('white')
 
     for vi,v in enumerate(uLabels):
         ind = (labels == v)
@@ -199,5 +206,7 @@ def clusteredScatter(xyDf,
         if ind.sum() > 2 and plotElipse:
             Xvar = xyDf[plotDims].loc[ind].values
             plot_point_cov(Xvar, ax=axh, color=colors[vi % len(colors)], alpha=0.2)
+    axh.set_xticks(())
+    axh.set_yticks(())
     plt.show()
     
