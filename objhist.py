@@ -69,10 +69,33 @@ class countdict(dict):
     def entropy(self,logFunc=np.log2):
         """Compute the entropy of the discrete distribution"""
         return -np.array([p*logFunc(p) for p in self.freq().values()]).sum()
-    def simpsons_index(self):
+    def simpsons_index(self, variant='D'):
+        """Simpson's Index (D)
+        Measures the probability that two individuals randomly selected from
+        a sample will belong to the same species. With this index, 0
+        represents infinite diversity and 1, no diversity.
+
+        Simpson's Index of Diversity (1-D)
+        The value of this index also ranges between 0 and 1, but now, the greater
+        the value, the greater the sample diversity. The index represents the
+        probability that two individuals randomly selected from a sample will
+        belong to different species.
+
+        Simpson's Reciprocal Index (1/D)
+        Ranges from 1 to the number of species. The higher the value,
+        the greater the diversity."""
+
         tot = float(self.sum())
         p = np.array([self[k]/tot for k in self.keys()])
-        return (p * p).sum()
+        D = (p * p).sum()
+
+        if variant == 'D':
+            pass    
+        elif variant == '1-D':
+            D = 1 - D
+        elif variant == '1/D':
+            D = 1/D
+        return D
         
     def relative_entropy(self,reference,log_func=np.log2):
         """Compute the relative entropy between the frequencies

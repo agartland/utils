@@ -11,7 +11,7 @@ __all__ = ['kmedoids',
            'computeInertia',
            'computeMembership']
 
-def kmedoids(dmat, k=3, weights=None, nPasses=1, maxIter=1000, initInds=None, potentialMedoidInds=None):
+def kmedoids(dmat, k=3, weights=None, nPasses=1, maxIter=1000, initInds=None, potentialMedoidInds=None, seed=110820):
     """Identify the k points that minimize all intra-cluster distances.
 
     The algorithm completes nPasses of the algorithm with random restarts.
@@ -39,6 +39,8 @@ def kmedoids(dmat, k=3, weights=None, nPasses=1, maxIter=1000, initInds=None, po
         Medoid indices used for random initialization and restarts for each pass.
     potentialMedoidInds : array of indices
         If specified then medoids are constrained to be chosen from this array.
+    seed : int or False
+        If not False, sets np.random.seed for reproducible results.
 
     Returns
     -------
@@ -54,6 +56,10 @@ def kmedoids(dmat, k=3, weights=None, nPasses=1, maxIter=1000, initInds=None, po
         Number of iterations run.
     nFound : int
         Number of unique solutions found (out of nPasses)"""
+
+    """Use a seed to guarantee reproducibility"""
+    if seed:
+        np.random.seed(seed)
 
     """Number of points"""
     N = dmat.shape[0]
@@ -496,7 +502,6 @@ def _test_plot(k=3, nPasses=20, maxIter=1000):
     iris = datasets.load_iris()
     obs = iris['data']
     dmat = neighbors.DistanceMetric.get_metric('euclidean').pairwise(obs)
-    np.random.seed(110820)
     weights = np.random.rand(obs.shape[0])
 
     plt.figure(2)

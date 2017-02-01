@@ -33,23 +33,41 @@ layouts = ['twopi', 'fdp','circo', 'neato', 'dot', 'spring', 'spectral']
 
 color2str = lambda col: 'rgb'+str(tuple((np.array(col)*256).round().astype(int)))
 
+def computeRelations(df):
+    """Compute all OR neccessary for a catcorr graph"""
+    res = []
+    for col1,col2 in itertools.combinations(df.columns, 2):
+        for val1,val2 in itertools.product(df[col1].unique(), df[col2].unique()):
+            w = ((df[col1] == val1) & (df[col2] == val2)).sum()
+            if w > 0:
+                OR,pvalue = testEdge(df, (col1,val1), (col2,val2))
+                res.append({'OR':OR, 'pvalue':pvalue, col1:val1, col2:val2})
+    resDf = pd.DataFrame(res)
+    resDf.loc[:,'qvalue'] = sm.stats.multipletests(resDf['pvalue'].values, method='fdr_bh')[1]
+    resDf = resDf.sort_values(by='pvalue', ascending=True)
+    return resDf
+
+
 def computeGraph(df):
     """Compute odds-ratios, p-values and FDR-adjusted q-values for each edge"""
     edgeKeys = []
     pvalueArr = []
+    ORArr = []
     tested = []
     for col1,col2 in itertools.combinations(df.columns, 2):
         for val1,val2 in itertools.product(df[col1].unique(), df[col2].unique()):
             w = ((df[col1] == val1) & (df[col2] == val2)).sum()
-            pvalue = 1
-            if w>0 and testSig:
+            if w > 0:
                 OR,pvalue = testEdge(df, (col1,val1), (col2,val2))
                 tested.append(True)
             else:
+                pvalue = 1.
+                OR = 1.
                 tested.append(False)
             edgeKeys.append(((col1,val1), (col2,val2)))
             pvalueArr.append(pvalue)
-    pvalueArr,tested = np.array(pvalueArr), np.array(tested)
+            ORArr.append(OR)
+    pvalueArr,tested, ORArr = np.array(pvalueArr), np.array(tested), np.array(ORArr)
     qvalueArr = np.ones(pvalueArr.shape)
     qvalueArr[tested] = sm.stats.multipletests(pvalueArr[tested], method='fdr_bh')[1]
 
@@ -64,15 +82,17 @@ def computeGraph(df):
     for col1,col2 in itertools.combinations(df.columns,2):
         for val1,val2 in itertools.product(df[col1].unique(),df[col2].unique()):
             w = ((df[col1]==val1) & (df[col2]==val2)).sum()
-            if w>0:
+            if w > 0:
+                key = edgeKeys.index(((col1,val1),(col2,val2)))
                 dat = dict(weight=w/df.shape[0])
-                dat['pvalue'] = pvalueArr[edgeKeys.index(((col1,val1),(col2,val2)))]
-                dat['qvalue'] = qvalueArr[edgeKeys.index(((col1,val1),(col2,val2)))]
+                dat['OR'] = ORArr[key]
+                dat['pvalue'] = pvalueArr[key]
+                dat['qvalue'] = qvalueArr[key]
                 g.add_edge((col1, val1), (col2, val2), **dat)
     return g
 
 
-def catcorr(df, layout='spring', mode='mpl', titleStr='', testSig=0.2, sRange=(50,inf), wRange=(0.5,inf), labelThresh=0.05):
+def catcorr(df, layout='spring', mode='mpl', titleStr='', testSig=0.05, sRange=(50,np.inf), wRange=(0.5,np.inf), labelThresh=0.05, fontsize=14):
     """Make a network plot showing the correlations among the
     categorical variables in the columns of df.
 
@@ -104,7 +124,7 @@ def catcorr(df, layout='spring', mode='mpl', titleStr='', testSig=0.2, sRange=(5
         If non-zero then testSig is used as the significance cutoff for plotting a highlighted edge.
         For each edge, tests the statistical hypothesis that number of observed pairings
         between values in two columns is significantly different than what one would expect
-        based on their marginal frequencies. Note: there is no adjustment for multiple comparisons.
+        based on their marginal frequencies. Note: there is FDR-adjustment for multiple comparisons.
     sRange,wRange : tuples of length 2
         Contains the min and max node sizes or edge widths in points, for scaling
 
@@ -129,8 +149,8 @@ def catcorr(df, layout='spring', mode='mpl', titleStr='', testSig=0.2, sRange=(5
     edgewidth = np.array([d['weight'] for n1,n2,d in g.edges(data=True)])
     nodesize = np.array([d['freq'] for n,d in g.nodes(data=True)])
 
-    nColors = np.min(np.max(len(df.columns),3),9)
-    colors = palettable.colorbrewer.get_map('Set1','Qualitative',nColors).mpl_colors
+    nColors = np.min([np.max([len(df.columns), 3]), 9])
+    colors = palettable.colorbrewer.get_map('Set1', 'Qualitative', nColors).mpl_colors
     cmap = {c:color for c,color in zip(df.columns, itertools.cycle(colors))}
     nodecolors = [cmap[n[0]] for n in g.nodes()]
     if layout == 'twopi':
@@ -156,12 +176,15 @@ def catcorr(df, layout='spring', mode='mpl', titleStr='', testSig=0.2, sRange=(5
         #nx.draw_networkx_nodes(g,pos,node_size=sznorm(nodesize,mn=500,mx=5000),node_color=nodecolors,alpha=1)
         ew = szscale(edgewidth, mn=wRange[0], mx=wRange[1])
 
-        for es,e in zip(ew,g.edges_iter()):
+        for es,e in zip(ew, g.edges_iter()):
             x1,y1=pos[e[0]]
             x2,y2=pos[e[1]]
             props = dict(color='black',alpha=0.4,zorder=1)
             if testSig and g[e[0]][e[1]]['qvalue'] < testSig:
-                props['color']='orange'
+                if g[e[0]][e[1]]['OR'] > 1.:
+                    props['color']='orange'
+                else:
+                    props['color']='green'
                 props['alpha']=0.8
             plt.plot([x1,x2],[y1,y2],'-',lw=es,**props)
 
@@ -175,12 +198,15 @@ def catcorr(df, layout='spring', mode='mpl', titleStr='', testSig=0.2, sRange=(5
                 plt.annotate(n[1],
                             xy=pos[n],
                             fontname='Bitstream Vera Sans',
-                            size='medium',
+                            size=fontsize,
                             weight='bold',
                             color='black',
                             va='center',
                             ha='center')
-        colorLegend(labels=df.columns,colors = [c for x,c in zip(df.columns,colors)],loc=0)
+        colorLegend(labels=df.columns,
+                    colors=[c for x,c in zip(df.columns,colors)],
+                    loc=0,
+                    title='N = %1.0f' % (~df.isnull()).all(axis=1).sum(axis=0))
         plt.title(titleStr)
     elif PLOTLY:
         """Send the plot to plot.ly"""
@@ -190,7 +216,10 @@ def catcorr(df, layout='spring', mode='mpl', titleStr='', testSig=0.2, sRange=(5
             x2,y2=pos[e[1]]
             props = dict(color='black',opacity=0.4)
             if testSig and g[e[0]][e[1]]['qvalue'] < testSig:
-                props['color']='orange'
+                if g[e[0]][e[1]]['OR'] > 1.:
+                    props['color']='orange'
+                else:
+                    props['color']='green'
                 props['opacity']=0.8
             tmp = pygo.Scatter(x=[x1,x2],
                           y=[y1,y2],
@@ -238,11 +267,11 @@ def generateTestData(nrows=100):
 
 def sznorm(vec, mx=1, mn=0):
     """Normalize values of vec to [mn, mx] interval"""
-    vec-=nanmin(vec)
-    vec=vec/nanmax(vec)
-    vec=vec*(mx-mn)+mn
+    vec -= np.nanmin(vec)
+    vec = vec / np.nanmax(vec)
+    vec = vec * (mx-mn) + mn
     vec[np.isnan(vec)] = mn
-    vec[vec<mn] = mn
+    vec[vec < mn] = mn
     return vec
 
 def szscale(vec, mx=np.inf, mn=1):
@@ -250,7 +279,7 @@ def szscale(vec, mx=np.inf, mn=1):
     such that sz ratios remain representative."""
     factor = mn/np.nanmin(vec)
     vec = vec*factor
-    vec[vec>mx] = mx
+    vec[vec > mx] = mx
     vec[np.isnan(vec)] = mn
     return vec    
 
@@ -300,14 +329,16 @@ def testEdge(df, node1, node2, verbose=False):
     col1,val1 = node1
     col2,val2 = node2
     
+    tmp = df[[col1, col2]].dropna()
+
     tab = np.zeros((2,2))
-    tab[0,0] = ((df[col1]!=val1) & (df[col2]!=val2)).sum()
-    tab[0,1] = ((df[col1]!=val1) & (df[col2]==val2)).sum()
-    tab[1,0] = ((df[col1]==val1) & (df[col2]!=val2)).sum()
-    tab[1,1] = ((df[col1]==val1) & (df[col2]==val2)).sum()
+    tab[0,0] = ((tmp[col1]!=val1) & (tmp[col2]!=val2)).sum()
+    tab[0,1] = ((tmp[col1]!=val1) & (tmp[col2]==val2)).sum()
+    tab[1,0] = ((tmp[col1]==val1) & (tmp[col2]!=val2)).sum()
+    tab[1,1] = ((tmp[col1]==val1) & (tmp[col2]==val2)).sum()
 
     """Add 1 to cells with zero"""
-    if np.any(tab==0):
+    if np.any(tab == 0):
         if verbose:
             print 'Adding one to %d cells with zero counts.' % (ind.sum())
             print
