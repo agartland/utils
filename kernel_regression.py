@@ -201,6 +201,11 @@ def kernel2dist(kern):
 
     Implementation of K2D in MiRKAT, Zhao et al., 2015
 
+    Also reccommended by:
+    E. Halperin, J. Buhler, R. Karp, R. Krauthgamer, B. Westover.
+    Detecting protein sequence conservation via metric embeddings.
+    Bioinformatics 19, 122-129 (2003).
+
     d_ij^2 = K_ii + K_jj - 2K_ij
 
     Parameters

@@ -7,7 +7,7 @@ import subprocess
 import numpy as np
 import re
 
-__all__ = ['nwalign',
+__all__ = ['needleall',
            'align2skbio',
            'skbio2align']
 

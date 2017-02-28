@@ -5,9 +5,12 @@ import matplotlib.transforms as mtrans
 from matplotlib import transforms
 import skbio
 from objhist import objhist
+import StringIO
 
 __all__ = ['computeMotif',
            'plotMotif']
+
+_shapely_colors = "Amino Acids,Color Name,RGB Values,Hexadecimal\nD|E,bright red,[230,10,10],E60A0A\nC|M,yellow,[230,230,0],E6E600\nK|R,blue,[20,90,255],145AFF\nS|T,orange,[250,150,0],FA9600\nF|Y,mid blue,[50,50,170],3232AA\nN|Q,cyan,[0,220,220],00DCDC\nG,light grey,[235,235,235],EBEBEB\nL|V|I,green,[15,130,15],0F820F\nA,dark grey,[200,200,200],C8C8C8\nW,pink,[180,90,180],B45AB4\nH,pale blue,[130,130,210],8282D2\nP,flesh,[220,150,130],DC9682"
 
 class Scale(matplotlib.patheffects.RendererBase):
     def __init__(self, sx=1., sy=1.):
@@ -96,8 +99,7 @@ def plotMotif(x, y, motif, axh=None, fontsize=30, aa_colors='shapely'):
         Full extent of the logo in data coodinates."""
 
     if aa_colors == 'shapely':
-        colorsDf = pd.read_csv(GIT_PATH+'utils/shapely_aa_colors.tsv', delimiter='\t')
-
+        colorsDf = pd.read_csv(StringIO.StringIO(_shapely_colors), delimiter=',')
         aa_colors = {aa:parseColor(aa, colorsDf=colorsDf) for aa in motif.index}
     else:
         """All AAs have the same color, specified by aa_colors"""
