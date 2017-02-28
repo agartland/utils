@@ -313,3 +313,41 @@ def _morisita_horn_index(a, b):
    
     return mh1
 
+def _simpsons_index(vec, variant='D'):
+    """Simpson's Index (D)
+    Measures the probability that two individuals randomly selected from
+    a sample will belong to the same species. With this index, 0
+    represents infinite diversity and 1, no diversity.
+
+    Simpson's Index of Diversity (1-D)
+    The value of this index also ranges between 0 and 1, but now, the greater
+    the value, the greater the sample diversity. The index represents the
+    probability that two individuals randomly selected from a sample will
+    belong to different species.
+
+    Simpson's Reciprocal Index (1/D)
+    Ranges from 1 to the number of species. The higher the value,
+    the greater the diversity.
+
+    Parameters
+    ----------
+    vec : ndarray, shape [nCategories,]
+        Number or frequencies of observations for each category
+    variant : str
+        Indicates variation to apply: "D", "1-D" or "1/D"
+
+    Returns
+    -------
+    index : float"""
+
+    tot = np.sum(vec).astype(float)
+    p = np.array(vec, dtype=float) / tot
+
+    D = (p * p).sum()
+    if variant == 'D':
+        pass    
+    elif variant == '1-D':
+        D = 1 - D
+    elif variant == '1/D':
+        D = 1/D
+    return D
