@@ -290,7 +290,9 @@ def pwpartialcorr(df, rowVars=None, colVars=None, adjust=[], method='pearson', m
     pvalue : pd.DataFrame [rowVars, colVars]
         Pvalues for pairwise correlations.
     qvalue : pd.DataFrame [rowVars, colVars]
-        Multiplicity adjusted q-values for pairwise correlations."""
+        Multiplicity adjusted q-values for pairwise correlations.
+    N : pd.DataFrame [rowVars, colVars]
+        Number of non-nan value pairs in the computation."""
 
     if rowVars is None:
         rowVars = df.columns
@@ -300,6 +302,7 @@ def pwpartialcorr(df, rowVars=None, colVars=None, adjust=[], method='pearson', m
     pvalue = np.zeros((len(rowVars),len(colVars)))
     qvalue = np.nan * np.zeros((len(rowVars),len(colVars)))
     rho = np.zeros((len(rowVars),len(colVars)))
+    N = np.zeros((len(rowVars),len(colVars)))
 
     """Store p-values in dict with keys that are unique pairs (so we only adjust across these)"""
     pairedPvalues = {}
@@ -309,11 +312,12 @@ def pwpartialcorr(df, rowVars=None, colVars=None, adjust=[], method='pearson', m
     for i,rowv in enumerate(rowVars):
         for j,colv in enumerate(colVars):
             if not rowv == colv:
-                if not df[[rowv,colv]].dropna().shape[0] < minN:
+                N[i, j] = df[[rowv,colv]].dropna().shape[0]
+                if not N[i, j] < minN:
                     rho[i,j],pvalue[i,j] = partialcorr(df[rowv],df[colv],adjust=[df[a] for a in adjust], method=method)
                 else:
                     """Pvalue = nan excludes these from the multiplicity adjustment"""
-                    rho[i,j],pvalue[i,j] = 1,np.nan
+                    rho[i,j],pvalue[i,j] = np.nan,np.nan
                 """Define unique key for the pair by sorting in order they appear in df columns"""
                 key = tuple(sorted([rowv,colv], key = allColumns.index))
                 pairedPvalues.update({key:pvalue[i,j]})
@@ -339,7 +343,8 @@ def pwpartialcorr(df, rowVars=None, colVars=None, adjust=[], method='pearson', m
     pvalue = pd.DataFrame(pvalue, index=rowVars, columns=colVars)
     qvalue = pd.DataFrame(qvalue, index=rowVars, columns=colVars)
     rho = pd.DataFrame(rho, index=rowVars, columns=colVars)
-    return rho, pvalue, qvalue
+    N = pd.DataFrame(N.astype(int), index=rowVars, columns=colVars)
+    return rho, pvalue, qvalue, N
 
 def crosscorr(dfA, dfB, method='pearson', minN=0, adjMethod='fdr_bh'):
     """Pairwise correlations between A and B after a join,
@@ -362,7 +367,9 @@ def crosscorr(dfA, dfB, method='pearson', minN=0, adjMethod='fdr_bh'):
     pvalue : pd.DataFrame [rowVars, colVars]
         Pvalues for pairwise correlations.
     qvalue : pd.DataFrame [rowVars, colVars]
-        Multiplicity adjusted q-values for pairwise correlations."""
+        Multiplicity adjusted q-values for pairwise correlations.
+    N  : pd.DataFrame [rowVars, colVars]
+        Number of non-nan value pairs in the calculation."""
     colA = dfA.columns
     colB = dfB.columns
     dfA = dfA.rename_axis(lambda s: s + '_A', axis=1)
@@ -370,7 +377,7 @@ def crosscorr(dfA, dfB, method='pearson', minN=0, adjMethod='fdr_bh'):
 
     joinedDf = pd.merge(dfA, dfB, left_index=True, right_index=True)
 
-    rho, pvalue, qvalue = pwpartialcorr(joinedDf, rowVars=dfA.columns, colVars=dfB.columns, method=method, minN=minN, adjMethod=adjMethod)
+    rho, pvalue, qvalue, N = pwpartialcorr(joinedDf, rowVars=dfA.columns, colVars=dfB.columns, method=method, minN=minN, adjMethod=adjMethod)
 
     rho.index = colA
     rho.columns = colB
@@ -380,7 +387,10 @@ def crosscorr(dfA, dfB, method='pearson', minN=0, adjMethod='fdr_bh'):
 
     qvalue.index = colA
     qvalue.columns = colB
-    return rho, pvalue, qvalue
+
+    N.index = colA
+    N.columns = colB
+    return rho, pvalue, qvalue, N
 
 
 def corrheatmap(df, rowVars=None, colVars=None, adjust=[], annotation=None, cutoff=None, cutoffValue=0.05, method='pearson', labelLookup={}, xtickRotate=True, labelSize='medium', minN=0, adjMethod='fdr_bh'):
