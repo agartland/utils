@@ -346,7 +346,7 @@ def pwpartialcorr(df, rowVars=None, colVars=None, adjust=[], method='pearson', m
     N = pd.DataFrame(N.astype(int), index=rowVars, columns=colVars)
     return rho, pvalue, qvalue, N
 
-def crosscorr(dfA, dfB, method='pearson', minN=0, adjMethod='fdr_bh'):
+def crosscorr(dfA, dfB, method='pearson', minN=0, adjMethod='fdr_bh', returnLong=False):
     """Pairwise correlations between A and B after a join,
     when there are potential column name overlaps.
 
@@ -390,7 +390,16 @@ def crosscorr(dfA, dfB, method='pearson', minN=0, adjMethod='fdr_bh'):
 
     N.index = colA
     N.columns = colB
-    return rho, pvalue, qvalue, N
+
+    if returnLong:
+        resDf = pd.DataFrame([pair for pair in itertools.product(rho.index, rho.columns)], columns=['A', 'B'])
+        resDf.loc[:, 'rho'] = rho.values.ravel()
+        resDf.loc[:, 'N'] = N.values.ravel()
+        resDf.loc[:, 'pvalue'] = pvalue.values.ravel()
+        resDf.loc[:, 'qvalue'] = qvalue.values.ravel()
+        return resDf
+    else:
+        return rho, pvalue, qvalue, N
 
 
 def corrheatmap(df, rowVars=None, colVars=None, adjust=[], annotation=None, cutoff=None, cutoffValue=0.05, method='pearson', labelLookup={}, xtickRotate=True, labelSize='medium', minN=0, adjMethod='fdr_bh'):
