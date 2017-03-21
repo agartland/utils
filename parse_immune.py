@@ -26,10 +26,23 @@ def unstackIR(df, uVars):
     magDf = tmpDf.pivot(index='ptid', columns='var', values='mag')
 
     return responseDf, magDf
+def _parsePTID(v):
+    """Returns a string version of a PTID"""
+    if pd.isnull(v):
+        out = 'NA'
+    elif np.isreal(v):
+        out = '%1.0f' % v
+    else:
+        out = v
+    out = out.replace('-','')
+    if out[-2:] == '.0':
+        out = out[:-2]
+    return out
 
 def _parseIR(fn, uVars, mag, subset={}, printUnique=False):
     raw = pd.read_csv(fn, dtype={'ptid':str, 'Ptid':str}, skipinitialspace=True)
     raw = raw.rename_axis({'Ptid':'ptid'}, axis=1)
+    raw.loc[:, 'ptid'] = raw.loc[:, 'ptid'].map(_parsePTID)
     allCols = raw.columns.tolist()
     if uVars is None:
         uVars = raw.columns.drop(['ptid', 'response',mag]).tolist()

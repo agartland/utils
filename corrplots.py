@@ -395,8 +395,7 @@ def crosscorr(dfA, dfB, method='pearson', minN=0, adjMethod='fdr_bh', returnLong
 
     if returnLong:
         resDf = pd.DataFrame([pair for pair in itertools.product(rho.index, rho.columns)],
-                     columns=['Analyte', 'Gene'])
-
+                             columns=['A', 'B'])
         resDf.loc[:, 'rho'] = rho.values.ravel()
         resDf.loc[:, 'N'] = N.values.ravel()
         resDf.loc[:, 'pvalue'] = pvalue.values.ravel()
