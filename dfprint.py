@@ -2,6 +2,7 @@ import time
 import subprocess
 import os.path as op
 import pandas as pd
+import os
 
 __all__ = ['toPNG', 'toPDF']
 
@@ -25,7 +26,11 @@ def toPNG(df, outFn, dpi=200, **kwargs):
     else:
         si = None
 
-    subprocess.check_call(' '.join(cmd), shell=True, startupinfo=si)
+    subprocess.check_call(' '.join(cmd),
+                          shell=True,
+                          startupinfo=si,
+                          stdout=devnull,
+                          stderr=devnull)
 
 def toPDF(df,
           outFn,
@@ -97,10 +102,16 @@ def toPDF(df,
             # si.wShowWindow = subprocess.SW_HIDE # default
         except:
             si = None
-        cmd.insert(2,'-interaction=nonstopmode')
+        cmd.insert(2, '-interaction=nonstopmode')
     else:
         si = None
     
-    subprocess.call(cmd, startupinfo=si)
-    """Run latex twice to get the layout correct"""
-    subprocess.call(cmd, startupinfo=si)
+
+    devnull = open(os.devnull, 'w')
+    for i in range(2):
+        """Run latex twice to get the layout correct"""
+        subprocess.call(cmd,
+                        startupinfo=si,
+                        stdout=devnull,
+                        stderr=devnull)
+    devnull.close()
