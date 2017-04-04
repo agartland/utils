@@ -26,11 +26,14 @@ def toPNG(df, outFn, dpi=200, **kwargs):
     else:
         si = None
 
+    devnull = open(os.devnull, 'w')
     subprocess.check_call(' '.join(cmd),
                           shell=True,
                           startupinfo=si,
                           stdout=devnull,
                           stderr=devnull)
+    devnull.close()
+    removeAuxFiles(outFn)
 
 def toPDF(df,
           outFn,
@@ -115,3 +118,13 @@ def toPDF(df,
                         stdout=devnull,
                         stderr=devnull)
     devnull.close()
+    removeAuxFiles(outFn)
+
+def removeAuxFiles(outFn):
+    extensions = ['aux', 'log', 'tex']
+    for ext in extensions:
+        fn = outFn[:-3] + ext
+        try:
+            os.remove(fn)
+        except OSError:
+            pass

@@ -39,8 +39,8 @@ def _parsePTID(v):
         out = out[:-2]
     return out
 
-def _parseIR(fn, uVars, mag, subset={}, printUnique=False):
-    raw = pd.read_csv(fn, dtype={'ptid':str, 'Ptid':str}, skipinitialspace=True)
+def _parseIR(fn, uVars, mag, subset={}, printUnique=False, sep=','):
+    raw = pd.read_csv(fn, dtype={'ptid':str, 'Ptid':str}, skipinitialspace=True, sep=sep)
     raw = raw.rename_axis({'Ptid':'ptid'}, axis=1)
     raw.loc[:, 'ptid'] = raw.loc[:, 'ptid'].map(_parsePTID)
     allCols = raw.columns.tolist()

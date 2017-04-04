@@ -7,6 +7,7 @@ import palettable
 from plot_ellipse import plot_point_cov
 from sklearn.decomposition import KernelPCA, PCA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from kernel_regression import kernel2dist, dist2kernel
 
 import seaborn as sns
 sns.set(style='darkgrid', palette='muted', font_scale=1.5)
@@ -242,7 +243,7 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
     mxy = np.max(np.abs(xy[:,plotDims[1]]))
     scalar = min(mxx,mxy) * 0.8
     
-    if method in ['lda','pca']:
+    if method in ['lda','pca'] and False:
         """Project a unit vector for each feature, into the new space"""    
         arrowxy = pca.transform(np.diag(np.ones(df.shape[1])))
         mxarr = np.max(np.abs(arrowxy))

@@ -7,6 +7,7 @@ import sys
 import traceback
 
 def convert(path):
+    print path
     files = glob(path)
     print 'Converting %d files in %s' % (len(files), path)
     for f in files:
