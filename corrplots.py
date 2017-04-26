@@ -449,7 +449,7 @@ def corrheatmap(df, rowVars=None, colVars=None, adjust=[], annotation=None, cuto
     if cutoff is None:
         cutoff = 'pvalue'
 
-    rho,pvalue,qvalue = pwpartialcorr(df, rowVars=rowVars, colVars=colVars, adjust=adjust, method=method, minN=minN)
+    rho,pvalue,qvalue,N = pwpartialcorr(df, rowVars=rowVars, colVars=colVars, adjust=adjust, method=method, minN=minN)
    
     plt.clf()
     fh = plt.gcf()
@@ -498,7 +498,7 @@ def corrheatmap(df, rowVars=None, colVars=None, adjust=[], annotation=None, cuto
                 elif annotation == 'rho2':
                     ann = '%1.2f' % (rho.iloc[i,j] ** 2)
                 elif annotation == 'qvalue':
-                    if qvalue[i,j]>0.001:
+                    if qvalue.iloc[i,j]>0.001:
                         ann = '%1.3f' % qvalue.iloc[i,j]
                     else:
                         ann = '%1.1e' % qvalue.iloc[i,j]
