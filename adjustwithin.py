@@ -85,8 +85,12 @@ def adjustwithin(df, pCol, withinCols, method='holm'):
         else:
             return ser
     
-    gby = df[[pCol] + withinCols].groupby(withinCols)
+    if not len(withinCols) == 0:
+        gby = df[[pCol] + withinCols].groupby(withinCols)
 
-    adjDf = gby.transform(partial(_transformFunc, method=method))
-    adjDf = df.drop(pCol, axis=1).join(adjDf)
+        adjDf = gby.transform(partial(_transformFunc, method=method))
+        adjDf = df.drop(pCol, axis=1).join(adjDf)
+    else:
+        adjDf = df.copy()
+        adjDf.loc[:, pCol] = adjustnonnan(adjDf.loc[:, pCol], method=method)
     return adjDf

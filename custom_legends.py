@@ -4,7 +4,7 @@ import numpy as np
 __all__ = ['colorLegend',
            'symbolLegend']
            
-def colorLegend(colors, labels, alphas=None, edgecolor='black',loc='best', **legendKwargs):
+def colorLegend(colors, labels, alphas=None, edgecolor='black',loc='best', axh=None, **legendKwargs):
     """Custom matplotlib legend with colors and labels etc.
     Useful in cases where it is awkward to include labels on the appropriate plot() objects.
     Parameters specify the characteristics of each line in the legend.
@@ -18,11 +18,13 @@ def colorLegend(colors, labels, alphas=None, edgecolor='black',loc='best', **leg
 
     All remaining kwargs are passed to legend()
     """
+    if axh is None:
+        axh = plt.gca()
 
     if alphas is None:
         alphas = np.ones(len(colors))
     circles = (plt.Circle((0,0), fc=c, ec=edgecolor, alpha=a) for c,a in zip(colors,alphas))
-    lh = plt.legend(circles,
+    lh = axh.legend(circles,
                     labels,
                     loc=loc,
                     **legendKwargs)

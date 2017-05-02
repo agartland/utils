@@ -19,7 +19,8 @@ __all__ = ['plotHCluster',
             'mapColors2Labels',
             'computeDMat',
             'computeHCluster',
-            'plotBicluster']
+            'plotBicluster',
+            'labeledDendrogram']
 
 def clean_axis(ax):
     """Remove ticks, tick labels, and frame from axis"""
@@ -30,13 +31,16 @@ def clean_axis(ax):
     ax.grid(False)
     ax.set_axis_bgcolor('white')
 
-def mapColors2Labels(labels, setStr='Set3', cmap=None):
+def mapColors2Labels(labels, setStr='Set3', cmap=None, returnLookup=False):
     """Return pd.Series of colors based on labels"""
     if cmap is None:
         N = max(3,min(12,len(np.unique(labels))))
         cmap = palettable.colorbrewer.get_map(setStr,'Qualitative',N).mpl_colors
-    cmapLookup = {k:col for k,col in zip(sorted(np.unique(labels)),itertools.cycle(cmap))}
-    return labels.map(cmapLookup.get)
+    cmapLookup = {k:col for k,col in zip(sorted(np.unique(labels)), itertools.cycle(cmap))}
+    if returnLookup:
+        return labels.map(cmapLookup.get), cmapLookup
+    else:
+        return labels.map(cmapLookup.get)
 
 def computeDMat(df, metric=None, minN=1, dfunc=None):
     if dfunc is None:
@@ -551,3 +555,30 @@ class PairScatter:
             plt.cla()
             scatterfit(self.df.iloc[:,xind], self.df.iloc[:,yind], method = self.method, plotLine = True)
             self.scatterAx.figure.show()
+
+def labeledDendrogram(dmat, labels, method='complete', cmap=None):
+    """Perform hierarchical clustering on df columns and plot square heatmap of pairwise distances"""
+    """TODO: add tick labels, with sparsity option"""
+
+    Z = sch.linkage(dmat, method=method)
+    den = sch.dendrogram(Z, color_threshold=np.inf, no_plot=True)
+
+    figh = plt.gcf()
+    figh.clf()
+
+    denAX = figh.add_axes([0.32, 0.05, 0.6, 0.9])
+    cbAX =  figh.add_axes([0.25, 0.05, 0.05, 0.9])
+
+    plt.sca(denAX)
+    denD = sch.dendrogram(Z, color_threshold=np.inf, orientation='right')
+    ind = denD['leaves']
+    clean_axis(denAX)
+    
+    cbSE,lookup = mapColors2Labels(labels, cmap=cmap, returnLookup=True)
+    axi = cbAX.imshow([[x] for x in cbSE.iloc[ind].values],
+                      interpolation='nearest',
+                      aspect='auto',
+                      origin='lower')
+    clean_axis(cbAX)
+
+    colorLegend(lookup.values(), lookup.keys(), axh=denAX)

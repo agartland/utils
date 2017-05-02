@@ -158,8 +158,12 @@ def plotEmbedding(dmatDf,
     if len(uLabels) > 1 and plotLegend:
         plt.legend(loc=0)
         # colorLegend(colors[:len(uLabels)], uLabels)
-    plt.xlabel('KPCA %1.0f (%1.0f%% variance explained)' % (plotDims[0]+1, 100*xyDf.explained_variance_[plotDims[0]]))
-    plt.ylabel('KPCA %1.0f (%1.0f%% variance explained)' % (plotDims[1]+1, 100*xyDf.explained_variance_[plotDims[1]]))
+    if hasattr(xyDf, 'explained_variance_'):
+        plt.xlabel('KPCA %1.0f (%1.0f%% variance explained)' % (plotDims[0]+1, 100*xyDf.explained_variance_[plotDims[0]]))
+        plt.ylabel('KPCA %1.0f (%1.0f%% variance explained)' % (plotDims[1]+1, 100*xyDf.explained_variance_[plotDims[1]]))
+    else:
+        plt.xlabel('KPCA %1.0f' % (plotDims[0]+1))
+        plt.ylabel('KPCA %1.0f' % (plotDims[1]+1))
     plt.show()
     return xyDf
 
