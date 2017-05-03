@@ -3,6 +3,7 @@ import subprocess
 import os.path as op
 import pandas as pd
 import os
+from functools import partial
 
 __all__ = ['toPNG', 'toPDF']
 
@@ -58,12 +59,17 @@ def toPDF(df,
     
     if type(df) is pd.Series:
         df = pd.DataFrame(df)
-
+    def repChar(s, c1, c2):
+        if not isinstance(s, basestring):
+            return s
+        else:
+            return s.replace(c1, c2)
     if not df.empty:
-        repUnderscore = lambda s: s if not isinstance(s, basestring) else s.replace('_','-')
-        df = df.applymap(repUnderscore)
-        df = df.rename_axis(repUnderscore, axis=0)
-        df = df.rename_axis(repUnderscore, axis=1)
+        for func in [partial(repChar, c1='_', c2='-'),
+                     partial(repChar, c1='%', c2='PCT')]:
+            df = df.applymap(func)
+            df = df.rename_axis(func, axis=0)
+            df = df.rename_axis(func, axis=1)
 
     texFn = outFn[:-3] + 'tex'
     header = [u'\\documentclass[10pt]{article}',
