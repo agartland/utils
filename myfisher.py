@@ -7,6 +7,7 @@ But falls back to the scipy test if it cannot be found
 
 from __future__ import division
 import numpy as np
+from copy import deepcopy
 
 __all__ = ['fisherTest','fisherTestVec','fisherPD']
 
@@ -136,7 +137,7 @@ def fisherPD(df, cols, alternative='two-sided'):
     OR : float
     p : float"""
 
-    df = deepcopy(df[cols]).dropna()
+    df = df[cols].dropna()
     uCols = [np.unique(df[c]) for c in cols]
     assert len(uCols[0]) == 2
     assert len(uCols[1]) == 2
