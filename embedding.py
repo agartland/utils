@@ -26,7 +26,7 @@ __all__ = [ 'embedDistanceMatrix',
 def embedDistanceMatrix(dmatDf, method='kpca', n_components=2):
     """Two-dimensional embedding of sequence distances in dmatDf,
     returning Nx2 x,y-coords: tsne, isomap, pca, mds, kpca, sklearn-tsne"""
-    if type(dmatDf) is pd.DataFrame:
+    if isinstance(dmatDf, pd.DataFrame):
         dmat = dmatDf.values
     else:
         dmat = dmatDf
@@ -48,7 +48,7 @@ def embedDistanceMatrix(dmatDf, method='kpca', n_components=2):
         xy = rot.fit_transform(xy)
     elif method == 'pca':
         pcaObj = PCA(n_components=None)
-        xy = pcaObj.fit_transform(dmat)[:,:n_components]
+        xy = pcaObj.fit_transform(dmat)[:, :n_components]
     elif method == 'kpca':
         pcaObj = KernelPCA(n_components=dmat.shape[0], kernel='precomputed', eigen_solver='dense')
         try:
@@ -56,7 +56,7 @@ def embedDistanceMatrix(dmatDf, method='kpca', n_components=2):
         except:
             print('Could not convert dmat to kernel for KernelPCA; using 1 - dmat/dmat.max() instead')
             gram = 1 - dmat / dmat.max()
-        xy = pcaObj.fit_transform(gram)[:,:n_components]
+        xy = pcaObj.fit_transform(gram)[:, :n_components]
     elif method == 'lle':
         lle = manifold.LocallyLinearEmbedding(n_neighbors=30, n_components=n_components, method='standard')
         xy = lle.fit_transform(dist)
@@ -68,7 +68,7 @@ def embedDistanceMatrix(dmatDf, method='kpca', n_components=2):
         return
 
     assert xy.shape[0] == dmatDf.shape[0]
-    xyDf = pd.DataFrame(xy[:,:n_components], index=dmatDf.index, columns=np.arange(n_components))
+    xyDf = pd.DataFrame(xy[:, :n_components], index=dmatDf.index, columns=np.arange(n_components))
     if method == 'kpca':
         """Not sure how negative eigenvalues should be handled here, but they are usually
         small so it shouldn't make a big difference"""
@@ -84,7 +84,7 @@ def computePWDist(df, metric='pearson-signed', dfunc=None, minN=10):
             dmat[np.isnan(dmat)] = 1.
         elif metric in ['spearman-signed', 'pearson-signed']:
             """Anti-correlations are considered as dissimilar and will NOT cluster together"""
-            dmat = ((1 - df.T.corr(method=metric.replace('-signed',''), min_periods=minN).values) / 2.)
+            dmat = ((1 - df.T.corr(method=metric.replace('-signed', ''), min_periods=minN).values) / 2.)
             dmat[np.isnan(dmat)] = 1.
         else:
             try:
@@ -99,14 +99,14 @@ def computePWDist(df, metric='pearson-signed', dfunc=None, minN=10):
             for j in range(nrows):
                 """Assume distance is symetric"""
                 if i <= j:
-                    tmpdf = df.iloc[:,[i,j]]
+                    tmpdf = df.iloc[:, [i, j]]
                     tmpdf = tmpdf.dropna()
                     if tmpdf.shape[0] >= minN:
-                        d = dfunc(df.iloc[:,i], df.iloc[:,j])
+                        d = dfunc(df.iloc[:, i], df.iloc[:, j])
                     else:
                         d = np.nan
-                    dmat[i,j] = d
-                    dmat[j,i] = d
+                    dmat[i, j] = d
+                    dmat[j, i] = d
     return pd.DataFrame(dmat, columns=df.index, index=df.index)
 
 def plotEmbedding(dmatDf,
@@ -150,8 +150,8 @@ def plotEmbedding(dmatDf,
                      colors=colors)
    
     if plotLabels:
-        annotationParams = dict(xytext=(0,5), textcoords='offset points', size=txtSize)
-        for coli,col in enumerate(dmatDf.columns):
+        annotationParams = dict(xytext=(0, 5), textcoords='offset points', size=txtSize)
+        for coli, col in enumerate(dmatDf.columns):
             if plotLabels:
                 axh.annotate(col, xy=(xyDf.loc[col, plotDims[0]], xyDf.loc[col, plotDims[1]]), **annotationParams)
 
@@ -188,7 +188,7 @@ def clusteredScatter(xyDf,
     if colors is None:
         nColors = min(max(len(uLabels), 3), 9)
         colors = palettable.colorbrewer.get_map('Set1', 'Qualitative', nColors).mpl_colors
-    elif type(colors) is pd.Series:
+    elif isinstance(colors, pd.Series):
         colors = colors[uLabels].values
 
     figh = plt.gcf()
@@ -198,7 +198,7 @@ def clusteredScatter(xyDf,
     # axh.axis('off')
     figh.patch.set_facecolor('white')
 
-    for vi,v in enumerate(uLabels):
+    for vi, v in enumerate(uLabels):
         ind = (labels == v)
         plt.scatter(xyDf.loc[ind, plotDims[0]],
                     xyDf.loc[ind, plotDims[1]],

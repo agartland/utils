@@ -16,7 +16,7 @@ class SeparateData(object):
         for attr in dir(self):
             if attr in skip:
                 pass
-            elif hasattr(self.__getattribute__(attr),'__call__'):
+            elif hasattr(self.__getattribute__(attr), '__call__'):
                 pass
             elif attr[:2] == '__':
                 pass
@@ -27,20 +27,20 @@ class SeparateData(object):
         return out
     def from_dict(self,d,special={},kwargs={}):
         for k in list(kwargs.keys()):
-            self.__setattr__(k,kwargs[k])
+            self.__setattr__(k, kwargs[k])
         for k in list(d.keys()):
             if not k in list(special.keys()):
-                self.__setattr__(k,d[k])
+                self.__setattr__(k, d[k])
             else:
-                self.__setattr__(k,special[k](d[k]))
-    def saveFile(self,filename):
-        with open(filename,'wb') as filehandle:
-            pickle.dump(self.to_dict(),filehandle)
+                self.__setattr__(k, special[k](d[k]))
+    def saveFile(self, filename):
+        with open(filename, 'wb') as filehandle:
+            pickle.dump(self.to_dict(), filehandle)
     def loadFile(self,filename,**kwargs):
-        with open(filename,'rb') as filehandle:
+        with open(filename, 'rb') as filehandle:
             obj = pickle.load(filehandle)
-        self.from_dict(obj,kwargs=kwargs)
-    def fromOldInstance(self,old):
+        self.from_dict(obj, kwargs=kwargs)
+    def fromOldInstance(self, old):
         self.from_dict(old.to_dict(skip=[]))
 
 def test_SD():
@@ -51,31 +51,31 @@ def test_SD():
     class SDSub(SeparateData):
         def __init__(self):
             self.keep1 = rand(3)
-            self.keep2 = [1,2,3]
-            self.keep3 = pd.DataFrame(rand(2,3))
+            self.keep2 = [1, 2, 3]
+            self.keep3 = pd.DataFrame(rand(2, 3))
 
             self.skip1 = rand(2)
-            self.skip2 = [8,9,10]
+            self.skip2 = [8, 9, 10]
 
     s = SDSub()
     out = s.to_dict()
-    out_skipped = s.to_dict(skip=['skip1','skip2'])
+    out_skipped = s.to_dict(skip=['skip1', 'skip2'])
 
     s2 = SDSub()
     #print s2.keep1,s2.skip1
     s2.from_dict(out_skipped)
     #print s2.keep1,s2.skip1
-    s2.from_dict(out,kwargs=dict(skip1=rand(4),skip2=[10,11]))
+    s2.from_dict(out, kwargs=dict(skip1=rand(4), skip2=[10, 11]))
     #print s2.keep1,s2.skip1
 
     fn = tempfile.mktemp()
     s.saveFile(fn)
     fn_skip = tempfile.mktemp()
-    s.saveFile(fn_skip,skip=['skip1','skip2'])
+    s.saveFile(fn_skip, skip=['skip1', 'skip2'])
 
     s3 = SDSub()
     #print s3.keep1,s3.skip1
     s3.loadFile(fn_skip)
     #print s3.keep1,s3.skip1
-    s3.loadFile(fn,skip1=rand(4),skip2=[10,11])
+    s3.loadFile(fn, skip1=rand(4), skip2=[10, 11])
     #print s3.keep1,s3.skip1

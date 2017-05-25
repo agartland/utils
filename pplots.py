@@ -13,11 +13,11 @@ def mapColors2Labels(labels, setStr='Set3', cmap=None):
         N = max(3, min(12, len(np.unique(labels))))
         # cmap = palettable.colorbrewer.get_map(setStr, 'Qualitative', N).mpl_colors
         """Use B+W colormap"""
-    cmapLookup = {k:col for k,col in zip(sorted(np.unique(labels)), itertools.cycle(cmap))}
+    cmapLookup = {k:col for k, col in zip(sorted(np.unique(labels)), itertools.cycle(cmap))}
     return labels.map(cmapLookup.get)
 
 def plotResultSummary(resDf, index, columns,
-                      stat=('stat','Rho'),
+                      stat=('stat', 'Rho'),
                       qvalue='qvalue',
                       pvalue='pvalue',
                       include=('pvalue', 0.05),
@@ -36,7 +36,7 @@ def plotResultSummary(resDf, index, columns,
         statlabel = stat
 
     includeInd = resDf[include[0]] <= include[1]
-    tmp = resDf.loc[includeInd, :]
+    tmp = resDf.loc[includeInd,:]
     
     if not minColumns is None:
         """Exclude rows that don't have at least two columns not censored,
@@ -45,7 +45,7 @@ def plotResultSummary(resDf, index, columns,
         gbMin = tmp[[index, star[0]]].groupby(index).agg(min)
         keepIndex = gbN.index[(gbN[pvalue] >= minColumns) | (gbMin[star[0]] <= star[1][0])]
         includeInd = tmp[index].isin(keepIndex)
-        tmp = tmp.loc[includeInd, :]
+        tmp = tmp.loc[includeInd,:]
     
     qH = tmp.pivot(index=index, columns=columns, values=qvalue)
     qH = qH.fillna(1)
@@ -98,7 +98,7 @@ def plotResultSummary(resDf, index, columns,
         left = 0.15
     gs = plt.GridSpec(1, nPanels, left=left, bottom=0.02, right=0.95, top=0.95, wspace=0.3)
     for i in range(nPanels):
-        tmp = {k:v.iloc[int(splitN*i) : int((i+1) * splitN)] for k,v in list(pdata.items())}
+        tmp = {k:v.iloc[int(splitN*i) : int((i+1) * splitN)] for k, v in list(pdata.items())}
         axh = figh.add_subplot(gs[0, i])
         axh.grid(None)
         pcolOut = plt.pcolormesh(tmp[stat].values, **pcParams)
@@ -113,8 +113,8 @@ def plotResultSummary(resDf, index, columns,
         
         axh.invert_yaxis()
 
-    for rowi,row in enumerate(tmp[star[0]].index):
-        for coli,col in enumerate(tmp[star[0]].columns):
+    for rowi, row in enumerate(tmp[star[0]].index):
+        for coli, col in enumerate(tmp[star[0]].columns):
             numStars = (tmp[star[0]].loc[row, col] < np.array(star[1])).sum()
             #ann = unichr(0x204e) * numStars
             ann = '+' * numStars
@@ -128,7 +128,7 @@ def plotResultSummary(resDf, index, columns,
     """Scale colorbar"""
     if scalebar:
         scaleLabel = statLabel
-        scaleAxh = figh.add_subplot(plt.GridSpec(1, 1, left=0.1, bottom=0.80, right=0.2, top=0.98)[0,0])
+        scaleAxh = figh.add_subplot(plt.GridSpec(1, 1, left=0.1, bottom=0.80, right=0.2, top=0.98)[0, 0])
         cb = figh.colorbar(pcolOut, cax=scaleAxh)
         cb.set_label(scaleLabel, size=tickSz)
         # cb.ax.set_yticklabels(ytl, fontsize=8)

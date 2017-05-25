@@ -12,7 +12,7 @@ __all__ = ['needleall',
            'skbio2align']
 
 def align2skbio(align):
-    return skbio.TabularMSA([Sequence(s, metadata=dict(id=str(i))) for i,s in align.items()])
+    return skbio.TabularMSA([Sequence(s, metadata=dict(id=str(i))) for i, s in align.items()])
 
 def skbio2align(seqColl):
     return pd.Series({s.metadata['id']:''.join(s.values) for s in seqColl})
@@ -51,12 +51,12 @@ def needleall(seqsA, seqsB=None, gop=5, gep=2):
         inBFn = inAFn
     outFn = tempfile.mktemp(prefix='tmp_results', suffix='.needleall', dir='.')
         
-    if not type(seqsA) is pd.Series:
+    if not isinstance(seqsA, pd.Series):
         alignA = pd.Series(seqsA)
     else:
         alignA = seqsA
 
-    if not seqsB is None and not type(seqsB) is pd.Series:
+    if not seqsB is None and not isinstance(seqsB, pd.Series):
         alignB = pd.Series(seqsB)
     elif not seqsB is None:
         alignB = seqsB

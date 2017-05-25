@@ -14,16 +14,16 @@ def assembleOverlappingPeptides(pepArr,overlap=11):
     overlapping 15mers..."""
     assembled = [pep for pep in pepArr]
     while len(assembled)>1:
-        for pepi1,pepi2 in itertools.combinations(arange(len(assembled)),2):
-            pep1,pep2 = assembled[pepi1],assembled[pepi2]
-            res = pairwise2.align.globalxs(pep2,pep1,-4,0)[0]
+        for pepi1, pepi2 in itertools.combinations(arange(len(assembled)), 2):
+            pep1, pep2 = assembled[pepi1], assembled[pepi2]
+            res = pairwise2.align.globalxs(pep2, pep1, -4, 0)[0]
             #print res[2]
             if res[2]>=overlap-8:
                 #print res[0]
                 #print res[1]
 
                 _ = assembled.pop(pepi2)
-                assembled[pepi1] = ''.join([aa1 if not aa1=='-' else aa2 for aa1,aa2 in zip(res[0],res[1])])
+                assembled[pepi1] = ''.join([aa1 if not aa1=='-' else aa2 for aa1, aa2 in zip(res[0], res[1])])
                 #print assembled[pepi1]
                 #print
                 break
@@ -41,7 +41,7 @@ def _assembleTwo(seq1, seq2):
                                        substitution_matrix=ident)
         if msa[1] >= 8:
             try:
-                (s1,e1),(s2,e2) = msa[-1]
+                (s1, e1), (s2, e2) = msa[-1]
             except:
                 print(msa)
 
@@ -92,8 +92,8 @@ if __name__ == '__main__':
                     errors += 1
             if errors > 0:
                 print(row['Peptide Id'], pep)
-        for i,aa in enumerate(out):
-            if type(aa) is int:
+        for i, aa in enumerate(out):
+            if isinstance(aa, int):
                 out[i] = '-'
         fullSeq = ''.join(out)
     elif args.useOverlap:

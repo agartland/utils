@@ -4,7 +4,7 @@ __all__ = ['optimalBins', 'optimalBinSize']
 
 def optimalBinSize(x):
     """Returns the optimal bin size for data in x"""
-    interquartile = np.diff(np.prctile(x,[25,75]))
+    interquartile = np.diff(np.prctile(x, [25, 75]))
     return 2. * interquartile * len(x)**(-1./3)
 
 def optimalBins(x,factor=1):

@@ -72,15 +72,15 @@ def kreg_perm(y, Ks, X=None, binary=True, nperms=9999, seed=110820, returnPerms=
     s2 = (1. / (n-p)) * np.sum(resid**2.)
 
     np.random.seed(seed)
-    if type(Ks) is list:
+    if isinstance(Ks, list):
         """If there are multiple kernels then use a min-P omnibus test"""
-        Ks = [K.values if type(K) is pd.DataFrame else K for K in Ks]
+        Ks = [K.values if isinstance(K, pd.DataFrame) else K for K in Ks]
 
         obsQ = np.array([computeQ(K, resid, s2) for K in Ks])[None,:]
         randQ = np.nan * np.zeros((nperms, len(Ks)))
         for permi in range(nperms):
             rind = np.random.permutation(n)
-            randQ[permi, :] = [computeQ(K[:, rind][rind, :], resid, s2) for K in Ks]
+            randQ[permi,:] = [computeQ(K[:, rind][rind,:], resid, s2) for K in Ks]
         
         Qall = np.concatenate((obsQ, randQ), axis=0)
         pall = np.zeros(Qall.shape)
@@ -91,14 +91,14 @@ def kreg_perm(y, Ks, X=None, binary=True, nperms=9999, seed=110820, returnPerms=
         pGlobal = argrank(minPall)[0] / (nperms + 1.)
         return pGlobal, pIndivid
     else:
-        if type(Ks) is pd.DataFrame:
+        if isinstance(Ks, pd.DataFrame):
             Ks = Ks.values
 
         obsQ = computeQ(Ks, resid, s2)
         randQ = np.nan * np.zeros(nperms)
         for permi in range(nperms):
             rind = np.random.permutation(n)
-            randQ[permi] = computeQ(Ks[:, rind][rind, :], resid, s2)
+            randQ[permi] = computeQ(Ks[:, rind][rind,:], resid, s2)
         pvalue = (np.sum(randQ > obsQ) + 1.) / (nperms + 1.)
         if returnPerms:
             return pvalue, obsQ, randQ
@@ -145,7 +145,7 @@ def computeKregStat(y, Ks, X=None, binary=True):
     """Squared standard error of the parameters (i.e. Beta_se)"""
     s2 = float(result.bse**2)
 
-    if type(K) is pd.DataFrame:
+    if isinstance(K, pd.DataFrame):
         K = K.values
 
     Q = np.linalg.multi_dot((resid/s2, K, resid))
@@ -188,10 +188,10 @@ def dist2kernel(dmat):
     n = dmat.shape[0]
     I = np.identity(n)
     """m = I - dot(1,1')/n"""
-    m = I - np.ones((n,n))/float(n)
+    m = I - np.ones((n, n))/float(n)
     kern = -0.5 * np.linalg.multi_dot((m, dmat**2, m))
 
-    if type(dmat) is pd.DataFrame:
+    if isinstance(dmat, pd.DataFrame):
         return pd.DataFrame(kern, index=dmat.index, columns=dmat.columns)
     else:
         return kern
@@ -252,8 +252,8 @@ def computePWDist(series1, series2, dfunc, symetric=True):
             if symetric:
                 if i <= j:
                     d = dfunc(series1.iloc[i], series2.iloc[j])
-                    dmat[i,j] = d
-                    dmat[j,i] = d
+                    dmat[i, j] = d
+                    dmat[j, i] = d
             else:
-                dmat[i,j] = dfunc(series1.iloc[i], series2.iloc[j])
+                dmat[i, j] = dfunc(series1.iloc[i], series2.iloc[j])
     return pd.DataFrame(dmat, columns=series2.index, index=series1.index)

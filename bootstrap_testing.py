@@ -29,18 +29,18 @@ def permTwoSampTest(vec1,vec2,statFunc=None,nPerms=10000):
     Optionally specify statFunc for other comparisons."""
     L1=len(vec1)
     L2=len(vec2)
-    data=np.concatenate((array(vec1),array(vec2)))
+    data=np.concatenate((array(vec1), array(vec2)))
     L=len(data)
     assert L==(L1+L2)
 
     if statFunc is None:
-        statFunc = lambda v1,v2: mean(v1)-mean(v2)
+        statFunc = lambda v1, v2: mean(v1)-mean(v2)
 
     samples = np.zeros(nPerms)
     for sampi in np.arange(nPerms):
         inds = permutation(L)
-        samples[sampi] = statFunc(data[inds[:L1]],data[inds[L1:]])
-    return (abs(samples)>abs(statFunc(vec1,vec2))).sum()/nPerms
+        samples[sampi] = statFunc(data[inds[:L1]], data[inds[L1:]])
+    return (abs(samples)>abs(statFunc(vec1, vec2))).sum()/nPerms
 
 def bootstrapTwoSampTest(vec1,vec2,statFunc=None,nPerms=10000):
     """Uses a bootstrap to calculate a p-value for a
@@ -55,19 +55,19 @@ def bootstrapTwoSampTest(vec1,vec2,statFunc=None,nPerms=10000):
     if statFunc is None:
         """Use studentized statistic with pooled variance instead for more accuracy
         (but assumes equal variances)"""
-        statFunc = lambda v1,v2: (mean(v1)-mean(v2)) / (sqrt((sum((v1-mean(v1))**2) + sum((v2-mean(v2))**2))/(L1+L2-2)) * sqrt(1/L1+1/L2))
+        statFunc = lambda v1, v2: (mean(v1)-mean(v2)) / (sqrt((sum((v1-mean(v1))**2) + sum((v2-mean(v2))**2))/(L1+L2-2)) * sqrt(1/L1+1/L2))
         #statFunc = lambda v1,v2: mean(v1)-mean(v2)
 
     samples = np.zeros(nPerms)
     for sampi in np.arange(nPerms):
-        inds = randint(L,size=L)
-        samples[sampi] = statFunc([data[i] for i in inds[:L1]],[data[i] for i in inds[L1:]])
-    return (abs(samples)>abs(statFunc(vec1,vec2))).sum()/nPerms
+        inds = randint(L, size=L)
+        samples[sampi] = statFunc([data[i] for i in inds[:L1]], [data[i] for i in inds[L1:]])
+    return (abs(samples)>abs(statFunc(vec1, vec2))).sum()/nPerms
 
 def bootstrapPairedTwoSampTest(vec1,vec2,nPerms=10000):
     """Uses a bootstrap to calculate a p-value for a
     two sample paired test of H0: mean(vec1-vec2) != 0"""
-    return bootstrapOneSampTest(vec1-vec2,nv=0,nPerms=nPerms)
+    return bootstrapOneSampTest(vec1-vec2, nv=0, nPerms=nPerms)
 
 def bootstrapOneSampTest(data,nv=0,nullTranslation=None,statFunc=None,nPerms=10000):
     """Uses a bootstrap to calculate a p-value for a
@@ -85,7 +85,7 @@ def bootstrapOneSampTest(data,nv=0,nullTranslation=None,statFunc=None,nPerms=100
     nullDist = nullTranslation(data)
     samples = np.zeros(nPerms)
     for sampi in np.arange(nPerms):
-        inds = randint(L,size=L)
+        inds = randint(L, size=L)
         samples[sampi] = statFunc([nullDist[i] for i in inds])
     return (np.abs(samples)>np.abs(statFunc(data))).sum()/nPerms
 def bootstrapPvalue(data,statFunc,alpha=0.05,nPerms=10000,returnNull=False):
@@ -100,10 +100,10 @@ def bootstrapPvalue(data,statFunc,alpha=0.05,nPerms=10000,returnNull=False):
     
     pvalues = np.zeros(nPerms)
     for sampi in np.arange(nPerms):
-        inds = randint(L,size=L)
+        inds = randint(L, size=L)
         pvalues[sampi] = statFunc([data[i] for i in inds])
     if returnNull:
-        return (pvalues>alpha).sum()/nPerms,pvalues
+        return (pvalues>alpha).sum()/nPerms, pvalues
     else:
         return (pvalues>alpha).sum()/nPerms
 
@@ -116,10 +116,10 @@ def bootstrapGeneral(data,nv=0,statFunc=np.mean,nPerms=10000,returnNull=False):
     
     samples = np.zeros(nPerms)
     for sampi in np.arange(nPerms):
-        inds = randint(L,size=L)
+        inds = randint(L, size=L)
         samples[sampi] = statFunc([data[i] for i in inds])
     if returnNull:
-        return 2*(samples<nv).sum()/nPerms,samples
+        return 2*(samples<nv).sum()/nPerms, samples
     else:
         return 2*(samples<nv).sum()/nPerms
 
@@ -128,7 +128,7 @@ def bootstrapSE(data,statFunc,nPerms=1000):
     L = len(data)
     samples = np.zeros(nPerms)
     for sampi in np.arange(nPerms):
-        inds = randint(L,size=L)
+        inds = randint(L, size=L)
         samples[sampi] = statFunc([data[i] for i in inds])
     return samples.std()
     

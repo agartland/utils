@@ -11,7 +11,7 @@ __all__ = ['parseICS',
            'icsTickLabels']
 
 icsTicks = np.log10([0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1])
-icsTickLabels = ['0.01','0.025', '0.05', '0.1','0.25','0.5','1']
+icsTickLabels = ['0.01', '0.025', '0.05', '0.1', '0.25', '0.5', '1']
 # icsTicks = np.log10([0.01, 0.025, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1])
 #icsTickLabels = ['0.01','0.025', '0.05', '0.1','0.2','0.4','0.6','0.8', '1']
 
@@ -41,7 +41,7 @@ def _parsePTID(v):
         out = '%1.0f' % v
     else:
         out = v
-    out = out.replace('-','')
+    out = out.replace('-', '')
     if out[-2:] == '.0':
         out = out[:-2]
     return out
@@ -52,7 +52,7 @@ def _parseIR(fn, uVars, mag, subset={}, printUnique=False, sep=','):
     raw.loc[:, 'ptid'] = raw.loc[:, 'ptid'].map(_parsePTID)
     allCols = raw.columns.tolist()
     if uVars is None:
-        uVars = raw.columns.drop(['ptid', 'response',mag]).tolist()
+        uVars = raw.columns.drop(['ptid', 'response', mag]).tolist()
 
     if printUnique:
         for v in uVars:
@@ -64,7 +64,7 @@ def _parseIR(fn, uVars, mag, subset={}, printUnique=False, sep=','):
         return
 
     cols = []        
-    for c in ['ptid','response']:
+    for c in ['ptid', 'response']:
         if c in allCols and not c in uVars:
             cols = cols + [c]
     cols = cols + uVars + ['mag']
@@ -73,7 +73,7 @@ def _parseIR(fn, uVars, mag, subset={}, printUnique=False, sep=','):
 
     """Keep rows that have one of the values in v for column k,
     for every key/value in subset dict"""
-    for k,v in list(subset.items()):
+    for k, v in list(subset.items()):
         raw = raw.loc[raw[k].isin(v)]
     
     ptids = raw['ptid'].unique().shape[0]
@@ -90,7 +90,7 @@ def _parseIR(fn, uVars, mag, subset={}, printUnique=False, sep=','):
     """What about dropping the negative controls?"""
     return raw[cols]
 
-def parseICS(fn, uVars=['visitno','tcellsub','cytokine','antigen'], mag='pctpos_adj', subset={}, printUnique=False):
+def parseICS(fn, uVars=['visitno', 'tcellsub', 'cytokine', 'antigen'], mag='pctpos_adj', subset={}, printUnique=False):
     """Parse a processed ICS file.
     Returns one row per response, subsetting on subset values."""
     out = _parseIR(fn, uVars, mag, subset=subset, printUnique=printUnique)
@@ -100,7 +100,7 @@ def parseICS(fn, uVars=['visitno','tcellsub','cytokine','antigen'], mag='pctpos_
         out['mag'] = np.log10(out.mag)
     return out
 
-def parseBAMA(fn, uVars=['isotype','antigen'], mag='delta', subset={}, printUnique=False):
+def parseBAMA(fn, uVars=['isotype', 'antigen'], mag='delta', subset={}, printUnique=False):
     #cols = ['protocol','ptid','antigen','response','delta','rx_code','antigen_label','visitno']
     out = _parseIR(fn, uVars, mag, subset=subset, printUnique=printUnique)
     if not printUnique:
@@ -109,7 +109,7 @@ def parseBAMA(fn, uVars=['isotype','antigen'], mag='delta', subset={}, printUniq
         out['mag'] = np.log10(out.mag)
     return out
 
-def parseNAB(fn, uVars=['celltype','virusdilution','isolate'], mag='titer_num', subset={}, printUnique=False):
+def parseNAB(fn, uVars=['celltype', 'virusdilution', 'isolate'], mag='titer_num', subset={}, printUnique=False):
     out = _parseIR(fn, uVars, mag, subset=subset, printUnique=printUnique)
     if not printUnique:
         out['mag'] = np.log10(out.mag)
@@ -122,15 +122,15 @@ def parseRx(rxFn, demFn=None):
     trtDf = tmp[trtCols].set_index('ptid')
     
     if not  demFn is None:
-        demCols = ['ptid','site','sex']
+        demCols = ['ptid', 'site', 'sex']
         demDf = pd.read_csv(demFn)
         #demDf['ptid'] = demDf.Ptid
         siteLists = dict(US = [121, 125, 126, 123, 127, 128, 129, 132, 133, 134, 167],
                         ZA = [138, 156, 157],
                         Lausanne = [168],
-                        Peru = [150,621])
+                        Peru = [150, 621])
         siteTranslation = {}
-        for k,v in list(siteLists.items()):
+        for k, v in list(siteLists.items()):
             siteTranslation.update({n:k for n in v})
         demDf['site'] = demDf.DEMsitei.map(siteTranslation.get)
         demDf['sex'] = demDf.DEMsex

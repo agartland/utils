@@ -54,11 +54,11 @@ def rejectionSampling(envPDF, envRV, targetPDF, n):
         if allDraws is None:
             allDraws = targetPr/envPr
         else:
-            allDraws = np.concatenate((allDraws,targetPr/envPr))
+            allDraws = np.concatenate((allDraws, targetPr/envPr))
         
         """Estimate the acceptance probability"""
         acceptanceProbability = allDraws.mean()
         
         i += actualN
     
-    return arr,acceptanceProbability
+    return arr, acceptanceProbability

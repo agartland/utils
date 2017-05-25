@@ -41,7 +41,7 @@ def generateNormalCorr(N, k, C, method='numpy'):
    
     return R
 
-def induceRankCorr(R,Cstar):
+def induceRankCorr(R, Cstar):
     """Induces rank correlation Cstar onto a sample R [N x k].
     Note that it is easy to specify correlations that are not possible to generate.
     Results generated with a given Cstar should be checked.
@@ -68,7 +68,7 @@ def induceRankCorr(R,Cstar):
     #erfcinv = lambda x: -stats.norm.ppf(x/2)/sqrt(2)
 
     C = Cstar
-    N,k = R.shape
+    N, k = R.shape
     """Calculate the sample correlation matrix T"""
     T = np.corrcoef(R.T)
 
@@ -92,14 +92,14 @@ def induceRankCorr(R,Cstar):
     
     """Match up the rank pairing in R according to RBstar"""
     ranks = _columnRanks(RBstar)
-    sortedR = np.sort(R,axis=0)
+    sortedR = np.sort(R, axis=0)
     corrR = np.zeros(R.shape)
     for j in np.arange(k):
-        corrR[:,j] = sortedR[ranks[:,j],j]
+        corrR[:, j] = sortedR[ranks[:, j], j]
 
     return corrR
 
-def generateBinVars(p,N):
+def generateBinVars(p, N):
     """Generate random binary variables with specified correlation
 
     "A simple method for generating correlated binary variates."
@@ -129,8 +129,8 @@ def generateBinVars(p,N):
     def alphaFunc(p):
         q = 1-p
         d = np.diag(q)/np.diag(p)
-        imat = np.tile(d.reshape((1,p.shape[0])),(p.shape[0],1))
-        jmat = np.tile(d.reshape((p.shape[0],1)),(1,p.shape[0]))
+        imat = np.tile(d.reshape((1, p.shape[0])), (p.shape[0], 1))
+        jmat = np.tile(d.reshape((p.shape[0], 1)), (1, p.shape[0]))
        
         ijmat = np.log(1 + p*np.sqrt(imat*jmat))
         dind = np.diag_indices(p.shape[0])
@@ -151,9 +151,9 @@ def generateBinVars(p,N):
         ana[ana==0] = nan
         #print ana
       
-        rs = list(np.unravel_index(np.nanargmin(ana),a.shape))
+        rs = list(np.unravel_index(np.nanargmin(ana), a.shape))
         mn = np.nanmin(ana)
-        if ana[rs[0],rs[0]] == 0 or ana[rs[1],rs[1]] == 0:
+        if ana[rs[0], rs[0]] == 0 or ana[rs[1], rs[1]] == 0:
             break
         betaL.append(mn)
         rsL.append(rs)
@@ -161,23 +161,23 @@ def generateBinVars(p,N):
 
         rs = set(rs)
         for i in range(a.shape[0]):
-            if np.all(ana[list(rs),i]>0):
+            if np.all(ana[list(rs), i]>0):
                 rs.add(i)
         slL.append(rs)
         #print rs
 
         for i in rs:
             for j in rs:
-                ana[i,j] = ana[i,j]-mn
+                ana[i, j] = ana[i, j]-mn
 
     poissonVars = []
     for b in betaL:
-        poissonVars.append(stats.poisson.rvs(b,size=(N,)))
-    Y = np.zeros((N,a.shape[0]))
+        poissonVars.append(stats.poisson.rvs(b, size=(N,)))
+    Y = np.zeros((N, a.shape[0]))
     for i in range(Y.shape[1]):
-        for sl,pv in zip(slL, poissonVars):
+        for sl, pv in zip(slL, poissonVars):
             if i in sl:
-                Y[:,i] = Y[:,i]+pv
+                Y[:, i] = Y[:, i]+pv
     Z = Y<1
 
     #print around(np.corrcoef(Z,rowvar=0),decimals=2)
@@ -190,7 +190,7 @@ def _columnRanks(u):
 
     out = np.zeros(u.shape)
     for j in np.arange(u.shape[1]):
-        out[:,j] = _argrank(u[:,j])
+        out[:, j] = _argrank(u[:, j])
     return out.astype(int)
 
 def _argrank(vec):

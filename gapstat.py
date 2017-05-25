@@ -77,14 +77,14 @@ def plotGapStat(lsICD, mBSICD, errBSICD, gap):
 
     maxK = len(gap)
     plt.clf()
-    plt.subplot(2,2,1)
+    plt.subplot(2, 2, 1)
     plt.plot(np.arange(maxK) + 1, np.exp(lsICD) / np.exp(lsICD[0]), 'o-', color = 'black', label = 'Observed data')
     plt.xticks(np.arange(maxK) + 1)
     plt.ylabel('Summed intra-cluster distances\nas a fraction of total pairwise distance')
     plt.xlabel('Number of clusters (K)')
-    plt.ylim((0,1))
+    plt.ylim((0, 1))
 
-    plt.subplot(2,2,2)
+    plt.subplot(2, 2, 2)
     plt.plot(np.arange(maxK) + 1, lsICD, 'o-', color = 'black', label = 'Observed data')
     plt.plot(np.arange(maxK) + 1, mBSICD, 'o-', color = 'red', label = 'Null data')
     plt.xticks(np.arange(maxK) + 1)
@@ -92,13 +92,13 @@ def plotGapStat(lsICD, mBSICD, errBSICD, gap):
     plt.xlabel('Number of clusters (K)')
     plt.legend(loc = 0)
 
-    plt.subplot(2,2,3)
+    plt.subplot(2, 2, 3)
     plt.plot(np.arange(maxK) + 1, gap, 'o-')
     plt.xticks(np.arange(maxK) + 1)
     plt.ylabel('Gap statistic')
     plt.xlabel('Number of clusters (K)')
 
-    plt.subplot(2,2,4)
+    plt.subplot(2, 2, 4)
     q = gap[:-1] - (gap[1:] - errBSICD[1:])
     plt.bar(left = np.arange(maxK-1) + 1, height = q, color = 'blue', align = 'center')
     plt.xticks(np.arange(maxK) + 1)
@@ -114,9 +114,9 @@ def _intra_cluster_distances(dmat, labels):
         ind = labels == k
         nk = ind.sum()
         if isinstance(dmat, pd.DataFrame):
-            tot += (dmat.loc[ind,:].loc[:,ind].values.flatten()**2).sum() / (2 * nk)
+            tot += (dmat.loc[ind,:].loc[:, ind].values.flatten()**2).sum() / (2 * nk)
         else:
-            tot += (dmat[ind,:][:,ind].flatten()**2).sum() / (2 * nk)
+            tot += (dmat[ind,:][:, ind].flatten()**2).sum() / (2 * nk)
     return tot
 
 def _bootstrap_each_column(d):
@@ -129,6 +129,6 @@ def _bootstrap_each_column(d):
     else:
         for ci in range(d.shape[1]):
             rind = np.floor(np.random.rand(d.shape[0]) * d.shape[0]).astype(int)
-            out[:,ci] = out[rind, ci]
+            out[:, ci] = out[rind, ci]
    
     return out

@@ -91,7 +91,7 @@ def estCumTE(df, treatment_col='treated', duration_col='dx', event_col='disease'
         varsa.index.name = 'timeline'
         varsa.name = 'surv_var'
         
-        sa = np.exp(-naf.cumulative_hazard_.iloc[:,0])
+        sa = np.exp(-naf.cumulative_hazard_.iloc[:, 0])
         sa.name = 'surv'
         return naf, sa, varsa
     def _alignTimepoints(x1, x2):
@@ -99,23 +99,23 @@ def estCumTE(df, treatment_col='treated', duration_col='dx', event_col='disease'
         new_index = np.unique(new_index)
         return x1.reindex(new_index, method='ffill'), x2.reindex(new_index, method='ffill')
     def _vval2ByBootstrap(timeline, nstraps=1000):
-        sa1_b,sa2_b = np.zeros((timeline.shape[0], nstraps)), np.zeros((timeline.shape[0], nstraps))
+        sa1_b, sa2_b = np.zeros((timeline.shape[0], nstraps)), np.zeros((timeline.shape[0], nstraps))
         for sampi in range(nstraps):
             tmp = df.sample(frac=1, replace=True, axis=0)
 
             ind1 = tmp[treatment_col] == 0
             naf1 = NelsonAalenFitter()
             naf1.fit(durations=tmp.loc[ind1, duration_col], event_observed=tmp.loc[ind1, event_col])
-            sa1 = np.exp(-naf1.cumulative_hazard_.iloc[:,0])
+            sa1 = np.exp(-naf1.cumulative_hazard_.iloc[:, 0])
             sa1 = sa1.reindex(timeline, method='ffill')
-            sa1_b[:,sampi] = sa1.values
+            sa1_b[:, sampi] = sa1.values
             
             ind2 = df[treatment_col] == 1
             naf2 = NelsonAalenFitter()
             naf2.fit(durations=tmp.loc[ind2, duration_col], event_observed=tmp.loc[ind2, event_col])
-            sa2 = np.exp(-naf2.cumulative_hazard_.iloc[:,0])
+            sa2 = np.exp(-naf2.cumulative_hazard_.iloc[:, 0])
             sa2 = sa2.reindex(timeline, method='ffill')
-            sa2_b[:,sampi] = sa2.values
+            sa2_b[:, sampi] = sa2.values
         vval2 = 1/np.sqrt(np.nanvar(np.log(sa1_b), axis=1) + np.nanvar(np.log(sa2_b), axis=1))
         return vval2
 
@@ -197,7 +197,7 @@ def estCumTE(df, treatment_col='treated', duration_col='dx', event_col='disease'
     upint = 1 - np.exp(upint)
 
     resDf = pd.concat((pointests, lowint, upint), axis=1, ignore_index=True)
-    resDf.columns = ['TE','UB','LB']
+    resDf.columns = ['TE', 'UB', 'LB']
     
     pvalues = np.nan * np.zeros(resDf.shape[0])
 
@@ -236,15 +236,15 @@ def estCoxPHTE(df, treatment_col='treated', duration_col='dx', event_col='diseas
     
     coxphf.fit(df[[treatment_col, duration_col, event_col]+covars], duration_col=duration_col, event_col=event_col)
     
-    te = 1 - np.exp(coxphf.hazards_.loc['coef',treatment_col])
-    ci = 1 - np.exp(coxphf.confidence_intervals_[treatment_col].loc[['upper-bound','lower-bound']])
+    te = 1 - np.exp(coxphf.hazards_.loc['coef', treatment_col])
+    ci = 1 - np.exp(coxphf.confidence_intervals_[treatment_col].loc[['upper-bound', 'lower-bound']])
     pvalue = coxphf._compute_p_values()[0]
 
     ind1 = df[treatment_col] == 0
     ind2 = df[treatment_col] == 1
     results = logrank_test(df[duration_col].loc[ind1], df[duration_col].loc[ind2], event_observed_A=df[event_col].loc[ind1], event_observed_B=df[event_col].loc[ind2])
-    index = ['TE','UB','LB','pvalue','logrank_pvalue','model']
-    return pd.Series([te,ci['upper-bound'],ci['lower-bound'],pvalue,results.p_value,coxphf],index=index)
+    index = ['TE', 'UB', 'LB', 'pvalue', 'logrank_pvalue', 'model']
+    return pd.Series([te, ci['upper-bound'], ci['lower-bound'], pvalue, results.p_value, coxphf], index=index)
 
 def scoreci(x, n, conf_level=0.95):
     """Wilson's confidence interval for a single proportion.
@@ -292,7 +292,7 @@ def unconditionalVE(nv,Nv, np, Np, alpha=0.025):
     """Wald CI"""
     pvalue = stats.norm.cdf(log(rr)/se)
 
-    return  pd.Series([ve, ci[0], ci[1], pvalue], index=['VE','LL', 'UL','p'])
+    return  pd.Series([ve, ci[0], ci[1], pvalue], index=['VE', 'LL', 'UL', 'p'])
 
 def AgrestiScoreVE(nv,Nv, np, Np, alpha=0.025):
     """Conditional test based on a fixed number of events,
@@ -310,11 +310,11 @@ def AgrestiScoreVE(nv,Nv, np, Np, alpha=0.025):
     n = nv + np
     pvhat = nv/n
 
-    ll,ul = scoreCIbinProp(pvhat, n, alpha=alpha)
+    ll, ul = scoreCIbinProp(pvhat, n, alpha=alpha)
     
     
     ve = veFunc(pvhat, Nv, Np)
     ci = veFunc(ll, Nv, Np), veFunc(ul, Nv, Np)
-    p = stats.binom.cdf(nv,n,Nv/(Nv+Np))
+    p = stats.binom.cdf(nv, n, Nv/(Nv+Np))
     
-    return  pd.Series([ve, ci[0], ci[1], p], index=['VE','LL', 'UL','p'])
+    return  pd.Series([ve, ci[0], ci[1], p], index=['VE', 'LL', 'UL', 'p'])

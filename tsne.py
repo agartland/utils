@@ -29,14 +29,14 @@ def run_tsne(X = array([]), no_dims = 2, initial_dims = 50, perplexity = 30.0):
     """
     LANDMARKS = 1
     
-    X=PCA(X,initial_dims)
-    writeDat(X,no_dims,perplexity,LANDMARKS)
+    X=PCA(X, initial_dims)
+    writeDat(X, no_dims, perplexity, LANDMARKS)
     tSNE()
-    Xmat,LM,costs=readResult()
+    Xmat, LM, costs=readResult()
     clearData()
     if LANDMARKS==1:
-        return reOrder(Xmat,LM)
-    return Xmat,LM
+        return reOrder(Xmat, LM)
+    return Xmat, LM
 
 def PCA(dataMatrix, INITIAL_DIMS) :
     """
@@ -50,31 +50,31 @@ def PCA(dataMatrix, INITIAL_DIMS) :
     if dataMatrix.shape[1]<INITIAL_DIMS:
         INITIAL_DIMS=dataMatrix.shape[1]
 
-    (eigValues,eigVectors)=linalg.eig(cov(dataMatrix.T))
+    (eigValues, eigVectors)=linalg.eig(cov(dataMatrix.T))
     perm=argsort(-eigValues)
-    eigVectors=eigVectors[:,perm[0:INITIAL_DIMS]]
-    dataMatrix=dot(dataMatrix,eigVectors)
+    eigVectors=eigVectors[:, perm[0:INITIAL_DIMS]]
+    dataMatrix=dot(dataMatrix, eigVectors)
     return dataMatrix
 
-def readbin(type,file) :
+def readbin(type, file) :
     """
     used to read binary data from a file
     """
-    return unpack(type,file.read(calcsize(type)))
+    return unpack(type, file.read(calcsize(type)))
 
-def writeDat(dataMatrix,NO_DIMS,PERPLEX,LANDMARKS):
+def writeDat(dataMatrix, NO_DIMS, PERPLEX, LANDMARKS):
     """
     Generates data.dat
     """
     print('Writing data.dat')
-    print('Dimension of projection : %i \nPerplexity : %i \nLandmarks(ratio) : %f'%(NO_DIMS,PERPLEX,LANDMARKS))
-    n,d = dataMatrix.shape
+    print('Dimension of projection : %i \nPerplexity : %i \nLandmarks(ratio) : %f'%(NO_DIMS, PERPLEX, LANDMARKS))
+    n, d = dataMatrix.shape
     f = open(TSNE_DIR+'data.dat', 'wb')
-    f.write(pack('=iiid',n,d,NO_DIMS,PERPLEX))
-    f.write(pack('=d',LANDMARKS))
+    f.write(pack('=iiid', n, d, NO_DIMS, PERPLEX))
+    f.write(pack('=d', LANDMARKS))
     for inst in dataMatrix :
         for el in inst :
-            f.write(pack('=d',el))
+            f.write(pack('=d', el))
     f.close()
 
 
@@ -85,7 +85,7 @@ def tSNE():
     cmd=[TSNE_DIR+'tSNE.exe']
     print('Calling executable "%s"' % cmd[0])
 
-    tsneProcess=subprocess.Popen(cmd,stdout=subprocess.PIPE,cwd=TSNE_DIR)
+    tsneProcess=subprocess.Popen(cmd, stdout=subprocess.PIPE, cwd=TSNE_DIR)
     print(tsneProcess.communicate()[0])
 
 def readResult():
@@ -93,16 +93,16 @@ def readResult():
     Reads result from result.dat
     """
     print('Reading result.dat')
-    f=open(TSNE_DIR+'result.dat','rb')
-    n,ND=readbin('ii',f)
-    Xmat=empty((n,ND))
+    f=open(TSNE_DIR+'result.dat', 'rb')
+    n, ND=readbin('ii', f)
+    Xmat=empty((n, ND))
     for i in range(n):
         for j in range(ND):
-            Xmat[i,j]=readbin('d',f)[0]
-    LM=readbin('%ii'%n,f)
-    costs=readbin('%id'%n,f)
+            Xmat[i, j]=readbin('d', f)[0]
+    LM=readbin('%ii'%n, f)
+    costs=readbin('%id'%n, f)
     f.close()
-    return (Xmat,LM,costs)
+    return (Xmat, LM, costs)
 
 def reOrder(Xmat, LM):
     """
@@ -111,7 +111,7 @@ def reOrder(Xmat, LM):
     """
     print('Reordering results')
     X=zeros(Xmat.shape)
-    for i,lm in enumerate(LM):
+    for i, lm in enumerate(LM):
         X[lm]=Xmat[i]
     return X
 

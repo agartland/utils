@@ -1,10 +1,10 @@
 
 import numpy as np
-from numpy.random import permutation,randint
+from numpy.random import permutation, randint
 from scipy import stats, special
 
 try:
-    from matplotlib.pyplot import plot, xticks,is_numlike,bar
+    from matplotlib.pyplot import plot, xticks, is_numlike, bar
 except ImportError:
     print('Imported objhist without matplotlib.')
 
@@ -119,7 +119,7 @@ class countdict(dict):
         p = np.array([freq[k] for k in keys])
         q = np.array([reference.freq()[k] for k in keys])
         divergence = -p*log_func(p/q)
-        return {k:v for k,v in zip(keys,divergence)}
+        return {k:v for k, v in zip(keys, divergence)}
         
     def jensen_shannon_divergence(self, b):
         """Compute Jensen-Shannon divergence between self and b (also an objhist).
@@ -166,11 +166,11 @@ class countdict(dict):
         """
 
         if returnFreq:
-            return [(k,self.freq()[k]) for i,k in zip(np.arange(n),self.sortedKeys(reverse=reverse))]
+            return [(k, self.freq()[k]) for i, k in zip(np.arange(n), self.sortedKeys(reverse=reverse))]
         else:
-            return [(k,self[k]) for i,k in zip(np.arange(n),self.sortedKeys(reverse=reverse))]
+            return [(k, self[k]) for i, k in zip(np.arange(n), self.sortedKeys(reverse=reverse))]
 
-    def add(self,newIter):
+    def add(self, newIter):
         """Add items in newIter to the existing frequency object.
         Object is updated in-place."""
         for k in newIter:
@@ -178,7 +178,7 @@ class countdict(dict):
                 self[k] += 1
             except KeyError:
                 self[k] = 1
-    def subset(self,newkeys):
+    def subset(self, newkeys):
         """Returns a copy of the countdict with only a subset of the keys remaining."""
         return countdict({k:self[k] for k in newkeys})
 
@@ -215,11 +215,11 @@ class countdict(dict):
             yDict = self
 
         if barPlot:
-            for x,k in zip(xvec,xlab):
+            for x, k in zip(xvec, xlab):
                 bar(x, yDict[k], align = 'center', color=color)
         else:
             plot(xvec, [yDict[k] for k in xlab], 's-', color=color)
-        xticks(xvec,xlab)
+        xticks(xvec, xlab)
 
     def generateRandomSequence(self, n=1, useFreqs=True):
         """Generate a random sequence of the objects in keys.
@@ -234,7 +234,7 @@ class countdict(dict):
             freqArr = freqArr/freqArr.sum()
 
             gridint = np.arange(len(keys))
-            arbdiscrete = stats.rv_discrete(values=(gridint,freqArr), name='arbdiscrete')
+            arbdiscrete = stats.rv_discrete(values=(gridint, freqArr), name='arbdiscrete')
             indices = arbdiscrete.rvs(size=n)
         else:
             indices = randint(len(keys), size=n)
@@ -271,8 +271,8 @@ def _jensen_shannon_divergence(a, b):
     b = b/b.sum()
     m = (a + b)
     m /= 2.
-    m = np.where(m,m,1.)
-    return 0.5*np.sum(special.xlogy(a,a/m)+special.xlogy(b,b/m))
+    m = np.where(m, m, 1.)
+    return 0.5*np.sum(special.xlogy(a, a/m)+special.xlogy(b, b/m))
 
 def _morisita_horn_index(a, b):
     """Compute the Morisita-Horn overlap index between two count vectors

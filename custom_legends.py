@@ -23,7 +23,7 @@ def colorLegend(colors, labels, alphas=None, edgecolor='black',loc='best', axh=N
 
     if alphas is None:
         alphas = np.ones(len(colors))
-    circles = (plt.Circle((0,0), fc=c, ec=edgecolor, alpha=a) for c,a in zip(colors,alphas))
+    circles = (plt.Circle((0, 0), fc=c, ec=edgecolor, alpha=a) for c, a in zip(colors, alphas))
     lh = axh.legend(circles,
                     labels,
                     loc=loc,
@@ -53,7 +53,7 @@ def symbolLegend(symbols, labels, facecolors=None, edgecolors=None, alphas=None,
     if facecolors is None:
         facecolors = ['white'] * len(symbols)
 
-    lh = plt.legend((plt.Line2D([0],[0], ls = '', marker = s, markerfacecolor = mfc, markeredgecolor = ec, alpha = a) for s,mfc,ec,a in zip(symbols,facecolors,edgecolors,alphas)),
+    lh = plt.legend((plt.Line2D([0], [0], ls = '', marker = s, markerfacecolor = mfc, markeredgecolor = ec, alpha = a) for s, mfc, ec, a in zip(symbols, facecolors, edgecolors, alphas)),
                 labels,
                 loc,
                 numpoints=1,

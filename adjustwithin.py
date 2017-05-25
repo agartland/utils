@@ -34,19 +34,19 @@ def adjustnonnan(pvalues, method='holm'):
     nanInd = np.isnan(p)
     
     """Drop the nans, calculate adjpvalues, copy to adjpvalues vector"""
-    rej,q,alphasidak,alphabon = sm.stats.multipletests(p[~nanInd], alpha=0.05, method=method)
+    rej, q, alphasidak, alphabon = sm.stats.multipletests(p[~nanInd], alpha=0.05, method=method)
     adjpvalues[~nanInd] = q
     
     """Reshape adjpvalues"""
-    if not type(pvalues) is list:
+    if not isinstance(pvalues, list):
         adjpvalues = adjpvalues.reshape(pvalues.shape)
 
     """Return same type as pvalues"""
-    if type(pvalues) is list:
+    if isinstance(pvalues, list):
         return [pv for pv in adjpvalues]
-    elif type(pvalues) is pd.core.frame.DataFrame:
+    elif isinstance(pvalues, pd.core.frame.DataFrame):
         return pd.DataFrame(adjpvalues, columns=pvalues.columns, index=pvalues.index)
-    elif type(pvalues) is pd.core.series.Series:
+    elif isinstance(pvalues, pd.core.series.Series):
         return pd.Series(adjpvalues, name=pvalues.name, index=pvalues.index)
     else:
         return adjpvalues

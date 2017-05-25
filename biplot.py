@@ -66,7 +66,7 @@ def corrSmatFunc(df, metric='pearson-signed', simFunc=None, minN=None):
             smat[np.isnan(smat)] = 0
         elif metric in ['spearman-signed', 'pearson-signed']:
             """Anti-correlations are considered as dissimilar and will NOT cluster together"""
-            smat = df.corr(method=metric.replace('-signed',''), min_periods=minN).values
+            smat = df.corr(method=metric.replace('-signed', ''), min_periods=minN).values
             smat = (smat**2 * np.sign(smat) + 1)/2
             smat[np.isnan(smat)] = 0
         else:
@@ -78,14 +78,14 @@ def corrSmatFunc(df, metric='pearson-signed', simFunc=None, minN=None):
             for j in range(ncols):
                 """Assume distance is symetric"""
                 if i <= j:
-                    tmpdf = df.iloc[:,[i,j]]
+                    tmpdf = df.iloc[:, [i, j]]
                     tmpdf = tmpdf.dropna()
                     if tmpdf.shape[0] >= minN:
-                        d = simFunc(df.iloc[:,i], df.iloc[:,j])
+                        d = simFunc(df.iloc[:, i], df.iloc[:, j])
                     else:
                         d = np.nan
-                    smat[i,j] = d
-                    smat[j,i] = d
+                    smat[i, j] = d
+                    smat[j, i] = d
     return pd.DataFrame(smat, columns=df.columns, index=df.columns)
 
 def _dimReduce(df, method='pca', n_components=2, labels=None, standardize=False, smatFunc=None, ldaShrinkage='auto'):
@@ -128,31 +128,31 @@ def _dimReduce(df, method='pca', n_components=2, labels=None, standardize=False,
 
 def screeplot(df, method='pca', n_components=10, standardize=False, smatFunc=None):
     """Create stacked bar plot of compents and the fraction contributed by each feature"""
-    n_components = int(np.min([n_components,df.columns.shape[0]]))
-    xy,pca = _dimReduce(df, method, n_components, standardize, smatFunc)
+    n_components = int(np.min([n_components, df.columns.shape[0]]))
+    xy, pca = _dimReduce(df, method, n_components, standardize, smatFunc)
     
     figh = plt.gcf()
     figh.clf()
-    axh1 = figh.add_subplot(2,1,1)
+    axh1 = figh.add_subplot(2, 1, 1)
     axh1.bar(left=list(range(n_components)),
              height=pca.explained_variance_ratio_[:n_components],
              align='center')
     plt.ylabel('Fraction of\nvariance explained')
     plt.xticks(())
 
-    axh2 = figh.add_subplot(2,1,2)
+    axh2 = figh.add_subplot(2, 1, 2)
     for compi in range(n_components):
         bottom = 0
-        for dimi,col in zip(list(range(df.shape[1])), itertools.cycle(palettable.colorbrewer.qualitative.Set3_12.mpl_colors)):
-            height = pca.components_[compi,dimi]**2 / (pca.components_[compi,:]**2).sum()
+        for dimi, col in zip(list(range(df.shape[1])), itertools.cycle(palettable.colorbrewer.qualitative.Set3_12.mpl_colors)):
+            height = pca.components_[compi, dimi]**2 / (pca.components_[compi,:]**2).sum()
             axh2.bar(left=compi, bottom=bottom, height=height, align='center', color=col)
             if height > 0.1:
-                note = df.columns[dimi].replace(' ','\n')
-                note += '(+)' if pca.components_[compi,dimi] >= 0 else '(-)'
-                axh2.annotate(note, xy=(compi, bottom+height/2), ha='center', va='center',size='small')
+                note = df.columns[dimi].replace(' ', '\n')
+                note += '(+)' if pca.components_[compi, dimi] >= 0 else '(-)'
+                axh2.annotate(note, xy=(compi, bottom+height/2), ha='center', va='center', size='small')
             bottom += height
-    plt.xticks(list(range(n_components)),['PC%d' % (i+1) for i in range(n_components)],rotation=90)
-    plt.ylim([0,1])
+    plt.xticks(list(range(n_components)), ['PC%d' % (i+1) for i in range(n_components)], rotation=90)
+    plt.ylim([0, 1])
     plt.ylabel('Fraction of\ncomponent variance')
 
 def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
@@ -208,49 +208,49 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
 
     uLabels = np.unique(labels).tolist()
     n_components = max(plotDims) + 1
-    xy,pca = _dimReduce(df, method=method, n_components=n_components, standardize=standardize, smatFunc=smatFunc, labels=labels, ldaShrinkage=ldaShrinkage)
+    xy, pca = _dimReduce(df, method=method, n_components=n_components, standardize=standardize, smatFunc=smatFunc, labels=labels, ldaShrinkage=ldaShrinkage)
 
-    colors = palettable.colorbrewer.get_map('Set1', 'qualitative', min(12,max(3,len(uLabels)))).mpl_colors
+    colors = palettable.colorbrewer.get_map('Set1', 'qualitative', min(12, max(3, len(uLabels)))).mpl_colors
     plt.clf()
     figh = plt.gcf()
-    axh = figh.add_axes([0.1,0.1,0.8,0.8], aspect='equal')
+    axh = figh.add_axes([0.1, 0.1, 0.8, 0.8], aspect='equal')
     axh.axis('on')
     figh.set_facecolor('white')
-    annotationParams = dict(xytext=(0,5), textcoords='offset points', size='medium')
+    annotationParams = dict(xytext=(0, 5), textcoords='offset points', size='medium')
     alpha = 0.8
-    for i,obs in enumerate(df.index):
+    for i, obs in enumerate(df.index):
         if plotLabels:
-            axh.annotate(obs, xy=(xy[i,plotDims[0]], xy[i,plotDims[1]]), **annotationParams)
+            axh.annotate(obs, xy=(xy[i, plotDims[0]], xy[i, plotDims[1]]), **annotationParams)
     for labi, lab in enumerate(uLabels):
         col = colors[labi]
         ind = np.where(labels==lab)[0]
         axh.scatter(xy[ind, plotDims[0]], xy[ind, plotDims[1]], marker='o', s=50, alpha=alpha, c=col, label=lab)
         #axh.scatter(xy[ind, plotDims[0]].mean(axis=0), xy[ind, plotDims[1]].mean(axis=0), marker='o', s=300, alpha=alpha/1.5, c=col)
-        Xvar = xy[ind, :][:,plotDims]
+        Xvar = xy[ind,:][:, plotDims]
         if len(ind) > 2 and plotElipse:
             plot_point_cov(Xvar, ax=axh, color=col, alpha=0.2)
     arrowParams = dict(arrowstyle='<-',
                         connectionstyle='Arc3',
                         color='black',
                         lw=1)
-    annotationParams = dict(xy=(0,0),
+    annotationParams = dict(xy=(0, 0),
                             textcoords='data',
                             color='black',
                             arrowprops=arrowParams,
                             ha='center',
                             va='center')
-    mxx = np.max(np.abs(xy[:,plotDims[0]]))
-    mxy = np.max(np.abs(xy[:,plotDims[1]]))
-    scalar = min(mxx,mxy) * 0.8
+    mxx = np.max(np.abs(xy[:, plotDims[0]]))
+    mxy = np.max(np.abs(xy[:, plotDims[1]]))
+    scalar = min(mxx, mxy) * 0.8
     
-    if method in ['lda','pca'] and False:
+    if method in ['lda', 'pca'] and False:
         """Project a unit vector for each feature, into the new space"""    
         arrowxy = pca.transform(np.diag(np.ones(df.shape[1])))
         mxarr = np.max(np.abs(arrowxy))
         """By using the squared transform the magnitude of the vector along each component
         reflects the fraction of variance explained by that feature along the component (e.g. PCA1)"""
         varfracxy = (arrowxy**2) * np.sign(arrowxy)
-        for vi,v in enumerate(df.columns):
+        for vi, v in enumerate(df.columns):
             arrowx, arrowy = arrowxy[vi,:] * scalar/mxarr
             #arrowx = varfracxy[vi,0] * mxx
             #arrowy = varfracxy[vi,1] * mxy

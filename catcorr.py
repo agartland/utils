@@ -29,21 +29,21 @@ __all__ = ['catcorr',
            'testEdge',
            'cull_rows']
 
-layouts = ['twopi', 'fdp','circo', 'neato', 'dot', 'spring', 'spectral']
+layouts = ['twopi', 'fdp', 'circo', 'neato', 'dot', 'spring', 'spectral']
 
 color2str = lambda col: 'rgb'+str(tuple((np.array(col)*256).round().astype(int)))
 
 def computeRelations(df):
     """Compute all OR neccessary for a catcorr graph"""
     res = []
-    for col1,col2 in itertools.combinations(df.columns, 2):
-        for val1,val2 in itertools.product(df[col1].unique(), df[col2].unique()):
+    for col1, col2 in itertools.combinations(df.columns, 2):
+        for val1, val2 in itertools.product(df[col1].unique(), df[col2].unique()):
             w = ((df[col1] == val1) & (df[col2] == val2)).sum()
             if w > 0:
-                OR,pvalue = testEdge(df, (col1,val1), (col2,val2))
+                OR, pvalue = testEdge(df, (col1, val1), (col2, val2))
                 res.append({'OR':OR, 'pvalue':pvalue, col1:val1, col2:val2})
     resDf = pd.DataFrame(res)
-    resDf.loc[:,'qvalue'] = sm.stats.multipletests(resDf['pvalue'].values, method='fdr_bh')[1]
+    resDf.loc[:, 'qvalue'] = sm.stats.multipletests(resDf['pvalue'].values, method='fdr_bh')[1]
     resDf = resDf.sort_values(by='pvalue', ascending=True)
     return resDf
 
@@ -54,20 +54,20 @@ def computeGraph(df):
     pvalueArr = []
     ORArr = []
     tested = []
-    for col1,col2 in itertools.combinations(df.columns, 2):
-        for val1,val2 in itertools.product(df[col1].unique(), df[col2].unique()):
+    for col1, col2 in itertools.combinations(df.columns, 2):
+        for val1, val2 in itertools.product(df[col1].unique(), df[col2].unique()):
             w = ((df[col1] == val1) & (df[col2] == val2)).sum()
             if w > 0:
-                OR,pvalue = testEdge(df, (col1,val1), (col2,val2))
+                OR, pvalue = testEdge(df, (col1, val1), (col2, val2))
                 tested.append(True)
             else:
                 pvalue = 1.
                 OR = 1.
                 tested.append(False)
-            edgeKeys.append(((col1,val1), (col2,val2)))
+            edgeKeys.append(((col1, val1), (col2, val2)))
             pvalueArr.append(pvalue)
             ORArr.append(OR)
-    pvalueArr,tested, ORArr = np.array(pvalueArr), np.array(tested), np.array(ORArr)
+    pvalueArr, tested, ORArr = np.array(pvalueArr), np.array(tested), np.array(ORArr)
     qvalueArr = np.ones(pvalueArr.shape)
     qvalueArr[tested] = sm.stats.multipletests(pvalueArr[tested], method='fdr_bh')[1]
 
@@ -79,11 +79,11 @@ def computeGraph(df):
             g.add_node((col, val), freq=freq)
     """Add edges for each unique pair of values
     with edgewidth proportional to frequency of pairing"""
-    for col1,col2 in itertools.combinations(df.columns,2):
-        for val1,val2 in itertools.product(df[col1].unique(),df[col2].unique()):
+    for col1, col2 in itertools.combinations(df.columns, 2):
+        for val1, val2 in itertools.product(df[col1].unique(), df[col2].unique()):
             w = ((df[col1]==val1) & (df[col2]==val2)).sum()
             if w > 0:
-                key = edgeKeys.index(((col1,val1),(col2,val2)))
+                key = edgeKeys.index(((col1, val1), (col2, val2)))
                 dat = dict(weight=w/df.shape[0])
                 dat['OR'] = ORArr[key]
                 dat['pvalue'] = pvalueArr[key]
@@ -92,7 +92,7 @@ def computeGraph(df):
     return g
 
 
-def catcorr(df, layout='spring', mode='mpl', titleStr='', testSig=0.05, sRange=(50,np.inf), wRange=(0.5,np.inf), labelThresh=0.05, fontsize=14):
+def catcorr(df, layout='spring', mode='mpl', titleStr='', testSig=0.05, sRange=(50, np.inf), wRange=(0.5, np.inf), labelThresh=0.05, fontsize=14):
     """Make a network plot showing the correlations among the
     categorical variables in the columns of df.
 
@@ -146,17 +146,17 @@ def catcorr(df, layout='spring', mode='mpl', titleStr='', testSig=0.05, sRange=(
     g = computeGraph(df)
 
     """Compute attributes of edges and nodes"""
-    edgewidth = np.array([d['weight'] for n1,n2,d in g.edges(data=True)])
-    nodesize = np.array([d['freq'] for n,d in g.nodes(data=True)])
+    edgewidth = np.array([d['weight'] for n1, n2, d in g.edges(data=True)])
+    nodesize = np.array([d['freq'] for n, d in g.nodes(data=True)])
 
     nColors = np.min([np.max([len(df.columns), 3]), 9])
     colors = palettable.colorbrewer.get_map('Set1', 'Qualitative', nColors).mpl_colors
-    cmap = {c:color for c,color in zip(df.columns, itertools.cycle(colors))}
+    cmap = {c:color for c, color in zip(df.columns, itertools.cycle(colors))}
     nodecolors = [cmap[n[0]] for n in g.nodes()]
     if layout == 'twopi':
         """If using this layout specify the most common node as the root"""
-        freq = {n:d['freq'] for n,d in g.nodes(data=True)}
-        pos = nx.graphviz_layout(g,prog=layout, root=np.max(list(freq.keys()),key=freq.get))
+        freq = {n:d['freq'] for n, d in g.nodes(data=True)}
+        pos = nx.graphviz_layout(g, prog=layout, root=np.max(list(freq.keys()), key=freq.get))
     elif layout == 'spring':
         pos = spring_layout(g)
     elif layout == 'spectral':
@@ -168,7 +168,7 @@ def catcorr(df, layout='spring', mode='mpl', titleStr='', testSig=0.05, sRange=(
     if mode == 'mpl':
         plt.clf()
         figh = plt.gcf()
-        axh = figh.add_axes([0.04,0.04,0.92,0.92])
+        axh = figh.add_axes([0.04, 0.04, 0.92, 0.92])
         axh.axis('off')
         figh.set_facecolor('white')
 
@@ -176,24 +176,24 @@ def catcorr(df, layout='spring', mode='mpl', titleStr='', testSig=0.05, sRange=(
         #nx.draw_networkx_nodes(g,pos,node_size=sznorm(nodesize,mn=500,mx=5000),node_color=nodecolors,alpha=1)
         ew = szscale(edgewidth, mn=wRange[0], mx=wRange[1])
 
-        for es,e in zip(ew, g.edges_iter()):
-            x1,y1=pos[e[0]]
-            x2,y2=pos[e[1]]
-            props = dict(color='black',alpha=0.4,zorder=1)
+        for es, e in zip(ew, g.edges_iter()):
+            x1, y1=pos[e[0]]
+            x2, y2=pos[e[1]]
+            props = dict(color='black', alpha=0.4, zorder=1)
             if testSig and g[e[0]][e[1]]['qvalue'] < testSig:
                 if g[e[0]][e[1]]['OR'] > 1.:
                     props['color']='orange'
                 else:
                     props['color']='green'
                 props['alpha']=0.8
-            plt.plot([x1,x2],[y1,y2],'-',lw=es,**props)
+            plt.plot([x1, x2], [y1, y2], '-', lw=es, **props)
 
         plt.scatter(x=[pos[s][0] for s in g.nodes()],
                     y=[pos[s][1] for s in g.nodes()],
-                    s=szscale(nodesize,mn=sRange[0],mx=sRange[1]), #Units for scatter is (size in points)**2
+                    s=szscale(nodesize, mn=sRange[0], mx=sRange[1]), #Units for scatter is (size in points)**2
                     c=nodecolors,
-                    alpha=1,zorder=2)
-        for n,d in g.nodes(data=True):
+                    alpha=1, zorder=2)
+        for n, d in g.nodes(data=True):
             if d['freq'] >= labelThresh:
                 plt.annotate(n[1],
                             xy=pos[n],
@@ -204,41 +204,41 @@ def catcorr(df, layout='spring', mode='mpl', titleStr='', testSig=0.05, sRange=(
                             va='center',
                             ha='center')
         colorLegend(labels=df.columns,
-                    colors=[c for x,c in zip(df.columns,colors)],
+                    colors=[c for x, c in zip(df.columns, colors)],
                     loc=0,
                     title='N = %1.0f' % (~df.isnull()).all(axis=1).sum(axis=0))
         plt.title(titleStr)
     elif PLOTLY:
         """Send the plot to plot.ly"""
         data = []
-        for es,e in zip(szscale(edgewidth,mn=wRange[0],mx=wRange[1]),g.edges_iter()):
-            x1,y1=pos[e[0]]
-            x2,y2=pos[e[1]]
-            props = dict(color='black',opacity=0.4)
+        for es, e in zip(szscale(edgewidth, mn=wRange[0], mx=wRange[1]), g.edges_iter()):
+            x1, y1=pos[e[0]]
+            x2, y2=pos[e[1]]
+            props = dict(color='black', opacity=0.4)
             if testSig and g[e[0]][e[1]]['qvalue'] < testSig:
                 if g[e[0]][e[1]]['OR'] > 1.:
                     props['color']='orange'
                 else:
                     props['color']='green'
                 props['opacity']=0.8
-            tmp = pygo.Scatter(x=[x1,x2],
-                          y=[y1,y2],
+            tmp = pygo.Scatter(x=[x1, x2],
+                          y=[y1, y2],
                           mode='lines',
-                          line=pygo.Line(width=es,**props),
+                          line=pygo.Line(width=es, **props),
                           showlegend=False)
             data.append(tmp)
         """May need to add sqrt() to match mpl plots"""
-        nodesize = szscale(nodesize,mn=sRange[0],mx=sRange[1]) #Units for plotly.Scatter is (size in points)
+        nodesize = szscale(nodesize, mn=sRange[0], mx=sRange[1]) #Units for plotly.Scatter is (size in points)
         for col in list(cmap.keys()):
-            ind = [nodei for nodei,node in enumerate(g.nodes()) if node[0]==col]
-            tmp = pygo.Scatter(x=[pos[s][0] for nodei,s in enumerate(g.nodes()) if nodei in ind],
-                    y=[pos[s][1] for nodei,s in enumerate(g.nodes()) if nodei in ind],
+            ind = [nodei for nodei, node in enumerate(g.nodes()) if node[0]==col]
+            tmp = pygo.Scatter(x=[pos[s][0] for nodei, s in enumerate(g.nodes()) if nodei in ind],
+                    y=[pos[s][1] for nodei, s in enumerate(g.nodes()) if nodei in ind],
                     mode='markers',
                     name=col,
-                    text=[node[1] for nodei,node in enumerate(g.nodes()) if nodei in ind],
+                    text=[node[1] for nodei, node in enumerate(g.nodes()) if nodei in ind],
                     textposition='middle center',
                     marker=pygo.Marker(size=nodesize[ind],
-                                  color=[color2str(nc) for nodei,nc in enumerate(nodecolors) if nodei in ind]))
+                                  color=[color2str(nc) for nodei, nc in enumerate(nodecolors) if nodei in ind]))
             data.append(tmp)
         layout = pygo.Layout(title=titleStr,
                         showlegend=True,
@@ -250,16 +250,16 @@ def catcorr(df, layout='spring', mode='mpl', titleStr='', testSig=0.05, sRange=(
 
 def generateTestData(nrows=100):
     """Generate a pd.DataFrame() with correlations that can be visualized by catcorr()"""
-    testDf = pd.DataFrame(zeros((nrows,3),dtype=object),columns = ['ColA','ColB','ColC'])
+    testDf = pd.DataFrame(zeros((nrows, 3), dtype=object), columns = ['ColA', 'ColB', 'ColC'])
     """Use objhist to generate specific frequencies of (0,0,0), (1,0,0) etc. with values 1-4"""
     oh = objhist([])
-    oh.update({('X','A','foo'):2,
-              ('X','A','bar'):5,
-              ('X','B','foo'):1,
-              ('X','B','bar'):10,
-              ('Y','A','bar'):10,
-              ('Y','B','bar'):7})
-    for i,v in enumerate(oh.generateRandomSequence(nrows)):
+    oh.update({('X', 'A', 'foo'):2,
+              ('X', 'A', 'bar'):5,
+              ('X', 'B', 'foo'):1,
+              ('X', 'B', 'bar'):10,
+              ('Y', 'A', 'bar'):10,
+              ('Y', 'B', 'bar'):7})
+    for i, v in enumerate(oh.generateRandomSequence(nrows)):
         testDf['ColA'].loc[i] = v[0]
         testDf['ColB'].loc[i] = v[1]
         testDf['ColC'].loc[i] = v[2]
@@ -326,16 +326,16 @@ def testEdge(df, node1, node2, verbose=False):
         Odds-ratio associated with the 2x2 contingency table
     pvalue : float
         P-value associated with the Fisher's exact test that H0: OR = 1"""
-    col1,val1 = node1
-    col2,val2 = node2
+    col1, val1 = node1
+    col2, val2 = node2
     
     tmp = df[[col1, col2]].dropna()
 
-    tab = np.zeros((2,2))
-    tab[0,0] = ((tmp[col1]!=val1) & (tmp[col2]!=val2)).sum()
-    tab[0,1] = ((tmp[col1]!=val1) & (tmp[col2]==val2)).sum()
-    tab[1,0] = ((tmp[col1]==val1) & (tmp[col2]!=val2)).sum()
-    tab[1,1] = ((tmp[col1]==val1) & (tmp[col2]==val2)).sum()
+    tab = np.zeros((2, 2))
+    tab[0, 0] = ((tmp[col1]!=val1) & (tmp[col2]!=val2)).sum()
+    tab[0, 1] = ((tmp[col1]!=val1) & (tmp[col2]==val2)).sum()
+    tab[1, 0] = ((tmp[col1]==val1) & (tmp[col2]!=val2)).sum()
+    tab[1, 1] = ((tmp[col1]==val1) & (tmp[col2]==val2)).sum()
 
     """Add 1 to cells with zero"""
     if np.any(tab == 0):
@@ -344,12 +344,12 @@ def testEdge(df, node1, node2, verbose=False):
             print()
     tab[tab==0] = 1
 
-    OR,pvalue = fisherTest(tab)
+    OR, pvalue = fisherTest(tab)
 
     if verbose:
         print('Node1: %s, %s' % node1)
         print('Node2: %s, %s' % node2)
         print()
-        print(pd.DataFrame(tab,index=['Node1(-)','Node1(+)'],columns = ['Node2(-)','Node2(+)']))
+        print(pd.DataFrame(tab, index=['Node1(-)', 'Node1(+)'], columns = ['Node2(-)', 'Node2(+)']))
         print('\nOR: %1.2f\nP-value: %1.3f' % (OR, pvalue))
     return OR, pvalue

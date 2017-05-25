@@ -77,9 +77,9 @@ __all__ = ['BADAA',
 
 BADAA = '-*BX#Z'
 AALPHABET = 'ACDEFGHIKLMNPQRSTVWY'
-AA2CODE = {aa:i for i,aa in enumerate(AALPHABET)}
+AA2CODE = {aa:i for i, aa in enumerate(AALPHABET)}
 AA2CODE.update({'-':21})
-CODE2AA = {i:aa for i,aa in enumerate(AALPHABET)}
+CODE2AA = {i:aa for i, aa in enumerate(AALPHABET)}
 CODE2AA.update({21:'-'})
 
 def isvalidpeptide(mer,badaa=None):
@@ -88,31 +88,31 @@ def isvalidpeptide(mer,badaa=None):
     if badaa is None:
         badaa=BADAA
     if not mer is None:
-        return not re.search('[%s]' % badaa,mer)
+        return not re.search('[%s]' % badaa, mer)
     else:
         return False
 def cleanAlign(align,badaa=None):
     """Remove all invalid sequences (containing badaa) from
     the alignment
     badaa is '-*BX#Z' by default"""
-    return align.loc[[isvalidpeptide(s,badaa) for s in align]]
+    return align.loc[[isvalidpeptide(s, badaa) for s in align]]
 def cleanDf(df,badaa=None):
     """Remove all invalid sequences (containing badaa) from
     the alignment
     badaa is '-*BX#Z' by default"""
-    return df.loc[[isvalidpeptide(s,badaa) for s in df.seq]]
+    return df.loc[[isvalidpeptide(s, badaa) for s in df.seq]]
 def removeBadAA(mer,badaa=None):
     """Remove badaa amino acids from the mer, default badaa is -*BX#Z"""
     if badaa is None:
         badaa=BADAA
     if not mer is None:
-        return re.sub('[%s]' % badaa,'',mer)
+        return re.sub('[%s]' % badaa, '', mer)
     else:
         return mer
 def _seq2vec(seq):
     """Convert AA sequence into numpy vector of integers for fast comparison"""
-    vec = zeros(len(seq),dtype=int)
-    for aai,aa in enumerate(seq):
+    vec = zeros(len(seq), dtype=int)
+    for aai, aa in enumerate(seq):
         vec[aai] = AA2CODE[aa]
     return vec
 
@@ -128,9 +128,9 @@ def padAlignment(align, applyPadding=True):
     """Replace *  and #  with - and - """
     for ind in align.index:
         if '*' in align[ind]:
-            align[ind] = align[ind].replace('*','-')
+            align[ind] = align[ind].replace('*', '-')
         if '#' in align[ind]:
-            align[ind] = align[ind].replace('#','-')
+            align[ind] = align[ind].replace('#', '-')
     """Pad with gaps if the lengths are all the same"""
     if applyPadding:
         L = align.map(len).unique()
@@ -139,7 +139,7 @@ def padAlignment(align, applyPadding=True):
             L = L.max()
             for ind in align.index:
                 if len(align[ind]) < L:
-                    align[ind] = align[ind].ljust(L,'-')
+                    align[ind] = align[ind].ljust(L, '-')
         else:
             L = L.max()
     return align
@@ -156,7 +156,7 @@ def consensus(align, ignoreGaps = True):
     for aai in arange(L):
         counts = objhist([seq[aai] for seq in align])
         if ignoreGaps and len(counts)>1:
-            droppedGaps = counts.pop('-',0)
+            droppedGaps = counts.pop('-', 0)
         cons += max(list(counts.keys()), key=counts.get)
     return cons
 
@@ -198,27 +198,27 @@ def peptideSetCoverage(peptides1,peptides2,mmTolerance=1):
         anyCover=False
         for pep1 in set(peptides1):
             try:
-                dist = cache[(pep1,pep2)]
+                dist = cache[(pep1, pep2)]
             except KeyError:
-                dist = seq_distance(pep1,pep2,subst=binarySubst,normed=False)
-                cache.update({(pep1,pep2):dist,(pep2,pep1):dist})
+                dist = seq_distance(pep1, pep2, subst=binarySubst, normed=False)
+                cache.update({(pep1, pep2):dist,(pep2, pep1):dist})
             if dist<=mmTolerance:
                 coveredPeps[pep1].append(pep2)
                 anyCover=True
         if anyCover:
             coveredPeps['tot'].append(pep2)
-    coverage={k:len(v)/len(peptides2) for k,v in list(coveredPeps.items())}
+    coverage={k:len(v)/len(peptides2) for k, v in list(coveredPeps.items())}
     return coverage
 
 
 def fasta2seqs(fn):
-    return [str(r.seq) for r in SeqIO.parse(open(fn,'r'),'fasta')]
-def seqs2fasta(seqs,fn):
-    with open(fn,'w') as fh:
-        for i,s in enumerate(seqs):
+    return [str(r.seq) for r in SeqIO.parse(open(fn, 'r'), 'fasta')]
+def seqs2fasta(seqs, fn):
+    with open(fn, 'w') as fh:
+        for i, s in enumerate(seqs):
             fh.write('>seq%d\n' % i)
             fh.write('%s\n' % s)
-def fasta2df(fn,sep='.',columns=['clade','country','year','name','seqid'],index=None,uniqueIndex=True):
+def fasta2df(fn,sep='.',columns=['clade', 'country', 'year', 'name', 'seqid'],index=None,uniqueIndex=True):
     """Read in a fasta file and turn it  into a Pandas DataFrame
 
     Defaults parse the HIV LANL fasta alignments.
@@ -237,8 +237,8 @@ def fasta2df(fn,sep='.',columns=['clade','country','year','name','seqid'],index=
     seqDf : pd.DataFrame
         All sequences from the fasta file with a seq column containing the sequences."""
     
-    with open(fn,'r') as fh:
-        records = SeqIO.parse(fh,'fasta')
+    with open(fn, 'r') as fh:
+        records = SeqIO.parse(fh, 'fasta')
         sDict = {'seq':[]}
         sDict.update({k:[] for k in columns})
         for r in records:
@@ -258,8 +258,8 @@ def fasta2df(fn,sep='.',columns=['clade','country','year','name','seqid'],index=
             seqDf = seqDf.set_index(index)
         else:
             tmp = seqDf[index].copy()
-            for i,ind in enumerate(tmp.index):
-                tmp[ind] = '%d_%s' % (i,tmp[ind])
+            for i, ind in enumerate(tmp.index):
+                tmp[ind] = '%d_%s' % (i, tmp[ind])
             seqDf = seqDf.set_index(tmp)
     return seqDf
 def df2fasta(df,fn,sep='.',columns=None):
@@ -268,11 +268,11 @@ def df2fasta(df,fn,sep='.',columns=None):
         columns=list(df.columns)
     if 'seq' in columns:
         columns.remove('seq')
-    with open(fn,'w') as fh:
-        for ind,row in df.iterrows():
+    with open(fn, 'w') as fh:
+        for ind, row in df.iterrows():
             label='>%s' % ind
             for col in columns:
-                label+='%s%s' % (sep,row[col])
+                label+='%s%s' % (sep, row[col])
             fh.write('%s\n' % label)
             fh.write('%s\n' % row['seq'])
 
@@ -280,7 +280,7 @@ def align2fasta(align, fn, applyPadding = True):
     """Write align to a FASTA file where align is a dict or pd.Series of sequences"""
     align = padAlignment(align, applyPadding)
 
-    with open(fn,'w') as fh:
+    with open(fn, 'w') as fh:
         for i in arange(align.shape[0]):
             ind = align.index[i]
             fh.write('>%s\n' % ind)
@@ -290,10 +290,10 @@ def align2mers(align,fn=None,nmers=[9]):
     align=padAlignment(align)
     mers=[]
     for seq in align:
-        mers.extend(getMers(re.sub('[%s]' % BADAA,'',seq),nmers))
+        mers.extend(getMers(re.sub('[%s]' % BADAA, '', seq), nmers))
     mers=set(mers)
     if not fn is None:
-        with open(fn,'w') as fh:
+        with open(fn, 'w') as fh:
             for pep in mers:
                 fh.write('%s\n' % pep)
     else:
@@ -301,12 +301,12 @@ def align2mers(align,fn=None,nmers=[9]):
 def align2mers_tracked(align,nmers=[9],firstOnly=True):
     """Return a df of all nmers in the alignment along with start position and seq index"""
     align = padAlignment(align)
-    cols = ['peptide','starti','seqi','L','count']
+    cols = ['peptide', 'starti', 'seqi', 'L', 'count']
     outD = {k:[] for k in cols}
     for k in nmers:
-        for seqi,seq in enumerate(align):
+        for seqi, seq in enumerate(align):
             for starti in range(len(seq)-k+1):
-                mer = grabKmer(seq,starti,k)[1]
+                mer = grabKmer(seq, starti, k)[1]
                 if not mer is None:
                     if not firstOnly or not mer in outD['peptide']:
                         outD['peptide'].append(mer)
@@ -321,7 +321,7 @@ def align2mers_tracked(align,nmers=[9],firstOnly=True):
 
 def fasta2align(fn,uniqueIndex=True):
     """Read sequences from a FASTA file and store in a pd.Series object indexed by the description"""
-    return fasta2df(fn,sep=None,columns=['name'],index='name',uniqueIndex=uniqueIndex).seq
+    return fasta2df(fn, sep=None, columns=['name'], index='name', uniqueIndex=uniqueIndex).seq
 
 def sliceAlign(align,region,sites=False):
     """Return a region of the alignment where region is (start, end)
@@ -344,7 +344,7 @@ def kmerSlice(align,starti,k,gapped=True):
         grabKmerFlag = 0
     else:
         grabKmerFlag = 1
-    return align.map(lambda s: grabKmer(s,starti,k)[grabKmerFlag])
+    return align.map(lambda s: grabKmer(s, starti, k)[grabKmerFlag])
 
 def alignmentEntropy(align, statistic = 'absolute', removeGaps = False, k = 1, logFunc = np.log):
     """Calculates the entropy in bits of each site (or kmer) in a sequence alignment.
@@ -384,9 +384,9 @@ def alignmentEntropy(align, statistic = 'absolute', removeGaps = False, k = 1, l
     L = len(align[align.index[0]])
     nKmers = L - k + 1
 
-    entropy = zeros(nKmers,dtype=float64)
+    entropy = zeros(nKmers, dtype=float64)
     for aai in arange(nKmers):
-        kmers = [grabKmer(seq,aai,k)[grabKmerFlag] for seq in align]
+        kmers = [grabKmer(seq, aai, k)[grabKmerFlag] for seq in align]
         """kmers that start with a gap or that are at the end and are of insufficent length, will be None"""
         kmers = [mer for mer in kmers if not mer is None]
         oh = objhist(kmers)
@@ -414,16 +414,16 @@ def generateAlignment(seqs):
         Aligned sequences.
     """
     """Create temporary file for MUSCLE"""
-    inFn=tempfile.mktemp(prefix='tmp_align',suffix='.fasta',dir=None)
-    outFn=tempfile.mktemp(prefix='tmp_align',suffix='.fasta',dir=None)
+    inFn=tempfile.mktemp(prefix='tmp_align', suffix='.fasta', dir=None)
+    outFn=tempfile.mktemp(prefix='tmp_align', suffix='.fasta', dir=None)
     
     
     """Creates an align object or pd.Series() with indexing to preserve order but does not appyl padding"""
     align = padAlignment(seqs, applyPadding=False)
     """Put alignments in the tempfiles"""
-    align2fasta(seqs,inFn,applyPadding=False)
+    align2fasta(seqs, inFn, applyPadding=False)
 
-    muscleCommand = ['muscle','-in',inFn,'-out',outFn]
+    muscleCommand = ['muscle', '-in', inFn, '-out', outFn]
     result = subprocess.call(muscleCommand)
 
     """If MUSCLE was successful"""
@@ -447,16 +447,16 @@ def generateAlignment(seqs):
         print('Different number of output seqs!')
         badSeqs+=1
 
-    for i,s1,s2 in zip(arange(len(seqs)),seqs,outAlign):
-        if not s1.replace('-','') == s2.replace('-',''):
-            print('%d: %s != %s' % (i,s1,s2))
+    for i, s1, s2 in zip(arange(len(seqs)), seqs, outAlign):
+        if not s1.replace('-', '') == s2.replace('-', ''):
+            print('%d: %s != %s' % (i, s1, s2))
             badSeqs+=1
     if badSeqs>0:
         raise Exception('Output seqs are different than input seqs! (%d)' % badSeqs)
 
     return outAlign
 
-def catAlignments(alignA,alignB):
+def catAlignments(alignA, alignB):
     """
     Take two dict or pd.Series as alignments and combine using MUSCLE
     Return a pd.Series of all aligned sequences indexed by original seq keys
@@ -472,9 +472,9 @@ def catAlignments(alignA,alignB):
     """
 
     """Create temporary files for MUSCLE to work on the two alignments"""
-    aFn=tempfile.mktemp(prefix='tmp_align',suffix='.fasta',dir=None)
-    bFn=tempfile.mktemp(prefix='tmp_align',suffix='.fasta',dir=None)
-    outFn=tempfile.mktemp(prefix='tmp_align',suffix='.fasta',dir=None)
+    aFn=tempfile.mktemp(prefix='tmp_align', suffix='.fasta', dir=None)
+    bFn=tempfile.mktemp(prefix='tmp_align', suffix='.fasta', dir=None)
+    outFn=tempfile.mktemp(prefix='tmp_align', suffix='.fasta', dir=None)
 
     
     """Make sure alignments have the same length and are Series objects"""
@@ -482,10 +482,10 @@ def catAlignments(alignA,alignB):
     alignB=padAlignment(alignB)
 
     """Put alignments in the tempfiles"""
-    align2fasta(alignA,aFn)
-    align2fasta(alignB,bFn)
+    align2fasta(alignA, aFn)
+    align2fasta(alignB, bFn)
 
-    muscleCommand=['muscle','-profile','-in1',aFn,'-in2',bFn,'-out',outFn]
+    muscleCommand=['muscle', '-profile', '-in1', aFn, '-in2', bFn, '-out', outFn]
     result=subprocess.call(muscleCommand)
 
     """If MUSCLE was successful"""
@@ -557,13 +557,13 @@ def pairwiseDiversity(fullAlign,region=None,subst=None,bySite=True):
     Return the fraction of valid (non-gap) pairwise comparisons at each site that are AA matched"""
 
     fullAlign=padAlignment(fullAlign)
-    align=sliceAlign(fullAlign,region)
+    align=sliceAlign(fullAlign, region)
     L=len(align[align.index[0]])
 
     if subst is None:
-        _PD_hamming(align,None,subst,bySite,True)
+        _PD_hamming(align, None, subst, bySite, True)
     
-    return _PD(align,None,subst,bySite,True)
+    return _PD(align, None, subst, bySite, True)
 
 def pairwiseDiversityInterGroup(align1,align2,region=None,subst=None,bySite=True):
     """Calculate pairwise diversity between two alignments
@@ -573,37 +573,37 @@ def pairwiseDiversityInterGroup(align1,align2,region=None,subst=None,bySite=True
     Return the fraction of valid (non-gap) pairwise comparisons at each site that are AA matched"""
 
     """Does not perform "padding" so alignments must have same sequence lengths"""
-    align1=sliceAlign(align1,region)
-    align2=sliceAlign(align2,region)
+    align1=sliceAlign(align1, region)
+    align2=sliceAlign(align2, region)
     L=len(align[align.index[0]])
 
     if subst is None:
-        _PD_hamming(align1,align2,subst,bySite,False)
+        _PD_hamming(align1, align2, subst, bySite, False)
     
-    return _PD(align1,align2,subst,bySite,False)
+    return _PD(align1, align2, subst, bySite, False)
 
-def _PD(alignA,alignB,subst,bySite,withinA):
+def _PD(alignA, alignB, subst, bySite, withinA):
     """Computation for pairwise diversity"""
     L=len(alignA.iloc[0])
 
     """Dist will be 1 where equal, 0 where not and nan if one is a gap"""
     if withinA:
-        dist=zeros((int(binomial(len(alignA),2)),L))
-        allPairs = itertools.combinations(alignA,2)
+        dist=zeros((int(binomial(len(alignA), 2)), L))
+        allPairs = itertools.combinations(alignA, 2)
     else:
-        dist=zeros((len(alignA)*len(alignB),L))
-        allPairs = itertools.product(alignA,alignB)
+        dist=zeros((len(alignA)*len(alignB), L))
+        allPairs = itertools.product(alignA, alignB)
     j=0
-    for seq1,seq2 in allPairs:
+    for seq1, seq2 in allPairs:
         """This line is the bottleneck. I should try some optimization here. This would help with all distance functions"""
-        dist[j,:]=array([i for i in map(lambda a,b: subst.get((a,b),subst.get((b,a))), seq1, seq2)])
+        dist[j,:]=array([i for i in map(lambda a, b: subst.get((a, b), subst.get((b, a))), seq1, seq2)])
         j+=1
     
     """Actually, pairwise diversity is a distance, not a similarity so identical AA should be counted as 0"""
     dist=1-dist
     if not bySite:
-        dist=nanmean(dist,axis=1)
-    return nanmean(dist,axis=0)
+        dist=nanmean(dist, axis=1)
+    return nanmean(dist, axis=0)
 
 def _PD_hamming(alignA,alignB,subst,bySite,withinA,ignoreGaps=True):
     """Computation for pairwise diversity using a vector optimized hamming distance.
@@ -612,49 +612,49 @@ def _PD_hamming(alignA,alignB,subst,bySite,withinA,ignoreGaps=True):
     gapCode = AA2CODE['-']
 
     """Convert alignments into integer arrays first to speed comparisons"""
-    matA = zeros((len(alignA),L))
-    for seqi,s in enumerate(alignA):
+    matA = zeros((len(alignA), L))
+    for seqi, s in enumerate(alignA):
         matA[seqi,:] = _seq2vec(s)
     if not withinA:
-        matB = zeros((len(alignB),L))
-        for seqi,s in enumerate(alignB):
+        matB = zeros((len(alignB), L))
+        for seqi, s in enumerate(alignB):
             matB[seqi,:] = _seq2vec(s)
 
     """Dist will be 1 where equal, 0 where not and nan if one is a gap"""
     if withinA:
-        dist=zeros((int(binomial(len(alignA),2)),L))
-        allPairs = itertools.combinations(arange(len(alignA)),2)
-        for j,(seqi1,seqi2) in enumerate(allPairs):
+        dist=zeros((int(binomial(len(alignA), 2)), L))
+        allPairs = itertools.combinations(arange(len(alignA)), 2)
+        for j, (seqi1, seqi2) in enumerate(allPairs):
             dist[j,:] = matA[seqi1,:]!=matA[seqi2,:]
             if ignoreGaps:
                 gapInd = (matA[seqi1,:]==gapCode) | (matA[seqi2,:]==gapCode)
-                dist[j,gapInd] = nan
+                dist[j, gapInd] = nan
     else:
-        dist=zeros((len(alignA)*len(alignB),L))
-        allPairs = itertools.product(arange(len(alignA)),arange(len(alignB)))
-        for j,(seqiA,seqiB) in enumerate(allPairs):
+        dist=zeros((len(alignA)*len(alignB), L))
+        allPairs = itertools.product(arange(len(alignA)), arange(len(alignB)))
+        for j, (seqiA, seqiB) in enumerate(allPairs):
             dist[j,:] = matA[seqiA,:]!=matB[seqiB,:]
             if ignoreGaps:
                 gapInd = (matA[seqiA,:]==gapCode) | (matB[seqiB,:]==gapCode)
-                dist[j,gapInd] = nan
+                dist[j, gapInd] = nan
 
     if not bySite:
-        dist=nanmean(dist,axis=1)
-    return nanmean(dist,axis=0)
+        dist=nanmean(dist, axis=1)
+    return nanmean(dist, axis=0)
 
 def pairwiseMutualInformation(align,nperms=1e4):
     """Compute the pairwise mutual information of all sites in the alignment
     Return matrix of M and p-values"""
     L=len(align[align.index[0]])
     columns=[align.map(lambda s: s[i]) for i in arange(L)]
-    M=nan*zeros((L,L))
-    p=nan*zeros((L,L))
-    Mstar=nan*zeros((L,L))
-    for xi,yi in itertools.combinations(arange(L),2):
+    M=nan*zeros((L, L))
+    p=nan*zeros((L, L))
+    Mstar=nan*zeros((L, L))
+    for xi, yi in itertools.combinations(arange(L), 2):
         freqx=objhist(columns[xi])
         freqy=objhist(columns[yi])
 
-        tmpM,tmpMstar,tmpp,Hx,Hy,Hxy=mutual_information(columns[xi],columns[yi],logfunc=log2,nperms=nperms)
+        tmpM, tmpMstar, tmpp, Hx, Hy, Hxy=mutual_information(columns[xi], columns[yi], logfunc=log2, nperms=nperms)
        
         """We wouldn't need to test invariant sites or a site with itself"""
         if len(freqx)==1 or len(freqy)==1:
@@ -662,12 +662,12 @@ def pairwiseMutualInformation(align,nperms=1e4):
         elif xi==yi:
             tmpp=nan
 
-        M[xi,yi]=tmpM
-        p[xi,yi]=tmpp
-        Mstar[xi,yi]=tmpMstar
+        M[xi, yi]=tmpM
+        p[xi, yi]=tmpp
+        Mstar[xi, yi]=tmpMstar
     q=fdrAdjust(p)
 
-    return M,Mstar,p,q
+    return M, Mstar, p, q
 
 def seqmat2align(smat,index=None):
     """Convert from an array of dtype=S1 to alignment"""
@@ -688,14 +688,14 @@ def align2mat(align, k=1, gapped=True):
         """Slightly faster, but not as flexible"""
         out = np.array([[s[i:i+k] for i in range(Nkmers)] for s in tmp], dtype='S%d' % k)
     else:
-        out = np.empty((L,Nkmers), dtype='S%d' % k)
-        for seqi,seq in enumerate(tmp):
+        out = np.empty((L, Nkmers), dtype='S%d' % k)
+        for seqi, seq in enumerate(tmp):
             for starti in range(Nkmers):
                 #out[seqi,starti] = seq[starti:starti+k]
                 full, ng = grabKmer(seq, starti, k=k)
                 if ng is None:
                     ng = '-'*k
-                out[seqi,starti] = ng
+                out[seqi, starti] = ng
     return out
 
 def align2aamat(align):
@@ -705,10 +705,10 @@ def align2aamat(align):
         break
     aaMat = align2mat(align)
     aaFeat = np.zeros((len(align), L, len(AALPHABET)))
-    for seqi,sitei in itertools.product(range(aaFeat.shape[0]), list(range(aaFeat.shape[1]))):
+    for seqi, sitei in itertools.product(range(aaFeat.shape[0]), list(range(aaFeat.shape[1]))):
         try:
-            aai = AALPHABET.index(aaMat[seqi,sitei])
-            aaFeat[seqi,sitei,aai] = 1.
+            aai = AALPHABET.index(aaMat[seqi, sitei])
+            aaFeat[seqi, sitei, aai] = 1.
         except ValueError:
             """If AA is not in AALPHABET then it is ignored"""
             continue
@@ -722,18 +722,18 @@ def condenseGappyAlignment(a, thresh=0.9):
     a = padAlignment(a)
     smat = align2mat(a)
     gapSiteInd = mean(smat == '-', axis=0) >= thresh
-    keepSeqInd = np.all(smat[:,gapSiteInd] == '-', axis=1)
-    print('Removing %d of %d sites and %d of %d sequences from the alignment.' % (gapSiteInd.sum(),smat.shape[1],(~keepSeqInd).sum(),smat.shape[0]))
+    keepSeqInd = np.all(smat[:, gapSiteInd] == '-', axis=1)
+    print('Removing %d of %d sites and %d of %d sequences from the alignment.' % (gapSiteInd.sum(), smat.shape[1], (~keepSeqInd).sum(), smat.shape[0]))
 
     smat = smat[keepSeqInd,:]
-    smat = smat[:,~gapSiteInd]
+    smat = smat[:, ~gapSiteInd]
     
     return seqmat2align(smat, index=a.index[keepSeqInd])
-def nx2sif(fn,g):
+def nx2sif(fn, g):
     """Write Networkx Graph() to SIF file for BioFabric or Cytoscape visualization"""
-    with open(fn,'w') as fh:
+    with open(fn, 'w') as fh:
         for e in g.edges_iter():
-            fh.write('%s pp %s\n' % (e[0],e[1]))
+            fh.write('%s pp %s\n' % (e[0], e[1]))
 def generateSequences(a,N=1,useFreqs=True):
     """Generate new sequences based on those in alignment a
     The AA at each position are chosen independently from the
@@ -745,31 +745,31 @@ def generateSequences(a,N=1,useFreqs=True):
     L = len(a.iloc[0])
 
     if useFreqs:
-        smat = empty((N,L),dtype='S1')
+        smat = empty((N, L), dtype='S1')
         for i in arange(L):
-            oh = objhist(sliceAlign(a,(i,i+1)))
-            smat[:,i] = oh.generateRandomSequence(N,useFreqs=True)
+            oh = objhist(sliceAlign(a, (i, i+1)))
+            smat[:, i] = oh.generateRandomSequence(N, useFreqs=True)
     else:
         chunkN = int(ceil(N/10))
         smat = None
         counter = 0
         actualN = 0
         while actualN < N and counter < N*100:
-            tmpmat = empty((chunkN,L),dtype='S1')
+            tmpmat = empty((chunkN, L), dtype='S1')
             for i in arange(L):
-                oh = objhist(sliceAlign(a,(i,i+1)))
-                tmpmat[:,i] = oh.generateRandomSequence(chunkN,useFreqs=False)
+                oh = objhist(sliceAlign(a, (i, i+1)))
+                tmpmat[:, i] = oh.generateRandomSequence(chunkN, useFreqs=False)
             if smat is None:
                 smat = tmpmat
             else:
-                smat = concatenate((smat,tmpmat),axis=0)
+                smat = concatenate((smat, tmpmat), axis=0)
             smat = unique_rows(smat)
             actualN = smat.shape[0]
             counter += 1
 
         outAlign = seqmat2align(smat[:actualN,:])
         if actualN<N:
-            print("Could not create N = %d unique sequences with %d attempts" % (N,counter*10))
+            print("Could not create N = %d unique sequences with %d attempts" % (N, counter*10))
             smat = smat[:actualN,:]
     outAlign = seqmat2align(smat)
     return outAlign
@@ -840,24 +840,24 @@ def kmerConsensus(align,k=9,verbose=False):
     full = [dict() for i in arange(L)]
     for starti in arange(Nkmers):
         """Create a temporary alignment of the ith kmer"""
-        tmpA = seqmat2align(mat[:,starti:starti+k])
+        tmpA = seqmat2align(mat[:, starti:starti+k])
         """Pick off the most common kmer at that start position"""
         top1 = objhist(tmpA).topN(n=2)[0][0]
         if verbose:
             print(' '*starti + top1)
             #print ' '*starti + objhist(tmpA).topN(n=2)[1][0]
         """Add each AA in the most frequent kmer to the consensus"""
-        for j,startj in enumerate(arange(starti,starti+k)):
+        for j, startj in enumerate(arange(starti, starti+k)):
             try:
                 full[startj][top1[j]] += 1
             except KeyError:
                 full[startj][top1[j]] = 1
     """Consensus is the mode AA at each position in full"""
-    con = ''.join([max(list(pos.keys()),key=pos.get) for pos in full])
+    con = ''.join([max(list(pos.keys()), key=pos.get) for pos in full])
     if verbose:
         print('Seq1: true consensus')
         print('Seq2: %dmer consensus' % k)
-        compSeq(consensus(align),con)
+        compSeq(consensus(align), con)
     return con, full
 def pepComp(align,useConsensus=True):
     """Return align with mix of upper and lower case
@@ -869,7 +869,7 @@ def pepComp(align,useConsensus=True):
         ref = identifyMindist(align)
     out = []
     for seq in align:
-        out.append(''.join([aa.upper() if aa.upper()==refaa.upper() else aa.lower() for aa,refaa in zip(seq,ref)]))
+        out.append(''.join([aa.upper() if aa.upper()==refaa.upper() else aa.lower() for aa, refaa in zip(seq, ref)]))
     return out
 
 def tree2pwdist(tree):
@@ -886,36 +886,36 @@ def tree2pwdist(tree):
     -------
     pwdist : pd.DataFrame
         Symmetric table of all pairwise distances with node labels as columns and index."""
-    if type(tree) == type(Phylo.BaseTree.Tree()):
+    if isinstance(tree, type(Phylo.BaseTree.Tree())):
         N = len(tree.get_terminals())
         names = [node.name for node in tree.get_terminals()]
-        pwdist = zeros((N,N))
-        for i,node1 in enumerate(tree.get_terminals()):
-            for j,node2 in enumerate(tree.get_terminals()):
+        pwdist = zeros((N, N))
+        for i, node1 in enumerate(tree.get_terminals()):
+            for j, node2 in enumerate(tree.get_terminals()):
                 """Compute half of these and assume symmetry"""
                 if i==j:
-                    pwdist[i,j] = 0
+                    pwdist[i, j] = 0
                 elif i<j:
-                    pwdist[i,j] = tree.distance(node1,node2)
-                    pwdist[j,i] = pwdist[i,j]
-    elif type(tree) == type(dendropy.Tree()):
+                    pwdist[i, j] = tree.distance(node1, node2)
+                    pwdist[j, i] = pwdist[i, j]
+    elif isinstance(tree, type(dendropy.Tree())):
         pdm = dendropy.treecalc.PatristicDistanceMatrix(tree)
         taxon_set = [n.taxon for n in tree.leaf_nodes()]
         N = len(taxon_set)
         names = [taxa.label for taxa in taxon_set]
-        pwdist = zeros((N,N))
-        for i,t1 in enumerate(taxon_set):
-            for j,t2 in enumerate(taxon_set):
+        pwdist = zeros((N, N))
+        for i, t1 in enumerate(taxon_set):
+            for j, t2 in enumerate(taxon_set):
                 """Compute half of these and assume symmetry"""
                 if i==j:
-                    pwdist[i,j] = 0
+                    pwdist[i, j] = 0
                 elif i<j:
-                    pwdist[i,j] = pdm(t1,t2)
-                    pwdist[j,i] = pwdist[i,j]
+                    pwdist[i, j] = pdm(t1, t2)
+                    pwdist[j, i] = pwdist[i, j]
     else:
         print('Tree type does not match Phylo.BaseTree.Tree or dendropy.Tree')
         return
-    return pd.DataFrame(pwdist,index = names, columns = names)
+    return pd.DataFrame(pwdist, index = names, columns = names)
 
 def overlappingKmers(s, k=15, overlap=11, includeFinalPeptide=True, returnStartInds=False):
     """Create a list of overlapping kmers from a single sequence
@@ -980,7 +980,7 @@ def compSeq(s1, s2, lineL=50):
             out = '.' if s1[sitei] == s2[sitei] else s2[sitei]
             outStr += s2[sitei]
         outStr += '\n\n'
-    outStr += 'Seq1 (%d) and Seq2 (%d) are %1.1f%% similar\n\n' % (len(s1),len(s2),1e2*samecount/count)
+    outStr += 'Seq1 (%d) and Seq2 (%d) are %1.1f%% similar\n\n' % (len(s1), len(s2), 1e2*samecount/count)
     print(outStr)
 
 def getStartPos(peptide, seq, subst=None):

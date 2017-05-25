@@ -67,10 +67,10 @@ def get2DBAMat(peptides, hlas, ba):
 
     hlaList = convertHLAAsterisk(hlaList)
 
-    bamat = _MAX_IC50 * np.ones((len(hlaList),len(peptides)))
-    for hlai,h in enumerate(hlaList):
+    bamat = _MAX_IC50 * np.ones((len(hlaList), len(peptides)))
+    for hlai, h in enumerate(hlaList):
         for pepi, pep in enumerate(peptides):
-            bamat[hlai,pepi] = ba[(h,pep)]
+            bamat[hlai, pepi] = ba[(h, pep)]
     baDf = pd.DataFrame(bamat, index = hlaList, columns = peptides)
     return baDf
 
@@ -107,12 +107,12 @@ def getBAMat(seqs, hlas, ba, k=9, gapless=False):
     """
 
     """Do all seqs have the same length"""
-    if len(np.unique(list(map(len,seqs)))) > 1:
-        raise ValueError('Sequences must all have the same length (%s)' % np.unique(list(map(len,seqs))))
+    if len(np.unique(list(map(len, seqs)))) > 1:
+        raise ValueError('Sequences must all have the same length (%s)' % np.unique(list(map(len, seqs))))
 
     nHLAs = len(hlas)
     nSeqs = len(seqs)
-    nSites = int(np.median(list(map(len,seqs))))
+    nSites = int(np.median(list(map(len, seqs))))
     nKmers = nSites - k + 1
 
     try:
@@ -120,12 +120,12 @@ def getBAMat(seqs, hlas, ba, k=9, gapless=False):
     except AttributeError:
         hlaList = hlas
 
-    baMat = np.nan * np.ones((nKmers,nSeqs,nHLAs), dtype = np.float64)
+    baMat = np.nan * np.ones((nKmers, nSeqs, nHLAs), dtype = np.float64)
 
     """Initialize the 3 dimensional binding affinity matrix"""
-    for seqi,s in enumerate(seqs):
+    for seqi, s in enumerate(seqs):
         for meri in range(nKmers):
-            gappedMer,gaplessMer = grabKmer(s,meri,k=k)
+            gappedMer, gaplessMer = grabKmer(s, meri, k=k)
             if gapless:
                 """Use the gapped 9mer to preserve the alignment precisely"""
                 mer = gaplessMer
@@ -133,10 +133,10 @@ def getBAMat(seqs, hlas, ba, k=9, gapless=False):
                 mer = gappedMer
             
             if mer is None:
-                baMat[meri,seqi,:] = np.nan
+                baMat[meri, seqi,:] = np.nan
             else:
-                for hlai,h in enumerate(hlaList):
-                    baMat[meri,seqi,hlai] = ba[(h,mer)]
+                for hlai, h in enumerate(hlaList):
+                    baMat[meri, seqi, hlai] = ba[(h, mer)]
     return baMat
 
 def BAMat2map(mat, hlas, siteMap=True, k=9, phenotypicFrequencies=False):
@@ -186,17 +186,17 @@ def BAMat2map(mat, hlas, siteMap=True, k=9, phenotypicFrequencies=False):
     
     freqVec = np.array([hlas[h] for h in hlaList])
 
-    nKmers,nSeqs,nHLAs = mat.shape
+    nKmers, nSeqs, nHLAs = mat.shape
 
     """Multiply element-wise by hla allele frequencies before summing"""
-    weightedMat = mat * np.tile(freqVec.reshape((1,1,nHLAs)), (nKmers,nSeqs,1))
+    weightedMat = mat * np.tile(freqVec.reshape((1, 1, nHLAs)), (nKmers, nSeqs, 1))
 
     if phenotypicFrequencies:
         """Convert total allele frequency into phenotypic frequency"""
-        locusFreq = np.zeros((2,nKmers,nSeqs))
-        for loci,locus in enumerate('AB'):
-            locusInd = [i for i,h in enumerate(hlaList) if h[0]==locus]
-            tmpFreq = weightedMat[:,:,locusInd].sum(axis=2)
+        locusFreq = np.zeros((2, nKmers, nSeqs))
+        for loci, locus in enumerate('AB'):
+            locusInd = [i for i, h in enumerate(hlaList) if h[0]==locus]
+            tmpFreq = weightedMat[:,:, locusInd].sum(axis=2)
             locusFreq[loci,:,:] = tmpFreq**2 + 2*tmpFreq*(1-tmpFreq)
         hlaBindingFreq = locusFreq[0,:,:]*locusFreq[1,:,:] + locusFreq[0,:,:]*(1-locusFreq[1,:,:]) + locusFreq[1,:,:]*(1-locusFreq[0,:,:])
     else:
@@ -239,12 +239,12 @@ def populationBindingMap(align, hlas, ba, bindingThreshold=5, k=9, atLeastFracSe
         indicating fraction of population binding the kmer, on average
     """
     """baMat is shape [nKmers x nSeqs x nHLAs]"""
-    baMat = (getBAMat(align,hlas,ba) < bindingThreshold).astype(np.float64)
+    baMat = (getBAMat(align, hlas, ba) < bindingThreshold).astype(np.float64)
     
     if atLeastFracSeqs>0:
         """Squashes baMat into [nKmers x 1 x nHLAs] indicating
         if each HLA binds at least X pct of sequences"""
-        baMat = (baMat.mean(axis=1)[:,None,:] > atLeastFracSeqs).astype(np.float64)
+        baMat = (baMat.mean(axis=1)[:, None,:] > atLeastFracSeqs).astype(np.float64)
 
     """If baMat is not squashed then vec is an average over sequences"""
     emap = BAMat2map(baMat, hlas, siteMap=False, k=9, phenotypicFrequencies=True)/baMat.shape[1]
@@ -312,7 +312,7 @@ def computeHLAHotspots(seqs, hlas, ba, hlaMask=None, bindingThreshold=5, nPerms=
     if hlaMask is None:
         hlaMask = np.ones((nSeqs, nHLAs))
 
-    hlaMaskMat = np.tile(hlaMask,(nKmers,1,1)).astype(np.float64)
+    hlaMaskMat = np.tile(hlaMask, (nKmers, 1, 1)).astype(np.float64)
 
     try:
         hlaList = sorted(hlas.keys())
@@ -334,14 +334,14 @@ def computeHLAHotspots(seqs, hlas, ba, hlaMask=None, bindingThreshold=5, nPerms=
     
     startT = time.time()
     logger.info('Starting computation of observed PDF')
-    obsPdf,obsSitePdf = _computePDF(weightedBinders, k)
+    obsPdf, obsSitePdf = _computePDF(weightedBinders, k)
     
     startT = time.time()
     logger.info('Starting permutation test')
     shuffledPr = np.zeros((nKmers, nPerms))
     
     """Only save the sites that were in k kmers (so dim=0 is nKmers not nSites)"""
-    shuffledSitePr = np.zeros((nKmers,nPerms))
+    shuffledSitePr = np.zeros((nKmers, nPerms))
     for permi in range(nPerms):
         if nPerms >= 100 and (permi % (nPerms//10)) == 0:
             logger.info('Completed %1.0f%% of permutations', 100 * (permi + 1.) / nPerms)
@@ -350,12 +350,12 @@ def computeHLAHotspots(seqs, hlas, ba, hlaMask=None, bindingThreshold=5, nPerms=
             so we can est. the p-value of the hotspot correctly)"""
         shuffWB = weightedBinders.copy()
         for hlai in range(nHLAs):
-            shuffWB[:,:,hlai] = shuffWB[permutation(nKmers),:,hlai]
-        pdf,sitePdf = _computePDF(shuffWB,k)
-        shuffledPr[:,permi] = pdf
+            shuffWB[:,:, hlai] = shuffWB[permutation(nKmers),:, hlai]
+        pdf, sitePdf = _computePDF(shuffWB, k)
+        shuffledPr[:, permi] = pdf
         
         """Don't include the sites at the begining which are in < k kmers"""
-        shuffledSitePr[:,permi] = sitePdf[(k-1):]
+        shuffledSitePr[:, permi] = sitePdf[(k-1):]
     logger.info('Completed hotspot computation in %1.1f seconds', time.time()-startT)
 
     """All kmers should be the same under the null so I can combine permutations across kmers"""
@@ -369,8 +369,8 @@ def computeHLAHotspots(seqs, hlas, ba, hlaMask=None, bindingThreshold=5, nPerms=
     
     sitePvalues = (np.array([(pr < shuffledSitePr).sum() for pr in obsSitePdf], dtype=np.float64) + 1) / (len(shuffledSitePr) + 1)
 
-    kmerNull = np.reshape(shuffledPr, (nKmers,nPerms))
-    siteNull = np.reshape(shuffledSitePr, (nKmers,nPerms))
+    kmerNull = np.reshape(shuffledPr, (nKmers, nPerms))
+    siteNull = np.reshape(shuffledSitePr, (nKmers, nPerms))
     if returnDf:
         kmerDf = pd.DataFrame({'KmerPDF':obsPdf,
                                'P-value':pvalues})
@@ -378,7 +378,7 @@ def computeHLAHotspots(seqs, hlas, ba, hlaMask=None, bindingThreshold=5, nPerms=
                                'P-value':sitePvalues})
         return kmerDf, siteDf
     else:
-        return obsPdf,pvalues,obsSitePdf,sitePvalues,kmerNull,siteNull
+        return obsPdf, pvalues, obsSitePdf, sitePvalues, kmerNull, siteNull
 
 def _computePDF(wb, k):
     """Used by computeHLAHotspots in the permutation test.
@@ -413,12 +413,12 @@ def plotKmerHotpots(pdf, pvalues=None, cutoff=0.025, pvalueCut=True, seqTicks=''
     if sigInd.sum() > 0:
         mn = min(pdf[sigInd])
         """Plot cutoff line"""
-        axh.plot([-1,xvec[-1]+1], [mn,mn], '--', color='red', lw=2, alpha=0.5)
+        axh.plot([-1, xvec[-1]+1], [mn, mn], '--', color='red', lw=2, alpha=0.5)
 
-    for x,y in zip(xvec,pdf):
-        axh.plot([x,x], [0,y], '-', color='gray', alpha=0.7)
-    axh.plot(xvec[sigInd],pdf[sigInd],'o',color='red')
-    axh.plot(xvec[~sigInd],pdf[~sigInd],'o',color='black')
+    for x, y in zip(xvec, pdf):
+        axh.plot([x, x], [0, y], '-', color='gray', alpha=0.7)
+    axh.plot(xvec[sigInd], pdf[sigInd], 'o', color='red')
+    axh.plot(xvec[~sigInd], pdf[~sigInd], 'o', color='black')
     plt.xlabel('9mer start position')
     
     plt.xlim((-1, xvec[-1]+1))
@@ -442,7 +442,7 @@ def plotSiteHotpots(pdf, pvalues, cutoff = 0.025, pvalueCut = True):
     if sigInd.sum() > 0:
         mn = min(pdf[sigInd])
         """Plot cutoff line"""
-        axh.plot([-1,xvec[-1]+1], [mn,mn], '--', color='red', lw=2, alpha=0.5)
+        axh.plot([-1, xvec[-1]+1], [mn, mn], '--', color='red', lw=2, alpha=0.5)
     
     axh.plot(xvec, pdf, '-', color='gray', alpha=0.7)
     axh.plot(xvec[~sigInd], pdf[~sigInd], 'o', color='gray', alpha=0.7)
@@ -456,9 +456,9 @@ def plotBindingGrid(hlas, peptides, ba, annotateIC50=True, limitToBinders=False)
     hlas = sorted(hlas, reverse =True)
     """Make a pd.DataFrame [hla x peptides] full of binding affinity IC50"""
     bamat = _MAX_IC50 * np.ones((len(hlas), len(peptides)))
-    for hlai,h in enumerate(hlas):
+    for hlai, h in enumerate(hlas):
         for pepi, pep in enumerate(peptides):
-            bamat[hlai,pepi] = ba[(h,pep)]
+            bamat[hlai, pepi] = ba[(h, pep)]
     baDf = pd.DataFrame(bamat, index=hlas, columns=peptides)
     if limitToBinders:
         ind = (bamat < np.log(1000)).any(axis=1)
@@ -472,22 +472,22 @@ def plotAlignmentBindingGrid(hlas, align, ba, topN=5, k=9, annotateIC50=True, li
 
     nHLAs = len(hlas)
     nSeqs = len(align)
-    nSites = int(np.median(list(map(len,align))))
+    nSites = int(np.median(list(map(len, align))))
     nKmers = nSites - k + 1
 
     """[hla,kmer]"""
-    bamat = _MAX_IC50 * np.ones((nHLAs,nKmers))
+    bamat = _MAX_IC50 * np.ones((nHLAs, nKmers))
 
     peptides=[]
-    for hlai,h in enumerate(hlas):
+    for hlai, h in enumerate(hlas):
         for meri in np.arange(bamat.shape[1]):
-            seqs = _sliceAlign(align,(meri,meri+k))
+            seqs = _sliceAlign(align, (meri, meri+k))
             """Remove any sequences with a gap at any position"""
             seqs = [s for s in seqs if s.find('-')==-1]
 
             topSeqs = [s for s in objhist(seqs).sortedKeys(reverse=True)][:topN]
-            tmp = np.array([ba[(h,pep)] for pep in topSeqs])
-            bamat[hlai,meri] = np.nanmin(tmp)
+            tmp = np.array([ba[(h, pep)] for pep in topSeqs])
+            bamat[hlai, meri] = np.nanmin(tmp)
 
             if hlai == 0:
                 peptides.append(topSeqs[0])
@@ -520,14 +520,14 @@ def _plotBindingGridCommon(hlas, peptides, baDf, annotateIC50):
     #heatCmap = get_cmap('hot')
 
     plt.clf()
-    axh = plt.subplot2grid((10,1), (1, 0), rowspan=9)
-    labelTxtProp = dict(family='monospace',size='medium',weight='bold',color='white',ha='center',va='center')
+    axh = plt.subplot2grid((10, 1), (1, 0), rowspan=9)
+    labelTxtProp = dict(family='monospace', size='medium', weight='bold', color='white', ha='center', va='center')
 
     axh.pcolor(qmat, cmap=heatCmap, vmin=0, vmax=1)
     if annotateIC50:
-        for hlai,h in enumerate(hlas):
+        for hlai, h in enumerate(hlas):
             for pepi, pep in enumerate(peptides):
-                if baDf.values[hlai,pepi] <= np.log(500):
+                if baDf.values[hlai, pepi] <= np.log(500):
                     txtArgs =  (np.round(np.exp(baDf.values[hlai, pepi]), -1))
                     plt.text(pepi+0.5,
                              hlai+0.5,
@@ -535,13 +535,13 @@ def _plotBindingGridCommon(hlas, peptides, baDf, annotateIC50):
                              **labelTxtProp)
 
     axh.colorbar(fraction=0.05,
-                 values=[0,0.2,0.4,0.6,1],
-                 boundaries=[0,50,150,400,1000],
+                 values=[0, 0.2, 0.4, 0.6, 1],
+                 boundaries=[0, 50, 150, 400, 1000],
                  label='IC50 (nM)')
 
     axh.grid(color='white')
-    plt.xlim((0,len(peptides)))
-    plt.ylim((0,len(hlas)))
+    plt.xlim((0, len(peptides)))
+    plt.ylim((0, len(hlas)))
     plt.yticks(np.arange(len(hlas)) + 0.5, hlas, fontname='Consolas')
     if len(peptides) < 50:
         axh.xaxis.tick_top()
@@ -550,7 +550,7 @@ def _plotBindingGridCommon(hlas, peptides, baDf, annotateIC50):
                    rotation=90,
                    fontname='Consolas')
     else:
-        plt.xticks(np.arange(0,len(peptides),10)+0.5, np.arange(0,len(peptides),10))
+        plt.xticks(np.arange(0, len(peptides), 10)+0.5, np.arange(0, len(peptides), 10))
 
     plt.xlabel('Peptides')
     plt.ylabel('HLA alleles')

@@ -9,7 +9,7 @@ But falls back to the scipy test if it cannot be found
 import numpy as np
 from copy import deepcopy
 
-__all__ = ['fisherTest','fisherTestVec','fisherPD']
+__all__ = ['fisherTest', 'fisherTestVec', 'fisherPD']
 
 try:
     """Attempt to use the fisher library (cython) if available (100x speedup)"""
@@ -38,15 +38,15 @@ try:
         p : float
             P-value associated with the test and the alternative hypothesis"""
         
-        res = fisher.pvalue(tab[0][0],tab[0][1],tab[1][0],tab[1][1])
+        res = fisher.pvalue(tab[0][0], tab[0][1], tab[1][0], tab[1][1])
         OR = (tab[0][0] * tab[1][1]) / (tab[0][1] * tab[1][0])
 
         if alternative == 'two-sided':
-            return (OR,res.two_tail)
+            return (OR, res.two_tail)
         elif alternative == 'less':
-            return (OR,res.left_tail)
+            return (OR, res.left_tail)
         elif alternative == 'greater':
-            return (OR,res.right_tail)
+            return (OR, res.right_tail)
 
     def fisherTestVec(a,b,c,d,alternative='two-sided'):
         """Vectorized Fisher's exact test performs n tests
@@ -74,15 +74,15 @@ try:
         p : shape (n,) ndarray
             Vector of p-values asspciated with each test and the alternative hypothesis"""
 
-        res = fisher.pvalue_npy(a.astype(np.uint),b.astype(np.uint),c.astype(np.uint),d.astype(np.uint))
+        res = fisher.pvalue_npy(a.astype(np.uint), b.astype(np.uint), c.astype(np.uint), d.astype(np.uint))
         OR = (a*d)/(b*c)
 
         if alternative == 'two-sided':
-            return (OR,res[2])
+            return (OR, res[2])
         elif alternative == 'less':
-            return (OR,res[0])
+            return (OR, res[0])
         elif alternative == 'greater':
-            return (OR,res[1])
+            return (OR, res[1])
 
     print("Using Cython-powered Fisher's exact test")
 
@@ -115,7 +115,7 @@ except ImportError:
             Vector of p-values asspciated with each test and the alternative hypothesis"""
         
         OR = (a*d)/(b*c)
-        p = np.asarray([fisherTest([[aa,bb],[cc,dd]], alternative=alternative)[1] for aa,bb,cc,dd in zip(a,b,c,d)])
+        p = np.asarray([fisherTest([[aa, bb], [cc, dd]], alternative=alternative)[1] for aa, bb, cc, dd in zip(a, b, c, d)])
         return OR, p
 
 def fisherPD(df, cols, alternative='two-sided'):
@@ -147,4 +147,4 @@ def fisherPD(df, cols, alternative='two-sided'):
     c = ((df[cols[0]] == uCols[0][1]) & (df[cols[1]] == uCols[1][0])).sum()
     d = ((df[cols[0]] == uCols[0][1]) & (df[cols[1]] == uCols[1][1])).sum()
     
-    return fisherTest([[a,b],[c,d]], alternative=alternative)
+    return fisherTest([[a, b], [c, d]], alternative=alternative)

@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from numpy.random import permutation,seed
+from numpy.random import permutation, seed
 import pandas as pd
 #import seaborn as sns
 
@@ -39,7 +39,7 @@ def scatterdots(data, x, axh=None, width=0.8, returnx=False, rseed=820, **kwargs
         if returnx:
             return None
         return
-    if not type(data) == np.ndarray:
+    if not isinstance(data, np.ndarray):
         data = np.array(data)
 
     validi = np.arange(len(data))
@@ -94,11 +94,11 @@ def myboxplot(data, x = 1, axh=None, width=0.8, boxcolor='black',scatterwidth=0.
     if axh is None:
         axh = plt.gca()
 
-    if type(data) is pd.Series:
+    if isinstance(data, pd.Series):
         data = data.values
 
     if not subsetInd is None:
-        if not (subsetInd.dtype == np.array([0,1], dtype=bool).dtype):
+        if not (subsetInd.dtype == np.array([0, 1], dtype=bool).dtype):
             tmp = np.zeros(data.shape, dtype=bool)
             tmp[subsetInd] = True
             subsetInd = tmp
@@ -171,14 +171,14 @@ def manyboxplots(df, cols=None, axh=None, colLabels=None,annotation='N',horizont
     elif len(colLabels)<cols:
         colLabels += cols[len(colLabels):]
 
-    for x,c in enumerate(cols):
+    for x, c in enumerate(cols):
         myboxplot(df[c].dropna(), x = x, axh = axh, **kwargs)
 
     if not vRange is None:        
         plt.ylim(vRange)
     yl = plt.ylim()
-    annotationKwargs = dict(xytext = (0,-10), textcoords = 'offset points', ha = 'center', va = 'top', size = 'medium')
-    for x,c in enumerate(cols):
+    annotationKwargs = dict(xytext = (0, -10), textcoords = 'offset points', ha = 'center', va = 'top', size = 'medium')
+    for x, c in enumerate(cols):
         tmp = df[c].dropna()
 
         if annotation == 'N':
@@ -186,6 +186,6 @@ def manyboxplots(df, cols=None, axh=None, colLabels=None,annotation='N',horizont
         elif annotation == 'pctpos':
             pass
         
-    plt.xlim((-1,x+1))
+    plt.xlim((-1, x+1))
     plt.xticks(np.arange(x+1))
     xlabelsL = axh.set_xticklabels(colLabels, fontsize = 'large', rotation = xRot, fontname = 'Consolas')

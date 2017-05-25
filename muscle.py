@@ -20,7 +20,7 @@ __all__ = ['muscle_align',
            'skbio2align']
 
 def align2skbio(align):
-    return skbio.TabularMSA([Sequence(s, metadata=dict(id=str(i))) for i,s in align.items()])
+    return skbio.TabularMSA([Sequence(s, metadata=dict(id=str(i))) for i, s in align.items()])
 
 def skbio2align(seqColl):
     return pd.Series({s.metadata['id']:''.join(s.values) for s in seqColl})
@@ -49,7 +49,7 @@ def muscle_align(seqs):
     inFn = tempfile.mktemp(prefix='tmp_align', suffix='.fasta', dir=None)
     outFn = tempfile.mktemp(prefix='tmp_align', suffix='.fasta', dir=None)
         
-    if not type(seqs) is pd.Series:
+    if not isinstance(seqs, pd.Series):
         align = pd.Series(seqs)
     else:
         align = seqs
@@ -94,9 +94,9 @@ def muscle_align(seqs):
         print('Different number of output seqs!')
         badSeqs += 1
 
-    for i,s1,s2 in zip(list(range(len(seqs))), seqs, outAlign):
+    for i, s1, s2 in zip(list(range(len(seqs))), seqs, outAlign):
         if not s1.replace('-', '') == s2.replace('-', ''):
-            print('%d: %s != %s' % (i,s1,s2))
+            print('%d: %s != %s' % (i, s1, s2))
             badSeqs += 1
     if badSeqs > 0:
         raise Exception('Output seqs are different than input seqs! (%d)' % badSeqs)

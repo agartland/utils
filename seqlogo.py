@@ -26,12 +26,12 @@ def parseColor(aa, colorsDf):
     """Used to parse the colors from shapely_aa_colors.tsv"""
     ind = colorsDf['Amino Acids'].map(lambda aminoacids: aa in aminoacids)
     if ind.sum() == 0:
-        return [0,0,0]
+        return [0, 0, 0]
         # return 'black'
     else:
         # return colorsDf['Color Name'].loc[ind].tolist()[0]
         tmp = colorsDf['RGB Values'].loc[ind].tolist()[0]
-        tmp = tmp.replace('[','').replace(']','').split(',')
+        tmp = tmp.replace('[', '').replace(']', '').split(',')
         arr = [float(a)/255. for a in tmp]
         return arr
 
@@ -52,7 +52,7 @@ def computeMotif(seqs):
 
     alphabet = skbio.sequence.Protein.alphabet
     
-    if not type(seqs) is pd.Series:
+    if not isinstance(seqs, pd.Series):
         align = pd.Series(seqs)
     else:
         align = seqs
@@ -67,7 +67,7 @@ def computeMotif(seqs):
         p = np.array([freq.get(k, 0) for k in alphabet])
         pNZ = p[p>0]
         totEntropy = np.log2(nAA) - ((-pNZ * np.log2(pNZ)).sum())
-        heights[:,coli] = p * totEntropy
+        heights[:, coli] = p * totEntropy
 
     return pd.DataFrame(heights, columns=list(range(L)), index=alphabet)
 

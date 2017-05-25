@@ -21,13 +21,13 @@ __all__ = ['otuLogRatios',
            '_maxTStat']
 
 def _dmeanStat(mat, boolInd, axis=0):
-    return mat[boolInd, :].mean(axis=axis) - mat[~boolInd, :].mean(axis=axis)
+    return mat[boolInd,:].mean(axis=axis) - mat[~boolInd,:].mean(axis=axis)
 def _sumDmeanStat(mat, boolInd):
     return (_dmeanStat(mat, boolInd)**2).sum()
 def _maxDmeanStat(mat, boolInd):
     return (_dmeanStat(mat, boolInd)**2).max()
 def _tStat(mat, boolInd, axis=0):
-    return tstatistic(mat[boolInd, :], mat[~boolInd, :], axis=axis, equal_var=True)
+    return tstatistic(mat[boolInd,:], mat[~boolInd,:], axis=axis, equal_var=True)
 def _sumTStat(mat, boolInd, axis=0):
     return np.abs(_tStat(mat, boolInd)).sum()
 def _maxTStat(mat, boolInd, axis=0):
@@ -58,14 +58,14 @@ def loadAbundance(filename, compositionNorm=True, truncate=True):
         -------
         outDf : pd.DataFrame [index: samples, columns: OTUs]"""
 
-        df = df.drop(['tax_id','rank'],axis = 1)
-        df = df.dropna(subset=['tax_name'],axis = 0)
+        df = df.drop(['tax_id', 'rank'], axis = 1)
+        df = df.dropna(subset=['tax_name'], axis = 0)
         df = df.rename_axis({'tax_name':'OTU'}, axis=1)
         df = df.set_index('OTU')
-        df = df.drop(['specimen'],axis = 0)
+        df = df.drop(['specimen'], axis = 0)
         df = df.T
-        df = df.dropna(subset=['label'],axis=0)
-        df['sid'] = df.label.str.replace('Sample-','S')
+        df = df.dropna(subset=['label'], axis=0)
+        df['sid'] = df.label.str.replace('Sample-', 'S')
         df = df.set_index('sid')
         df = df.drop('label', axis=1)
         df = df.astype(float)
@@ -114,12 +114,12 @@ def ratios2otumat(otuDf, lrvec):
     mat : pd.DataFrame [index: OTUs, columns: OTUs]"""
 
     nSamples, nOTUs = otuDf.shape
-    otuMat = pd.DataFrame(np.zeros((nOTUs,nOTUs)), columns=otuDf.columns, index=otuDf.columns)
+    otuMat = pd.DataFrame(np.zeros((nOTUs, nOTUs)), columns=otuDf.columns, index=otuDf.columns)
     for ind in lrvec.index:
         i = np.where(otuDf.columns == ind[0])[0]
         j = np.where(otuDf.columns == ind[1])[0]
-        otuMat.values[i,j] = lrvec[ind]
-        otuMat.values[j,i] = lrvec[ind]
+        otuMat.values[i, j] = lrvec[ind]
+        otuMat.values[j, i] = lrvec[ind]
     return otuMat
 
 
@@ -149,7 +149,7 @@ def otuLogRatios(otuDf):
     logRatio = np.zeros((nSamples, nRatios))
 
     """List of tuples of two indices for each ratio [nRatios]"""
-    ratioIndices = [(otui,otuj) for otui in range(nOTUs - 1) for otuj in range(otui+1,nOTUs)]
+    ratioIndices = [(otui, otuj) for otui in range(nOTUs - 1) for otuj in range(otui+1, nOTUs)]
 
     """List of indices corresponding to the ratios that contain each OTU"""
     otuIndices = [[j for j in range(nRatios) if otui in ratioIndices[j]] for otui in range(nOTUs)]
@@ -157,7 +157,7 @@ def otuLogRatios(otuDf):
     ratioCount = 0
     for otui in range(nOTUs - 1):
         tmpCount = int(nOTUs - (otui+1))
-        logRatio[:, ratioCount:(ratioCount+tmpCount)] =  logOTU[:, otui+1:] - logOTU[:,otui][:,None]
+        logRatio[:, ratioCount:(ratioCount+tmpCount)] =  logOTU[:, otui+1:] - logOTU[:, otui][:, None]
         ratioCount += tmpCount
 
     cols = [(otuDf.columns[ratioIndices[r][0]], otuDf.columns[ratioIndices[r][1]]) for r in range(nRatios)]
@@ -199,7 +199,7 @@ def globalLRPermTest(otuDf, labels, statfunc=_sumTStat, nperms=999, seed=110820)
     nRatios = int(nOTUs * (nOTUs-1) / 2)
 
     """List of tuples of two indices for each ratio [nRatios]"""
-    ratioIndices = [(otui,otuj) for otui in range(nOTUs - 1) for otuj in range(otui+1,nOTUs)]
+    ratioIndices = [(otui, otuj) for otui in range(nOTUs - 1) for otuj in range(otui+1, nOTUs)]
 
     """List of indices corresponding to the ratios that contain each OTU"""
     otuIndices = [[j for j in range(nRatios) if otui in ratioIndices[j]] for otui in range(nOTUs)]
@@ -254,7 +254,7 @@ def LRPermTest(otuDf, labels, statfunc=_dmeanStat, nperms=999, adjMethod='fdr_bh
     nRatios = int(nOTUs * (nOTUs-1) / 2)
 
     """List of tuples of two indices for each ratio [nRatios]"""
-    ratioIndices = [(otui,otuj) for otui in range(nOTUs - 1) for otuj in range(otui+1,nOTUs)]
+    ratioIndices = [(otui, otuj) for otui in range(nOTUs - 1) for otuj in range(otui+1, nOTUs)]
 
     """List of indices corresponding to the ratios that contain each OTU"""
     otuIndices = [[j for j in range(nRatios) if otui in ratioIndices[j]] for otui in range(nOTUs)]
@@ -266,8 +266,8 @@ def LRPermTest(otuDf, labels, statfunc=_dmeanStat, nperms=999, adjMethod='fdr_bh
     obs = statfunc(logRatio.values, labelBool)
     for permi in range(nperms):
         rind = np.random.permutation(nSamples)
-        samples[permi, :] = statfunc(logRatio.values, labelBool[rind])
-    pvalues = ((np.abs(samples) >= np.abs(obs[None, :])).sum(axis=0) + 1) / (nperms + 1)
+        samples[permi,:] = statfunc(logRatio.values, labelBool[rind])
+    pvalues = ((np.abs(samples) >= np.abs(obs[None,:])).sum(axis=0) + 1) / (nperms + 1)
 
     if adjMethod is None or adjMethod.lower() == 'none':
         qvalues = pvalues
@@ -331,7 +331,7 @@ def ancom(otuDf, labels, alpha=0.2, statfunc=_dmeanStat, nperms=0, adjMethod='fd
     nRatios = int(nOTUs * (nOTUs-1) / 2)
 
     """List of tuples of two indices for each ratio [nRatios]"""
-    ratioIndices = [(otui,otuj) for otui in range(nOTUs - 1) for otuj in range(otui+1,nOTUs)]
+    ratioIndices = [(otui, otuj) for otui in range(nOTUs - 1) for otuj in range(otui+1, nOTUs)]
 
     """List of indices corresponding to the ratios that contain each OTU"""
     otuIndices = [[j for j in range(nRatios) if otui in ratioIndices[j]] for otui in range(nOTUs)]
@@ -344,12 +344,12 @@ def ancom(otuDf, labels, alpha=0.2, statfunc=_dmeanStat, nperms=0, adjMethod='fd
         obs = statfunc(logRatio.values, labelBool)
         for permi in range(nperms):
             rind = np.random.permutation(nSamples)
-            samples[permi, :] = statfunc(logRatio.values, labelBool[rind])
-        pvalues = ((np.abs(samples) >= np.abs(obs[None, :])).sum(axis=0) + 1) / (nperms + 1)
+            samples[permi,:] = statfunc(logRatio.values, labelBool[rind])
+        pvalues = ((np.abs(samples) >= np.abs(obs[None,:])).sum(axis=0) + 1) / (nperms + 1)
     else:
         pvalues = np.zeros(nRatios)
         for ratioi in range(nRatios):
-            _,pvalues[ratioi] = stats.ranksums(logRatio.values[labelBool,ratioi], logRatio.values[~labelBool,ratioi])   
+            _, pvalues[ratioi] = stats.ranksums(logRatio.values[labelBool, ratioi], logRatio.values[~labelBool, ratioi])   
 
     if adjMethod is None or adjMethod.lower() == 'none':
         qvalues = pvalues
@@ -385,7 +385,7 @@ def _pvalueAdjust(pvalues, method='fdr_bh'):
     p = np.asarray(pvalues).ravel()
     qvalues = p.copy()
     nanInd = np.isnan(p)
-    _,q,_,_ = sm.stats.multipletests(p[~nanInd], alpha=0.2, method=method)
+    _, q, _, _ = sm.stats.multipletests(p[~nanInd], alpha=0.2, method=method)
     qvalues[~nanInd] = q
     qvalues = qvalues.reshape(pvalues.shape)
 

@@ -232,15 +232,15 @@ def hlaRule(island, hlaList, ba, topPct=0.1, nmer=[8, 9, 10]):
     possibleEpitopeInds = getMers(sharedInds, nmer=nmer)
     rankPctMat = np.ones((len(island), len(possibleEpitopeInds), len(hlaList)))
 
-    for ri,r in enumerate(island):
+    for ri, r in enumerate(island):
         """Get the predictions for all mers in this response"""
-        ranks,sorti,kmers,ic50,hla = rankEpitopes(ba, hlaList, r.seq, nmer=nmer, peptideLength=None)
-        for ii,inds in enumerate(possibleEpitopeInds):
+        ranks, sorti, kmers, ic50, hla = rankEpitopes(ba, hlaList, r.seq, nmer=nmer, peptideLength=None)
+        for ii, inds in enumerate(possibleEpitopeInds):
             """Find the part of each epitope that overlaps with this response"""
             curMer = ''.join([r.seq[si-r.L] for si in inds])
             if len(curMer) in nmer:
-                for hi,h in enumerate(hlaList):
-                    curIC50 = ba[(h,curMer)]
+                for hi, h in enumerate(hlaList):
+                    curIC50 = ba[(h, curMer)]
                     rankPctMat[ri, ii, hi] = (ic50 < curIC50).sum() / len(ic50)
 
     """Are any of the possible HLA:mer pairs in the topPct for all responses?"""
@@ -287,7 +287,7 @@ def findpeptide(pep, seq):
     endPos : int
         Start position (zero-indexed) of pep in seq or -1 if not found"""
 
-    ng = seq.replace('-','')
+    ng = seq.replace('-', '')
     ngInd = ng.find(pep)
     ngCount = 0
     pos = 0

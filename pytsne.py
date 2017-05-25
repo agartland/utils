@@ -88,7 +88,7 @@ def pca(X = np.array([]), no_dims = 50):
 	(n, d) = X.shape;
 	X = X - np.tile(np.mean(X, 0), (n, 1));
 	(l, M) = np.linalg.eig(np.dot(X.T, X));
-	Y = np.dot(X, M[:,0:no_dims]);
+	Y = np.dot(X, M[:, 0:no_dims]);
 	return Y;
 
 
@@ -137,7 +137,7 @@ def run_tsne(X = np.array([]), no_dims = 2, initial_dims = 50, perplexity = 30.0
 		# Compute gradient
 		PQ = P - Q;
 		for i in range(n):
-			dY[i,:] = np.sum(np.tile(PQ[:,i] * num[:,i], (no_dims, 1)).T * (Y[i,:] - Y), 0);
+			dY[i,:] = np.sum(np.tile(PQ[:, i] * num[:, i], (no_dims, 1)).T * (Y[i,:] - Y), 0);
 			
 		# Perform the update
 		if iter < 20:
@@ -169,4 +169,4 @@ if __name__ == "__main__":
 	X = np.loadtxt("mnist2500_X.txt");
 	labels = np.loadtxt("mnist2500_labels.txt");
 	Y = tsne(X, 2, 50, 20.0);
-	scatter(Y[:,0], Y[:,1], 20, labels);
+	scatter(Y[:, 0], Y[:, 1], 20, labels);

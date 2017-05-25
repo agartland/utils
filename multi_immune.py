@@ -10,7 +10,7 @@ from functools import partial
 from matplotlib.gridspec import GridSpec
 from matplotlib import cm
 import scipy.cluster.hierarchy as sch
-from corrplots import validPairwiseCounts, partialcorr,combocorrplot
+from corrplots import validPairwiseCounts, partialcorr, combocorrplot
 import statsmodels.api as sm
 from scipy import stats
 import seaborn as sns
@@ -47,7 +47,7 @@ def corrDmatFunc(df, metric='pearson-signed', dfunc=None, minN=10):
             dmat[np.isnan(dmat)] = 1
         elif metric in ['spearman-signed', 'pearson-signed']:
             """Anti-correlations are considered as dissimilar and will NOT cluster together"""
-            dmat = ((1 - df.corr(method = metric.replace('-signed',''), min_periods = minN).values) / 2)
+            dmat = ((1 - df.corr(method = metric.replace('-signed', ''), min_periods = minN).values) / 2)
             dmat[np.isnan(dmat)] = 1
         else:
             raise NameError('metric name not recognized')
@@ -58,14 +58,14 @@ def corrDmatFunc(df, metric='pearson-signed', dfunc=None, minN=10):
             for j in range(ncols):
                 """Assume distance is symetric"""
                 if i <= j:
-                    tmpdf = df.iloc[:,[i,j]]
+                    tmpdf = df.iloc[:, [i, j]]
                     tmpdf = tmpdf.dropna()
                     if tmpdf.shape[0] >= minN:
-                        d = dfunc(df.iloc[:,i],df.iloc[:,j])
+                        d = dfunc(df.iloc[:, i], df.iloc[:, j])
                     else:
                         d = np.nan
-                    dmat[i,j] = d
-                    dmat[j,i] = d
+                    dmat[i, j] = d
+                    dmat[j, i] = d
     return pd.DataFrame(dmat, columns = df.columns, index = df.columns)
 
 def hierClusterFunc(dmatDf, K=6, method='complete', returnLinkageMat=False):
@@ -83,9 +83,9 @@ def _colors2labels(labels, setStr='Set1', cmap=None):
     uLabels = sorted(np.unique(labels), key=oh.get, reverse=True)
     if cmap is None:
         N = max(3, min(9, len(uLabels)))
-        cmap = palettable.colorbrewer.get_map(setStr,'Qualitative',N).mpl_colors
-    cmapLookup = {k:col for k,col in zip(uLabels, itertools.cycle(cmap))}
-    if type(labels) is pd.Series:
+        cmap = palettable.colorbrewer.get_map(setStr, 'Qualitative', N).mpl_colors
+    cmapLookup = {k:col for k, col in zip(uLabels, itertools.cycle(cmap))}
+    if isinstance(labels, pd.Series):
         return labels.map(cmapLookup.get)
     else:
         return [cmapLookup[v] for v in labels]
@@ -105,7 +105,7 @@ def plotHeatmap(df, labels=None, titleStr=None, vRange=None, tickSz='small', cma
         vmin = np.min(np.ravel(df.values))
         vmax = np.max(np.ravel(df.values))
     else:
-        vmin,vmax = vRange
+        vmin, vmax = vRange
     
     if cmap is None:
         if vmin < 0 and vmax > 0 and vmax <= 1 and vmin >= -1:
@@ -117,12 +117,12 @@ def plotHeatmap(df, labels=None, titleStr=None, vRange=None, tickSz='small', cma
     fig.clf()
 
     if labels is None:
-        heatmapAX = fig.add_subplot(GridSpec(1,1,left=0.05,bottom=0.05,right=0.78,top=0.85)[0,0])
-        scale_cbAX = fig.add_subplot(GridSpec(1,1,left=0.87,bottom=0.05,right=0.93,top=0.85)[0,0])
+        heatmapAX = fig.add_subplot(GridSpec(1, 1, left=0.05, bottom=0.05, right=0.78, top=0.85)[0, 0])
+        scale_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.87, bottom=0.05, right=0.93, top=0.85)[0, 0])
     else:
-        cbAX = fig.add_subplot(GridSpec(1,1,left=0.05,bottom=0.05,right=0.09,top=0.85)[0,0])
-        heatmapAX = fig.add_subplot(GridSpec(1,1,left=0.1,bottom=0.05,right=0.78,top=0.85)[0,0])
-        scale_cbAX = fig.add_subplot(GridSpec(1,1,left=0.87,bottom=0.05,right=0.93,top=0.85)[0,0])
+        cbAX = fig.add_subplot(GridSpec(1, 1, left=0.05, bottom=0.05, right=0.09, top=0.85)[0, 0])
+        heatmapAX = fig.add_subplot(GridSpec(1, 1, left=0.1, bottom=0.05, right=0.78, top=0.85)[0, 0])
+        scale_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.87, bottom=0.05, right=0.93, top=0.85)[0, 0])
 
     my_norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
 
@@ -136,9 +136,9 @@ def plotHeatmap(df, labels=None, titleStr=None, vRange=None, tickSz='small', cma
     _clean_axis(heatmapAX)
 
     if annotation:
-        for i,j in itertools.product(list(range(df.shape[0])), list(range(df.shape[1]))):
-            v = df.values[i,j]
-            heatmapAX.annotate('%1.2f' % v, xy=(i,j), size='x-large', weight='bold', color='white',ha='center',va='center')
+        for i, j in itertools.product(list(range(df.shape[0])), list(range(df.shape[1]))):
+            v = df.values[i, j]
+            heatmapAX.annotate('%1.2f' % v, xy=(i, j), size='x-large', weight='bold', color='white', ha='center', va='center')
 
     """Column tick labels along the rows"""
     if tickSz is None:
@@ -159,7 +159,7 @@ def plotHeatmap(df, labels=None, titleStr=None, vRange=None, tickSz='small', cma
             l.set_markersize(0)
 
     """Add a colorbar"""
-    cb = fig.colorbar(axi,scale_cbAX) # note that we could pass the norm explicitly with norm=my_norm
+    cb = fig.colorbar(axi, scale_cbAX) # note that we could pass the norm explicitly with norm=my_norm
     cb.set_label(cmapLabel)
     """Make colorbar labels smaller"""
     """for t in cb.ax.yaxis.get_ticklabels():
@@ -176,7 +176,7 @@ def plotHierClust(dmatDf, Z, labels=None, titleStr=None, vRange=None, tickSz='sm
         vmin = np.min(np.ravel(dmatDf.values))
         vmax = np.max(np.ravel(dmatDf.values))
     else:
-        vmin,vmax = vRange
+        vmin, vmax = vRange
     
     if cmap is None:
         if vmin < 0 and vmax > 0 and vmax <= 1 and vmin >= -1:
@@ -188,15 +188,15 @@ def plotHierClust(dmatDf, Z, labels=None, titleStr=None, vRange=None, tickSz='sm
     fig.clf()
 
     if labels is None:
-        denAX = fig.add_subplot(GridSpec(1,1,left=0.05,bottom=0.05,right=0.15,top=0.85)[0,0])
-        heatmapAX = fig.add_subplot(GridSpec(1,1,left=0.16,bottom=0.05,right=0.78,top=0.85)[0,0])
+        denAX = fig.add_subplot(GridSpec(1, 1, left=0.05, bottom=0.05, right=0.15, top=0.85)[0, 0])
+        heatmapAX = fig.add_subplot(GridSpec(1, 1, left=0.16, bottom=0.05, right=0.78, top=0.85)[0, 0])
     else:
-        denAX = fig.add_subplot(GridSpec(1,1,left=0.05,bottom=0.05,right=0.15,top=0.85)[0,0])
-        cbAX = fig.add_subplot(GridSpec(1,1,left=0.16,bottom=0.05,right=0.19,top=0.85)[0,0])
-        heatmapAX = fig.add_subplot(GridSpec(1,1,left=0.2,bottom=0.05,right=0.78,top=0.85)[0,0])
+        denAX = fig.add_subplot(GridSpec(1, 1, left=0.05, bottom=0.05, right=0.15, top=0.85)[0, 0])
+        cbAX = fig.add_subplot(GridSpec(1, 1, left=0.16, bottom=0.05, right=0.19, top=0.85)[0, 0])
+        heatmapAX = fig.add_subplot(GridSpec(1, 1, left=0.2, bottom=0.05, right=0.78, top=0.85)[0, 0])
 
     if plotColorbar:
-        scale_cbAX = fig.add_subplot(GridSpec(1,1,left=0.87,bottom=0.05,right=0.93,top=0.85)[0,0])
+        scale_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.87, bottom=0.05, right=0.93, top=0.85)[0, 0])
 
     my_norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
 
@@ -208,7 +208,7 @@ def plotHierClust(dmatDf, Z, labels=None, titleStr=None, vRange=None, tickSz='sm
 
     if not labels is None:
         cbSE = _colors2labels(labels)
-        axi = cbAX.imshow([[x] for x in cbSE.iloc[colInd].values],interpolation='nearest',aspect='auto',origin='lower')
+        axi = cbAX.imshow([[x] for x in cbSE.iloc[colInd].values], interpolation='nearest', aspect='auto', origin='lower')
         _clean_axis(cbAX)
         if plotLegend:
             uLabels = np.unique(labels)
@@ -219,7 +219,7 @@ def plotHierClust(dmatDf, Z, labels=None, titleStr=None, vRange=None, tickSz='sm
             
 
     """Heatmap plot"""
-    axi = heatmapAX.imshow(dmatDf.values[colInd,:][:,colInd],interpolation='nearest',aspect='auto',origin='lower',norm=my_norm,cmap=cmap)
+    axi = heatmapAX.imshow(dmatDf.values[colInd,:][:, colInd], interpolation='nearest', aspect='auto', origin='lower', norm=my_norm, cmap=cmap)
     _clean_axis(heatmapAX)
 
     """Column tick labels along the rows"""
@@ -229,12 +229,12 @@ def plotHierClust(dmatDf, Z, labels=None, titleStr=None, vRange=None, tickSz='sm
     else:
         heatmapAX.set_yticks(np.arange(dmatDf.shape[1]))
         heatmapAX.yaxis.set_ticks_position('right')
-        heatmapAX.set_yticklabels(dmatDf.columns[colInd],fontsize=tickSz,fontname='Consolas')
+        heatmapAX.set_yticklabels(dmatDf.columns[colInd], fontsize=tickSz, fontname='Consolas')
 
         """Column tick labels"""
         heatmapAX.set_xticks(np.arange(dmatDf.shape[1]))
         heatmapAX.xaxis.set_ticks_position('top')
-        xlabelsL = heatmapAX.set_xticklabels(dmatDf.columns[colInd],fontsize=tickSz,rotation=90,fontname='Consolas')
+        xlabelsL = heatmapAX.set_xticklabels(dmatDf.columns[colInd], fontsize=tickSz, rotation=90, fontname='Consolas')
 
         """Remove the tick lines"""
         for l in heatmapAX.get_xticklines() + heatmapAX.get_yticklines(): 
@@ -242,7 +242,7 @@ def plotHierClust(dmatDf, Z, labels=None, titleStr=None, vRange=None, tickSz='sm
 
     """Add a colorbar"""
     if plotColorbar:
-        cb = fig.colorbar(axi,scale_cbAX) # note that we could pass the norm explicitly with norm=my_norm
+        cb = fig.colorbar(axi, scale_cbAX) # note that we could pass the norm explicitly with norm=my_norm
         cb.set_label(cmapLabel)
         """Make colorbar labels smaller"""
         for t in cb.ax.yaxis.get_ticklabels():
@@ -250,7 +250,7 @@ def plotHierClust(dmatDf, Z, labels=None, titleStr=None, vRange=None, tickSz='sm
 
     """Add title as xaxis label"""
     if not titleStr is None:
-        heatmapAX.set_xlabel(titleStr,size='x-large')
+        heatmapAX.set_xlabel(titleStr, size='x-large')
     plt.show()
 
 
@@ -278,12 +278,12 @@ def pivotDiagnostic(df, index, columns, values):
     except ValueError:
         if type(columns) in [str, str]:
             columns = [columns]
-        if not type(columns) is list:
+        if not isinstance(columns, list):
             columns = list(columns)
 
         if type(values) in [str, str]:
             values = [values]
-        if not type(values) is list:
+        if not isinstance(values, list):
             values = list(values)
 
         dupInd = df[[index] + columns].duplicated(keep=False)

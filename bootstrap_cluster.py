@@ -39,41 +39,41 @@ def bootstrapFeatures(dmat, clusterFunc, bootstraps = 100, rseed = 110820):
 
     N = dmat.shape[0]
 
-    pwrel = np.zeros((N,N))
+    pwrel = np.zeros((N, N))
     """Keep track of the number of times that two variables are sampled together"""
-    tot = np.zeros((N,N))
+    tot = np.zeros((N, N))
   
     for i in range(bootstraps):
         """Use tmp arrays because there can only be 1 count per bootstrap maximum"""
-        tmpTot = np.zeros((N,N))
-        tmpRel = np.zeros((N,N))
+        tmpTot = np.zeros((N, N))
+        tmpRel = np.zeros((N, N))
 
         rind = np.floor(np.random.rand(N) * N).astype(int)
         if isinstance(dmat, pd.DataFrame):
-            rdmat = dmat.iloc[:,rind].iloc[rind,:]
+            rdmat = dmat.iloc[:, rind].iloc[rind,:]
         else:
-            rdmat = dmat[:,rind][rind,:]
+            rdmat = dmat[:, rind][rind,:]
         labels = clusterFunc(rdmat)
 
-        for rj,rk in itertools.product(list(range(N)),list(range(N))):
+        for rj, rk in itertools.product(list(range(N)), list(range(N))):
             """Go through all pairs of variables (lower half of the pwdist matrix)"""
             
             """Keep track of indices into original dmat (j,k) and those into the
             resampled dmat (rj, rk)"""
-            j,k = rind[rj], rind[rk]
+            j, k = rind[rj], rind[rk]
             if j<k:
-                if rj != rk and tmpTot[j,k] == 0:
-                    tmpTot[j,k] = 1 
+                if rj != rk and tmpTot[j, k] == 0:
+                    tmpTot[j, k] = 1 
                     if labels[rj] == labels[rk]:
-                        tmpRel[j,k] = 1
+                        tmpRel[j, k] = 1
         pwrel += tmpRel
         tot += tmpTot
-    for j,k in itertools.product(list(range(N)),list(range(N))):
+    for j, k in itertools.product(list(range(N)), list(range(N))):
         if j<k:
-            pwrel[j,k] = pwrel[j,k] / tot[j,k]
-            pwrel[k,j] = pwrel[j,k]
+            pwrel[j, k] = pwrel[j, k] / tot[j, k]
+            pwrel[k, j] = pwrel[j, k]
         elif j == k:
-            pwrel[j,k] = 1
+            pwrel[j, k] = 1
     pwrel = 1 - pwrel
 
     if isinstance(dmat, pd.DataFrame):
@@ -121,9 +121,9 @@ def bootstrapObservations(df, dmatFunc, clusterFunc, bootstraps = 100, rseed = 1
     assert N == dmat.shape[0]
     assert N == dmat.shape[1]
 
-    pwrel = np.zeros((N,N))
+    pwrel = np.zeros((N, N))
     """Keep track of the number of times that two variables are sampled together"""
-    tot = np.zeros((N,N))
+    tot = np.zeros((N, N))
   
     for i in range(bootstraps):
         """Resample observations (rows) with replacement"""
@@ -135,18 +135,18 @@ def bootstrapObservations(df, dmatFunc, clusterFunc, bootstraps = 100, rseed = 1
 
         labels = clusterFunc(rdmat)
 
-        for j,k in itertools.product(list(range(N)),list(range(N))):
+        for j, k in itertools.product(list(range(N)), list(range(N))):
             """Go through all pairs of variables (lower half of the pwdist matrix)"""
             if j<k:
                 if labels[j] == labels[k]:
-                    pwrel[j,k] += 1.
+                    pwrel[j, k] += 1.
 
-    for j,k in itertools.product(list(range(N)),list(range(N))):
+    for j, k in itertools.product(list(range(N)), list(range(N))):
         if j<k:
-            pwrel[j,k] = pwrel[j,k] / bootstraps
-            pwrel[k,j] = pwrel[j,k]
+            pwrel[j, k] = pwrel[j, k] / bootstraps
+            pwrel[k, j] = pwrel[j, k]
         elif j == k:
-            pwrel[j,k] = 1
+            pwrel[j, k] = 1
     pwrel = 1 - pwrel
 
     if isinstance(dmat, pd.DataFrame):

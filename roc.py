@@ -52,14 +52,14 @@ def computeROC(df, model, outcomeVar, predVars):
     prob : pd.Series
         Predicted probabilities with index from df"""
 
-    if not type(predVars) is list:
+    if not isinstance(predVars, list):
         predVars = list(predVars)
     tmp = df[[outcomeVar] + predVars].dropna()
 
     try:
         results = model.fit(X=tmp[predVars].astype(float), y=tmp[outcomeVar].astype(float))
         if hasattr(results, 'predict_proba'):
-            prob = results.predict_proba(tmp[predVars].astype(float))[:,1]
+            prob = results.predict_proba(tmp[predVars].astype(float))[:, 1]
         else:
             prob = results.predict(tmp[predVars].astype(float))
             results.predict_proba = results.predict
@@ -67,13 +67,13 @@ def computeROC(df, model, outcomeVar, predVars):
 
         acc = sklearn.metrics.accuracy_score(tmp[outcomeVar].values, np.round(prob), normalize=True)
         auc = sklearn.metrics.auc(fpr, tpr)
-        tpr[0], tpr[-1] = 0,1
+        tpr[0], tpr[-1] = 0, 1
     except sm.tools.sm_exceptions.PerfectSeparationError:
         print('PerfectSeparationError: %s (N = %d; %d predictors)' % (outcomeVar, tmp.shape[0], len(predVars)))
         acc = 1.
         fpr = np.zeros(5)
         tpr = np.ones(5)
-        tpr[0], tpr[-1] = 0,1
+        tpr[0], tpr[-1] = 0, 1
         prob = df[outcomeVar].values.astype(float)
         auc = 1.
         results = None
@@ -113,7 +113,7 @@ def computeCVROC(df, model, outcomeVar, predVars, nFolds=10):
     success : bool
         An indicator of whether the cross-validation was completed."""
 
-    if not type(predVars) is list:
+    if not isinstance(predVars, list):
         predVars = list(predVars)
     tmp = df[[outcomeVar] + predVars].dropna()
     cv = sklearn.cross_validation.KFold(n=tmp.shape[0],
@@ -135,16 +135,16 @@ def computeCVROC(df, model, outcomeVar, predVars, nFolds=10):
                                                                             predVars)
         if not res is None:
             counter += 1
-            testProb = res.predict_proba(testDf[predVars].astype(float))[:,1]
+            testProb = res.predict_proba(testDf[predVars].astype(float))[:, 1]
             testFPR, testTPR, _ = sklearn.metrics.roc_curve(testDf[outcomeVar].values, testProb)
-            tpr[:,i] = np.interp(fpr, testFPR, testTPR)
+            tpr[:, i] = np.interp(fpr, testFPR, testTPR)
             acc += sklearn.metrics.accuracy_score(testDf[outcomeVar].values, np.round(testProb), normalize=True)
             results.append(res)
             prob.append(pd.Series(testProb, index=testDf.index))
     
     if counter == nFolds:
         meanTPR = np.nanmean(tpr, axis=1)
-        meanTPR[0], meanTPR[-1] = 0,1
+        meanTPR[0], meanTPR[-1] = 0, 1
         meanACC = acc / counter
         meanAUC = sklearn.metrics.auc(fpr, meanTPR)
         """Compute mean probability over test predictions in CV"""
@@ -162,7 +162,7 @@ def computeCVROC(df, model, outcomeVar, predVars, nFolds=10):
                                                                     outcomeVar,
                                                                     predVars)
         meanTPR = np.interp(fpr, testFPR, testTPR)
-        meanTPR[0], meanTPR[-1] = 0,1
+        meanTPR[0], meanTPR[-1] = 0, 1
         results = [res]
         success = False
         '''
@@ -207,7 +207,7 @@ def computeLOOROC(df, model, outcomeVar, predVars):
     success : bool
         An indicator of whether the cross-validation was completed."""
 
-    if not type(predVars) is list:
+    if not isinstance(predVars, list):
         predVars = list(predVars)
     tmp = df[[outcomeVar] + predVars].dropna()
 
@@ -225,7 +225,7 @@ def computeLOOROC(df, model, outcomeVar, predVars):
         wholeRes = model.fit(X=tmp[predVars].astype(float), y=tmp[outcomeVar].astype(float))
         if not hasattr(wholeRes, 'predict_proba'):
             wholeRes.predict_proba = wholeRes.predict
-        wholeProb = wholeRes.predict_proba(tmp[predVars].astype(float))[:,1]
+        wholeProb = wholeRes.predict_proba(tmp[predVars].astype(float))[:, 1]
     except sm.tools.sm_exceptions.PerfectSeparationError:
         print('PerfectSeparationError on complete dataset: %s (N = %d; %d predictors)' % (outcomeVar, tmp.shape[0], len(predVars)))
         outcome = tmp[outcomeVar]
@@ -236,7 +236,7 @@ def computeLOOROC(df, model, outcomeVar, predVars):
         tpr = np.interp(fpr, testFPR, testTPR)
         acc = 1
         auc = 1
-        tpr[0], tpr[-1] = 0,1
+        tpr[0], tpr[-1] = 0, 1
 
         probS = pd.Series(prob, index=tmp.index)
         probS.name = 'Prob'
@@ -254,7 +254,7 @@ def computeLOOROC(df, model, outcomeVar, predVars):
             results.append(res)
             if not hasattr(res, 'predict_proba'):
                 res.predict_proba = res.predict
-            prob[i] = res.predict_proba(testDf[predVars].astype(float))[0,1]
+            prob[i] = res.predict_proba(testDf[predVars].astype(float))[0, 1]
         except sm.tools.sm_exceptions.PerfectSeparationError:
             print('PerfectSeparationError: %s (N = %d; %d predictors)' % (outcomeVar, tmp.shape[0], len(predVars)))
             prob[i] = wholeProb[i]
@@ -264,7 +264,7 @@ def computeLOOROC(df, model, outcomeVar, predVars):
     tpr = np.interp(fpr, testFPR, testTPR)
     acc = sklearn.metrics.accuracy_score(outcome, np.round(prob), normalize=True)
     auc = sklearn.metrics.auc(testFPR, testTPR)
-    tpr[0], tpr[-1] = 0,1
+    tpr[0], tpr[-1] = 0, 1
 
     probS = pd.Series(prob, index=ids)
     probS.name = 'Prob'
@@ -297,9 +297,9 @@ def plotCVROC(df, model, outcomeVar, predictorsList, predictorLabels=None, rocFu
     
     colors = palettable.colorbrewer.qualitative.Set1_8.mpl_colors
 
-    fprList, tprList, labelList = [],[],[]
+    fprList, tprList, labelList = [], [], []
 
-    for predVarsi,predVars in enumerate(predictorsList):
+    for predVarsi, predVars in enumerate(predictorsList):
         fpr, tpr, auc, acc, res, probS, success = rocFunc(df,
                                                          model,
                                                          outcomeVar,
@@ -319,7 +319,7 @@ def plotROC(fprL, tprL, aucL=None, accL=None, labelL=None, outcomeVar=''):
     if labelL is None and aucL is None and accL is None:
         labelL = ['Model %d' % i for i in range(len(fprL))]
     else:
-        labelL = ['%s (AUC = %0.2f; ACC = %0.2f)' % (label, auc, acc) for label,auc,acc in zip(labelL, aucL, accL)]
+        labelL = ['%s (AUC = %0.2f; ACC = %0.2f)' % (label, auc, acc) for label, auc, acc in zip(labelL, aucL, accL)]
 
     colors = palettable.colorbrewer.qualitative.Set1_8.mpl_colors
 
@@ -351,15 +351,15 @@ def plotProb(outcome, prob, **kwargs):
     colors = palettable.colorbrewer.qualitative.Set1_3.mpl_colors
 
     tmp = pd.concat((outcome, prob), join='inner', axis=1)
-    tmp = tmp.sort_values(by=[outcome.name,'Prob'])
+    tmp = tmp.sort_values(by=[outcome.name, 'Prob'])
     tmp['x'] = np.arange(tmp.shape[0])
     
     plt.clf()
-    for color,val in zip(colors, tmp[outcome.name].unique()):
+    for color, val in zip(colors, tmp[outcome.name].unique()):
         ind = tmp[outcome.name] == val
         lab = '%s = %1.0f (%d)' % (outcome.name, val, ind.sum())
         plt.scatter(tmp.x.loc[ind], tmp.Prob.loc[ind], label=lab, color=color, **kwargs)
-    plt.plot([0,tmp.shape[0]],[0.5, 0.5], 'k--', lw=1)
+    plt.plot([0, tmp.shape[0]], [0.5, 0.5], 'k--', lw=1)
     plt.legend(loc='upper left')
     plt.ylabel('Predicted Pr(%s)' % outcome.name)
     plt.ylim((-0.05, 1.05))
@@ -380,24 +380,24 @@ def plot2Prob(df, outcomeVar, prob, **kwargs):
     prob : list
         Contains two pd.Series with predicted probabilities
         from computeROC or computeCVROC"""
-    labels = {(0,0):'Neither',
-              (1,1):'Both',
-              (0,1):'%s only' % outcomeVar[1],
-              (1,0):'%s only' % outcomeVar[0]}
-    markers = ['o','s','^','x']
+    labels = {(0, 0):'Neither',
+              (1, 1):'Both',
+              (0, 1):'%s only' % outcomeVar[1],
+              (1, 0):'%s only' % outcomeVar[0]}
+    markers = ['o', 's', '^', 'x']
     colors = palettable.colorbrewer.qualitative.Set1_5.mpl_colors
     tmp = df[outcomeVar].join(prob[0], how='inner').join(prob[1], how='inner', rsuffix='_Y')
 
     plt.clf()
     plt.gca().set_aspect('equal')
     prodIter = itertools.product(tmp[outcomeVar[0]].unique(), tmp[outcomeVar[1]].unique())
-    for color,m,val in zip(colors, markers, prodIter):
+    for color, m, val in zip(colors, markers, prodIter):
         valx, valy = val
         ind = (tmp[outcomeVar[0]] == valx) & (tmp[outcomeVar[1]] == valy)
         lab = labels[val] + ' (%d)' % ind.sum()
         plt.scatter(tmp.Prob.loc[ind], tmp.Prob_Y.loc[ind], label=lab, color=color, marker=m, **kwargs)
-    plt.plot([0.5,0.5], [0,1], 'k--', lw=1)
-    plt.plot([0,1], [0.5,0.5], 'k--', lw=1)
+    plt.plot([0.5, 0.5], [0, 1], 'k--', lw=1)
+    plt.plot([0, 1], [0.5, 0.5], 'k--', lw=1)
     plt.ylim((-0.05, 1.05))
     plt.xlim((-0.05, 1.05))
     plt.legend(loc='upper left')
@@ -447,7 +447,7 @@ def lassoVarSelect(df, outcomeVar, predVars, nFolds=10, LOO=False, alpha=None):
         Variables with non-zero coefficients
     alpha : float
         Optimal alpha value using coordinate descent path"""
-    if not type(predVars) is list:
+    if not isinstance(predVars, list):
         predVars = list(predVars)
     tmp = df[[outcomeVar] + predVars].dropna()
     if nFolds == 1 or not alpha is None:
@@ -464,7 +464,7 @@ def lassoVarSelect(df, outcomeVar, predVars, nFolds=10, LOO=False, alpha=None):
         model = sklearn.linear_model.LassoCV(cv=cv)# , alphas=np.linspace(0.001,0.1,50))
     results = model.fit(y=tmp[outcomeVar].astype(float), X=tmp[predVars].astype(float))
 
-    if hasattr(model,'alpha_'):
+    if hasattr(model, 'alpha_'):
         optimalAlpha = model.alpha_
     else:
         optimalAlpha = model.alpha
@@ -491,9 +491,9 @@ class smLogisticRegression(object):
         return self
 
     def predict_proba(self, X):
-        prob = np.zeros((X.shape[0],2))
-        prob[:,0] = 1 - self.predict(X)
-        prob[:,1] = self.predict(X)
+        prob = np.zeros((X.shape[0], 2))
+        prob[:, 0] = 1 - self.predict(X)
+        prob[:, 1] = self.predict(X)
         return prob
 
     def predict(self, X):

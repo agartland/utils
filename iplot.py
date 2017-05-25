@@ -43,25 +43,25 @@ class AnnotationPicker:
             self.drawOne(ind)
             for linkedPicker in self.links:
                 linkedPicker.drawOne(ind)
-    def drawOne(self,ind):
-        x,y=self.xdata[ind],self.ydata[ind]
+    def drawOne(self, ind):
+        x, y=self.xdata[ind], self.ydata[ind]
         note=self.notes[ind]
         # print 'Drawing %s at (%s, %s)' % (note, x, y)
-        if (x,y) in list(self.drawn.keys()):
-            markers = self.drawn[(x,y)]
+        if (x, y) in list(self.drawn.keys()):
+            markers = self.drawn[(x, y)]
             for m in markers:
                 m.set_visible(not m.get_visible())
             self.axis.figure.canvas.draw()
         else:
-            kwargs={'xy':(x,y),
+            kwargs={'xy':(x, y),
                     'size':'x-small',
                     'family':'monospace',
-                    'xytext':(5,5),
+                    'xytext':(5, 5),
                     'textcoords':'offset points'}
             kwargs.update(self.textKwargs)
-            t = self.axis.annotate( "%s" % (note),**kwargs)
-            m = self.axis.scatter([x],[y], marker='d', c='r', zorder=100,s=1)
-            self.drawn.update({(x,y):(t,m)})
+            t = self.axis.annotate( "%s" % (note), **kwargs)
+            m = self.axis.scatter([x], [y], marker='d', c='r', zorder=100, s=1)
+            self.drawn.update({(x, y):(t, m)})
             self.fig.canvas.draw()
         
     def __del__(self):
@@ -69,7 +69,7 @@ class AnnotationPicker:
     def disconnect(self):
         self.fig.canvas.mpl_disconnect(self.connid)
     def connect(self):
-        self.connid=self.fig.canvas.mpl_connect('pick_event',self.callback)
+        self.connid=self.fig.canvas.mpl_connect('pick_event', self.callback)
 
 def linkPickers(pickers):
     """Links a sequence of pickers such that picking a point on one plot
@@ -116,9 +116,9 @@ class AnnoteFinder:
             clickY = event.ydata
             if self.axis is None or self.axis==event.inaxes:
                 annotes = []
-                for x,y,a in self.data:
+                for x, y, a in self.data:
                     if clickX-self.xtol < x < clickX+self.xtol and clickY-self.ytol < y < clickY+self.ytol :
-                        annotes.append((self.distance(x,clickX,y,clickY),x,y, a) )
+                        annotes.append((self.distance(x, clickX, y, clickY), x, y, a) )
                 if annotes:
                     annotes.sort()
                     distance, x, y, annote = annotes[0]
@@ -130,26 +130,26 @@ class AnnoteFinder:
         """
         Draw the annotation on the plot
         """
-        if (x,y) in self.drawnAnnotations:
-            markers = self.drawnAnnotations[(x,y)]
+        if (x, y) in self.drawnAnnotations:
+            markers = self.drawnAnnotations[(x, y)]
             for m in markers:
                 m.set_visible(not m.get_visible())
             self.axis.figure.canvas.draw()
         else:
-            kwargs={'xy':(x,y),
+            kwargs={'xy':(x, y),
                     'size':'small',
                     'family':'monospace',
-                    'xytext':(5,5),
+                    'xytext':(5, 5),
                     'textcoords':'offset points'}
             if self.coordCaption:
-                t = axis.annotate("(%3.2f, %3.2f) - %s"%(x,y,annote), **kwargs)
+                t = axis.annotate("(%3.2f, %3.2f) - %s"%(x, y, annote), **kwargs)
             else:
-                t = axis.annotate( "%s" % (annote),**kwargs)
-            m = axis.scatter([x],[y], marker='d', c='r', zorder=100,s=1)
-            self.drawnAnnotations[(x,y)] =(t,m)
+                t = axis.annotate( "%s" % (annote), **kwargs)
+            m = axis.scatter([x], [y], marker='d', c='r', zorder=100, s=1)
+            self.drawnAnnotations[(x, y)] =(t, m)
             self.axis.figure.canvas.draw()
 
     def drawSpecificAnnote(self, annote):
-        annotesToDraw = [(x,y,a) for x,y,a in self.data if a==annote]
-        for x,y,a in annotesToDraw:
+        annotesToDraw = [(x, y, a) for x, y, a in self.data if a==annote]
+        for x, y, a in annotesToDraw:
             self.drawAnnote(self.axis, x, y, a)

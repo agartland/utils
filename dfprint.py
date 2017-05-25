@@ -9,7 +9,7 @@ __all__ = ['toPNG', 'toPDF']
 
 def toPNG(df, outFn, dpi=200, **kwargs):
     assert outFn[-4:] == '.png'
-    folder,fn = op.split(outFn)
+    folder, fn = op.split(outFn)
     pdfFn = outFn.replace('.png', '.pdf')
     toPDF(df, pdfFn, **kwargs)
     cmd = ['convert',# '-interaction=nonstopmode',
@@ -55,9 +55,9 @@ def toPDF(df,
     else:
         paper = 'legalpaper'
 
-    folder,fn = op.split(outFn)
+    folder, fn = op.split(outFn)
     
-    if type(df) is pd.Series:
+    if isinstance(df, pd.Series):
         df = pd.DataFrame(df)
     def repChar(s, c1, c2):
         if not isinstance(s, str):
@@ -90,7 +90,7 @@ def toPDF(df,
     
     footer = ['\\end{document}']
 
-    with open(texFn,'w') as fh:
+    with open(texFn, 'w') as fh:
         for h in header:
             fh.write(h + '\n')
         sout = df.to_latex(float_format=lambda f: float_format % f,

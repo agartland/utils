@@ -24,15 +24,15 @@ try:
     """Attempt to use the fisher library (cython) if available (100x speedup)"""
     import fisher
     def fisherTest(tab,alternative='two-sided'):
-        res = fisher.pvalue(tab[0][0],tab[0][1],tab[1][0],tab[1][1])
+        res = fisher.pvalue(tab[0][0], tab[0][1], tab[1][0], tab[1][1])
         OR = (tab[0][0] * tab[1][1]) / (tab[0][1] * tab[1][0])
 
         if alternative == 'two-sided':
-            return (OR,res.two_tail)
+            return (OR, res.two_tail)
         elif alternative == 'less':
-            return (OR,res.left_tail)
+            return (OR, res.left_tail)
         elif alternative == 'greater':
-            return (OR,res.right_tail)
+            return (OR, res.right_tail)
     print("Using Cython-powered Fisher's exact test")
 except ImportError:
     print("Using scipy.stats Fisher's exact test (slow)")
@@ -90,20 +90,20 @@ def veEndpointsRequired(rr0=1, rralt=0.5, targetpow=0.9, K=1, alpha=0.025):
     """Start search at trials w/ > 5 infection endpts"""
     n = 5      
     """Find (approx?) upper bound for n"""
-    while curPower < np.min(targetpow + 0.05,0.99):
+    while curPower < np.min(targetpow + 0.05, 0.99):
         n = n + 1
         """Compute critical value for exact binomial test and power"""
-        xcrit = stats.binom.ppf(alpha,n,p0) - 1
-        curPower = stats.binom.cdf(xcrit,n,p)
+        xcrit = stats.binom.ppf(alpha, n, p0) - 1
+        curPower = stats.binom.cdf(xcrit, n, p)
     
     """Now search backwards for smallest n for which power is greater than target for all larger n"""
     while curPower > targetpow:     
         n = n - 1
-        xcrit = stats.binom.ppf(alpha,n,p0) - 1
-        curPower = stats.binom.cdf(xcrit,n,p)
+        xcrit = stats.binom.ppf(alpha, n, p0) - 1
+        curPower = stats.binom.cdf(xcrit, n, p)
 
     n = n + 1
-    xcrit = stats.binom.ppf(alpha,n,p0) - 1
+    xcrit = stats.binom.ppf(alpha, n, p0) - 1
     return n, xcrit
 
 def eventRatePower(rate, N, alpha=0.05,iterations=1e3,alternative='two-sided',rseed=820):
@@ -124,7 +124,7 @@ def magnitudePower(mu, N, sigma=None, CV=None, alpha=0.05, paired=False, iterati
             print('Need to specify variability as sigma or CV!')
             return
         else:
-            sigma = [m*c for c,m in zip(CV,mu)]
+            sigma = [m*c for c, m in zip(CV, mu)]
     dataFunc = [lambda N: np.random.randn(N)*sigma[0] + mu[0], lambda N: np.random.randn(N)*sigma[1] + mu[1]]
     
     if paired:
@@ -137,7 +137,7 @@ def magnitudePower(mu, N, sigma=None, CV=None, alpha=0.05, paired=False, iterati
         testFunc = stats.ttest_ind
     return powerBySim(dataFunc, testFunc, N, alpha=alpha, iterations=iterations, rseed=rseed)
 
-def powerBySim(dataFunc, testFunc, N, alpha=0.05, iterations=1e3, PMagInds=(1,0), rseed=820):
+def powerBySim(dataFunc, testFunc, N, alpha=0.05, iterations=1e3, PMagInds=(1, 0), rseed=820):
     """Calculate power for detecting difference in two groups,
     based on functions for simulating data and testing for difference.
     Returns power or for vector of alphas, a vector of powers.
@@ -158,13 +158,13 @@ def powerBySim(dataFunc, testFunc, N, alpha=0.05, iterations=1e3, PMagInds=(1,0)
     res = np.array([testFunc(dataFunc[0](N[0]), dataFunc[1](N[1])) for i in range(iterations)])
 
     """Note that these are swapped from how many tests work [pvalue, mag] which is why default is (1,0)"""
-    p = res[:,PMagInds[0]]
-    magnitude = np.nanmean(res[:,PMagInds[1]])
+    p = res[:, PMagInds[0]]
+    magnitude = np.nanmean(res[:, PMagInds[1]])
     
     if isscalar(alpha):
         return (p < alpha).mean(), magnitude
     else:
-        tiledPow = (np.tile(p[None,:], (len(alpha),1)) < np.tile(alpha[:,None],(1,iterations))).mean(axis=0)
+        tiledPow = (np.tile(p[None,:], (len(alpha), 1)) < np.tile(alpha[:, None], (1, iterations))).mean(axis=0)
         return tiledPow, magnitude
 
 def fisherTestVector(aVec, bVec, alternative='two-sided'):
@@ -173,7 +173,7 @@ def fisherTestVector(aVec, bVec, alternative='two-sided'):
     bS = bVec.sum()
     aL = len(aVec[:])
     bL = len(bVec[:])
-    table = [[aS,aL-aS],[bS,bL-bS]]
+    table = [[aS, aL-aS], [bS, bL-bS]]
     return fisherTest(table, alternative)
 
 def powerBySubsample(df, func, subsamples, nStraps=1000, aplha=0.05):
@@ -184,7 +184,7 @@ def powerBySubsample(df, func, subsamples, nStraps=1000, aplha=0.05):
     Returns the fraction of times the null hyp was rejected in subsamples
     Data samples should be along the first dimension (rows)"""
 
-    observedP,observedEffect = func(df)
+    observedP, observedEffect = func(df)
 
     effectSize = np.zeros(nStraps)
     pvalue = np.zeros(nStraps)
@@ -199,7 +199,7 @@ def powerBySubsample(df, func, subsamples, nStraps=1000, aplha=0.05):
 
     return power, effectSize, pvalue, observedEffect, observedP
 
-def probGTEX(x,N,prob):
+def probGTEX(x, N, prob):
     """Probability of x or more events (x>0) given,
     N trials and per trial probability prob"""
     return 1 - stats.binom.cdf(x-1, N, prob)
@@ -225,7 +225,7 @@ def correlationCI(N, rho=None, alpha=0.05, bootstraps=None):
     Borkowf CB. 2000. A new nonparametric method for variance estimation and
     confidence interval construction for Spearman's rank correlation 34:219-241"""
     if rho is None:
-        rho = np.linspace(0.05,0.95,20)
+        rho = np.linspace(0.05, 0.95, 20)
     t = rho * np.sqrt((N-2) / (1-rho**2))
     p = stats.distributions.t.sf(np.abs(t), N-2)*2
 
@@ -237,22 +237,22 @@ def correlationCI(N, rho=None, alpha=0.05, bootstraps=None):
         lower = np.tanh(np.arctanh(rho) - delta)
         upper = np.tanh(np.arctanh(rho) + delta)
     else:
-        aL,bL = [],[]
-        fakedata = np.random.randn(N,2)
+        aL, bL = [], []
+        fakedata = np.random.randn(N, 2)
         for i in range(len(rho)):
-            res = induceRankCorr(fakedata, np.array([[1,rho[i]],[rho[i],1]]))
-            aL.append(res[:,0])
-            bL.append(res[:,1])
+            res = induceRankCorr(fakedata, np.array([[1, rho[i]], [rho[i], 1]]))
+            aL.append(res[:, 0])
+            bL.append(res[:, 1])
 
-        out = np.array([spearmanCI(a,b, alpha=alpha, bootstraps=bootstraps) for a,b in zip(aL,bL)])
-        rho = out[:,0]
-        p = out[:,1]
-        lower = out[:,2]
-        upper = out[:,3]
+        out = np.array([spearmanCI(a, b, alpha=alpha, bootstraps=bootstraps) for a, b in zip(aL, bL)])
+        rho = out[:, 0]
+        p = out[:, 1]
+        lower = out[:, 2]
+        upper = out[:, 3]
     return rho, p, lower, upper
 
 def spearmanCI(a, b, alpha=0.05, bootstraps=None):
-    rho,p = stats.spearmanr(a,b)
+    rho, p = stats.spearmanr(a, b)
 
     if bootstraps is None:
         stderr = 1./np.sqrt(N - 3)
@@ -261,7 +261,7 @@ def spearmanCI(a, b, alpha=0.05, bootstraps=None):
         upper = np.tanh(np.arctanh(rho) + delta)
     else:
         func = lambda *data: stats.spearmanr(*data)[0]
-        lower,upper = ci((a,b), statfunction=func, alpha=alpha, n_samples=bootstraps)
+        lower, upper = ci((a, b), statfunction=func, alpha=alpha, n_samples=bootstraps)
     return rho, p, lower, upper
 
 def statDistByN(N, CV, statFunc, alpha=0.05, straps=1000):
@@ -273,7 +273,7 @@ def statDistByN(N, CV, statFunc, alpha=0.05, straps=1000):
     result = np.zeros(straps)
     for i in range(straps):
         result[i] = statFunc(np.random.randn(N)*(CV*mu) + mu)
-    return result.mean(), np.percentile(result,alpha/2), np.percentile(result, 1-alpha/2), result
+    return result.mean(), np.percentile(result, alpha/2), np.percentile(result, 1-alpha/2), result
 
 def sumAnyNBinom(p, anyN=1):
     """Returns probability of a positive outcome given that 
@@ -296,7 +296,7 @@ def sumAnyNBinom(p, anyN=1):
     n = len(p)
     tmp = np.zeros(n)
     tot = np.zeros(2**n)
-    for eventi,event in enumerate(itertools.product(*tuple([[0,1]]*n))):
+    for eventi, event in enumerate(itertools.product(*tuple([[0, 1]]*n))):
         event = np.array(event)
         if np.sum(event) >= anyN:
             tmp[np.find(event==1)] = p[np.find(event==1)]
@@ -363,4 +363,4 @@ def computeRR(df, outcome, predictor, alpha=0.05):
     """Wald CI"""
     pvalue = stats.norm.cdf(np.log(rr)/se)
 
-    return  pd.Series([rr, ci[0], ci[1], pvalue], index=['RR','LL', 'UL','pvalue'])
+    return  pd.Series([rr, ci[0], ci[1], pvalue], index=['RR', 'LL', 'UL', 'pvalue'])
