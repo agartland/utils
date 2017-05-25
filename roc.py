@@ -1,3 +1,4 @@
+from __future__ import division
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -6,12 +7,15 @@ import itertools
 import statsmodels.api as sm
 import sklearn
 import sklearn.ensemble
+import sklearn.cross_validation
+import sklearn.linear_model
 import palettable
 
 sns.set(style='darkgrid', palette='muted', font_scale=1.5)
 
 __all__ = ['computeROC',
            'computeCVROC',
+           'computeLOOROC',
            'plotROC',
            'plotCVROC',
            'plotProb',

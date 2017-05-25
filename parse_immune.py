@@ -6,7 +6,14 @@ __all__ = ['parseICS',
            'parseNAB',
            'parseRx',
            'unstackIR',
-           'irLabels']
+           'irLabels',
+           'icsTicks',
+           'icsTickLabels']
+
+icsTicks = np.log10([0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1])
+icsTickLabels = ['0.01','0.025', '0.05', '0.1','0.25','0.5','1']
+# icsTicks = np.log10([0.01, 0.025, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1])
+#icsTickLabels = ['0.01','0.025', '0.05', '0.1','0.2','0.4','0.6','0.8', '1']
 
 def irLabels(c):
     poss = ['CD4+', 'CD8+', 'IgG', 'IgA']

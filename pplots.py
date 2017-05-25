@@ -56,7 +56,8 @@ def plotResultSummary(resDf, index, columns,
     statH = statH.fillna(0)
     pdata = {pvalue:pH, qvalue:qH, stat:statH}
 
-    if statH.shape[0] == 0:
+    if statH.shape[0] < 2:
+        plt.clf()
         return
 
     if indexOrder is None:
