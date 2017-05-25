@@ -20,16 +20,16 @@ class SeparateData(object):
                 pass
             elif attr[:2] == '__':
                 pass
-            elif attr in special.keys():
+            elif attr in list(special.keys()):
                 out[attr] = special[attr](self.__getattribute__(attr))
             else:
                 out[attr] = self.__getattribute__(attr)
         return out
     def from_dict(self,d,special={},kwargs={}):
-        for k in kwargs.keys():
+        for k in list(kwargs.keys()):
             self.__setattr__(k,kwargs[k])
-        for k in d.keys():
-            if not k in special.keys():
+        for k in list(d.keys()):
+            if not k in list(special.keys()):
                 self.__setattr__(k,d[k])
             else:
                 self.__setattr__(k,special[k](d[k]))

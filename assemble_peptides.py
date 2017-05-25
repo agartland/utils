@@ -43,7 +43,7 @@ def _assembleTwo(seq1, seq2):
             try:
                 (s1,e1),(s2,e2) = msa[-1]
             except:
-                print msa
+                print(msa)
 
             if s1 >= s2:
                 return seq1 + seq2[e2+1:]
@@ -51,7 +51,7 @@ def _assembleTwo(seq1, seq2):
                 return seq2 + seq1[e1+1:]
             return out
         else:
-            print 'No significant overlap'
+            print('No significant overlap')
             raise
 
 def _extendForward(seq, peptides, overlapL=8):
@@ -79,19 +79,19 @@ if __name__ == '__main__':
     
     df = pd.read_excel(args.filename)
     if args.useInds:
-        out = range(1, df['AA End'].max() + 1)
+        out = list(range(1, df['AA End'].max() + 1))
         for i, row in df.iterrows():
             pep = row['Peptide Sequence']
             errors = 0
-            for aai, aa in zip(range(row['AA Start'], row['AA Start'] + len(pep)), pep):
+            for aai, aa in zip(list(range(row['AA Start'], row['AA Start'] + len(pep))), pep):
                 # print '(%s)%d%s' % (out[aai - 1], aai, aa)
                 if out[aai - 1] == aai:
                     out[aai - 1] = aa
                 elif not out[aai - 1] == aa:
-                    print 'Error in assembly at %s%d%s' % (out[aai - 1], aai, aa)
+                    print('Error in assembly at %s%d%s' % (out[aai - 1], aai, aa))
                     errors += 1
             if errors > 0:
-                print row['Peptide Id'], pep
+                print(row['Peptide Id'], pep)
         for i,aa in enumerate(out):
             if type(aa) is int:
                 out[i] = '-'
@@ -109,12 +109,12 @@ if __name__ == '__main__':
             for pep in oldPeptides:
                 if re.search(pep, middleOL):
                     peptides.remove(pep)
-                    print 'Found %s in middle of %s' % (pep, seq)
+                    print('Found %s in middle of %s' % (pep, seq))
                     break
                 elif re.search(pep, startOL) or re.search(pep, endOL):
-                    print 'Found %s in edge of %s' % (pep, seq)
+                    print('Found %s in edge of %s' % (pep, seq))
                     seq = _assembleTwo(seq, pep)
-                    print seq
+                    print(seq)
                     peptides.remove(seq)
                     break
         fullSeq = seq
@@ -122,6 +122,6 @@ if __name__ == '__main__':
         pass
 
     fastaStr = '>%s\n%s\n' % (df['Peptide Group Name'].unique()[0], fullSeq)
-    print fastaStr
+    print(fastaStr)
     with open(outFn, 'w') as fh:
         fh.write(fastaStr)

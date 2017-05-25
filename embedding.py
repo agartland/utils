@@ -14,7 +14,7 @@ try:
     import tsne
 except ImportError:
     import pytsne as tsne
-    print "seqdistance: Could not load tsne; falling back on pytsne"
+    print("seqdistance: Could not load tsne; falling back on pytsne")
 
 """Embedding of pairwise-distance matrices."""
 
@@ -54,7 +54,7 @@ def embedDistanceMatrix(dmatDf, method='kpca', n_components=2):
         try:
             gram = dist2kernel(dmat)
         except:
-            print 'Could not convert dmat to kernel for KernelPCA; using 1 - dmat/dmat.max() instead'
+            print('Could not convert dmat to kernel for KernelPCA; using 1 - dmat/dmat.max() instead')
             gram = 1 - dmat / dmat.max()
         xy = pcaObj.fit_transform(gram)[:,:n_components]
     elif method == 'lle':
@@ -64,7 +64,7 @@ def embedDistanceMatrix(dmatDf, method='kpca', n_components=2):
         tsneObj = TSNE(n_components=n_components, metric='precomputed', random_state=0)
         xy = tsneObj.fit_transform(dmat)
     else:
-        print 'Method unknown: %s' % method
+        print('Method unknown: %s' % method)
         return
 
     assert xy.shape[0] == dmatDf.shape[0]

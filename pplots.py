@@ -68,7 +68,7 @@ def plotResultSummary(resDf, index, columns,
         kept = pdata[pvalue].index.tolist()
         indexOrder = [ss for ss in indexOrder if ss in kept]
 
-    for k in pdata.keys():
+    for k in list(pdata.keys()):
         pdata[k] = pdata[k].loc[indexOrder]
     
     censorInd = pdata[censor[0]] < censor[1]
@@ -98,7 +98,7 @@ def plotResultSummary(resDf, index, columns,
         left = 0.15
     gs = plt.GridSpec(1, nPanels, left=left, bottom=0.02, right=0.95, top=0.95, wspace=0.3)
     for i in range(nPanels):
-        tmp = {k:v.iloc[int(splitN*i) : int((i+1) * splitN)] for k,v in pdata.items()}
+        tmp = {k:v.iloc[int(splitN*i) : int((i+1) * splitN)] for k,v in list(pdata.items())}
         axh = figh.add_subplot(gs[0, i])
         axh.grid(None)
         pcolOut = plt.pcolormesh(tmp[stat].values, **pcParams)

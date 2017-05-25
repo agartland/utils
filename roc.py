@@ -1,4 +1,4 @@
-from __future__ import division
+
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -69,7 +69,7 @@ def computeROC(df, model, outcomeVar, predVars):
         auc = sklearn.metrics.auc(fpr, tpr)
         tpr[0], tpr[-1] = 0,1
     except sm.tools.sm_exceptions.PerfectSeparationError:
-        print 'PerfectSeparationError: %s (N = %d; %d predictors)' % (outcomeVar, tmp.shape[0], len(predVars))
+        print('PerfectSeparationError: %s (N = %d; %d predictors)' % (outcomeVar, tmp.shape[0], len(predVars)))
         acc = 1.
         fpr = np.zeros(5)
         tpr = np.ones(5)
@@ -153,9 +153,9 @@ def computeCVROC(df, model, outcomeVar, predVars, nFolds=10):
         assert probS.shape[0] == tmp.shape[0]
         success = True
     else:
-        print 'ROC: did not finish all folds (%d of %d)' % (counter, nFolds)
+        print('ROC: did not finish all folds (%d of %d)' % (counter, nFolds))
         """If we get a PerfectSeparation error on one fold then report model fit to all data"""
-        print "Returning metrics from fitting complete dataset (no CV)"
+        print("Returning metrics from fitting complete dataset (no CV)")
 
         testFPR, testTPR, meanAUC, meanACC, res, probS = computeROC(tmp,
                                                                     model,
@@ -227,7 +227,7 @@ def computeLOOROC(df, model, outcomeVar, predVars):
             wholeRes.predict_proba = wholeRes.predict
         wholeProb = wholeRes.predict_proba(tmp[predVars].astype(float))[:,1]
     except sm.tools.sm_exceptions.PerfectSeparationError:
-        print 'PerfectSeparationError on complete dataset: %s (N = %d; %d predictors)' % (outcomeVar, tmp.shape[0], len(predVars))
+        print('PerfectSeparationError on complete dataset: %s (N = %d; %d predictors)' % (outcomeVar, tmp.shape[0], len(predVars)))
         outcome = tmp[outcomeVar]
         prob = outcome
         results = [None] * tmp.shape[0]
@@ -256,7 +256,7 @@ def computeLOOROC(df, model, outcomeVar, predVars):
                 res.predict_proba = res.predict
             prob[i] = res.predict_proba(testDf[predVars].astype(float))[0,1]
         except sm.tools.sm_exceptions.PerfectSeparationError:
-            print 'PerfectSeparationError: %s (N = %d; %d predictors)' % (outcomeVar, tmp.shape[0], len(predVars))
+            print('PerfectSeparationError: %s (N = %d; %d predictors)' % (outcomeVar, tmp.shape[0], len(predVars)))
             prob[i] = wholeProb[i]
             results.append(None)
     

@@ -7,9 +7,9 @@ import sys
 import traceback
 
 def convert(path):
-    print path
+    print(path)
     files = glob(path)
-    print 'Converting %d files in %s' % (len(files), path)
+    print('Converting %d files in %s' % (len(files), path))
     for f in files:
         if f[-9:] == '.sas7bdat':
             fout = f[:-9] + '.csv'

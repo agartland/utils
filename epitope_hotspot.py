@@ -8,7 +8,7 @@ try:
     import matplotlib.pyplot as plt
     import matplotlib
 except ImportError:
-    print 'Imported epitope_hotspot without matplotlib.'
+    print('Imported epitope_hotspot without matplotlib.')
 
 
 import statsmodels.api as sm
@@ -107,12 +107,12 @@ def getBAMat(seqs, hlas, ba, k=9, gapless=False):
     """
 
     """Do all seqs have the same length"""
-    if len(np.unique(map(len,seqs))) > 1:
-        raise ValueError('Sequences must all have the same length (%s)' % np.unique(map(len,seqs)))
+    if len(np.unique(list(map(len,seqs)))) > 1:
+        raise ValueError('Sequences must all have the same length (%s)' % np.unique(list(map(len,seqs))))
 
     nHLAs = len(hlas)
     nSeqs = len(seqs)
-    nSites = int(np.median(map(len,seqs)))
+    nSites = int(np.median(list(map(len,seqs))))
     nKmers = nSites - k + 1
 
     try:
@@ -306,7 +306,7 @@ def computeHLAHotspots(seqs, hlas, ba, hlaMask=None, bindingThreshold=5, nPerms=
     nPerms = int(nPerms)
     nHLAs = len(hlas)
     nSeqs = len(seqs)
-    nSites = int(np.median(map(len, seqs)))
+    nSites = int(np.median(list(map(len, seqs))))
     nKmers = nSites-k+1
 
     if hlaMask is None:
@@ -472,7 +472,7 @@ def plotAlignmentBindingGrid(hlas, align, ba, topN=5, k=9, annotateIC50=True, li
 
     nHLAs = len(hlas)
     nSeqs = len(align)
-    nSites = int(np.median(map(len,align)))
+    nSites = int(np.median(list(map(len,align))))
     nKmers = nSites - k + 1
 
     """[hla,kmer]"""
@@ -506,7 +506,7 @@ def _plotBindingGridCommon(hlas, peptides, baDf, annotateIC50):
     qmat = baDf.values.copy()
     quantization = {4:0.0, 5:0.2, 6:0.4 , 7:0.6 , 16:0.9}
 
-    for bound in sorted(quantization.keys(), reverse = True):
+    for bound in sorted(list(quantization.keys()), reverse = True):
         qmat[baDf.values < bound] = quantization[bound]
     qmat[np.isnan(qmat)] = 0.9
 

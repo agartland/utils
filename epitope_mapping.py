@@ -1,4 +1,4 @@
-from __future__ import division
+
 import pandas as pd
 import numpy as np
 from copy import deepcopy
@@ -45,7 +45,7 @@ class responseClass(object):
         return hash(self.__key__())
     @property
     def coords(self):
-        return range(self.start, self.start + self.L)
+        return list(range(self.start, self.start + self.L))
     def todict(self):
         return dict(protein=self.protein,
                     pepID=self.pepID,
@@ -73,7 +73,7 @@ class epitopeClass(responseClass):
 
 def hamming(str1, str2):
     """Hamming distance between two strings"""
-    return sum([i for i in itertools.imap(operator.__ne__, str1, str2)])
+    return sum([i for i in map(operator.__ne__, str1, str2)])
 
 def overlap(response1, response2):
     """Any overlap between two responses?"""
@@ -120,7 +120,7 @@ def findEpitopes(responses, sharedRule, **kwargs):
     """Start with all possible sets of responses (i.e. combinations)"""
     sharedSets = []
     for N in range(1, len(responses) + 1):
-        for inds in itertools.combinations(range(len(responses)), N):
+        for inds in itertools.combinations(list(range(len(responses))), N):
             sharedSets.append(inds)
 
     """Remove any sets that don't have one unique shared response/epitope"""

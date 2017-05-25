@@ -47,7 +47,7 @@ class AnnotationPicker:
         x,y=self.xdata[ind],self.ydata[ind]
         note=self.notes[ind]
         # print 'Drawing %s at (%s, %s)' % (note, x, y)
-        if (x,y) in self.drawn.keys():
+        if (x,y) in list(self.drawn.keys()):
             markers = self.drawn[(x,y)]
             for m in markers:
                 m.set_visible(not m.get_visible())
@@ -91,7 +91,7 @@ class AnnoteFinder:
     """
 
     def __init__(self, xdata, ydata, annotes, axis=None, xtol=None, ytol=None,coordCaption=False):
-        self.data = zip(xdata, ydata, annotes)
+        self.data = list(zip(xdata, ydata, annotes))
         if xtol is None:
             xtol = ((max(xdata) - min(xdata))/float(len(xdata)))/2
         if ytol is None:

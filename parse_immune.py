@@ -58,9 +58,9 @@ def _parseIR(fn, uVars, mag, subset={}, printUnique=False, sep=','):
         for v in uVars:
             u = raw[v].astype(str).unique()
             if raw[v].dtype == object or len(u) <= 20:
-                print '%s: %s' % (v, ', '.join(u))
+                print('%s: %s' % (v, ', '.join(u)))
             else:
-                print '%s: mean %1.2f' % (v, np.nanmean(raw[v]))
+                print('%s: mean %1.2f' % (v, np.nanmean(raw[v])))
         return
 
     cols = []        
@@ -73,7 +73,7 @@ def _parseIR(fn, uVars, mag, subset={}, printUnique=False, sep=','):
 
     """Keep rows that have one of the values in v for column k,
     for every key/value in subset dict"""
-    for k,v in subset.items():
+    for k,v in list(subset.items()):
         raw = raw.loc[raw[k].isin(v)]
     
     ptids = raw['ptid'].unique().shape[0]
@@ -83,9 +83,9 @@ def _parseIR(fn, uVars, mag, subset={}, printUnique=False, sep=','):
     
     printTuple = (ptids*conditions - total, ptids, conditions, ptids*conditions, total)
     if total > (ptids * conditions):
-        print 'uVars are not sufficiently unique (%d): expected %d PTIDs x %d conditions = %d assays, found %d' % printTuple
+        print('uVars are not sufficiently unique (%d): expected %d PTIDs x %d conditions = %d assays, found %d' % printTuple)
     elif tmp.shape[0] < (tmp['ptid'].unique().shape[0] * tmp.index.unique().shape[0]):
-        print 'Missing %d assays: expected %d PTIDs x %d conditions = %d assays, found %d' % printTuple
+        print('Missing %d assays: expected %d PTIDs x %d conditions = %d assays, found %d' % printTuple)
 
     """What about dropping the negative controls?"""
     return raw[cols]
@@ -130,7 +130,7 @@ def parseRx(rxFn, demFn=None):
                         Lausanne = [168],
                         Peru = [150,621])
         siteTranslation = {}
-        for k,v in siteLists.items():
+        for k,v in list(siteLists.items()):
             siteTranslation.update({n:k for n in v})
         demDf['site'] = demDf.DEMsitei.map(siteTranslation.get)
         demDf['sex'] = demDf.DEMsex

@@ -76,7 +76,7 @@ def kmedoids(dmat, k=3, weights=None, nPasses=1, maxIter=1000, initInds=None, po
         potentialMedoidSet = set(np.arange(N))
 
     if len(initInds)==0:
-        print 'No possible initInds provided.'
+        print('No possible initInds provided.')
         return
 
     bestInertia = None
@@ -298,7 +298,7 @@ def fuzzycmedoids(dmat, c, membershipMethod=('FCM',2), weights=None, nPasses=1, 
         potentialMedoidInds = np.arange(N)
 
     if len(initInds) == 0:
-        print 'No possible initInds provided.'
+        print('No possible initInds provided.')
         return
 
     allMedoids = np.zeros((nPasses, c))
@@ -460,10 +460,10 @@ def tryallmedoids(dmat, c, weights=None, potentialMedoidInds=None, fuzzy=True, f
 
     combinations = scipy.misc.comb(len(potentialMedoidInds), c)
     if combinations > 1e7:
-        print "Too many combinations to try: %1.1g > 10M" % combinations
+        print("Too many combinations to try: %1.1g > 10M" % combinations)
 
     bestInertia = None
-    for medInds in itertools.combinations(range(len(potentialMedoidInds)), c):
+    for medInds in itertools.combinations(list(range(len(potentialMedoidInds))), c):
         medoids = potentialMedoidInds[np.array(medInds)]
 
         if fuzzy:

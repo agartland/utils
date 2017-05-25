@@ -1,4 +1,4 @@
-from __future__ import division
+
 from functools import *
 import pandas as pd
 import itertools
@@ -157,7 +157,7 @@ def consensus(align, ignoreGaps = True):
         counts = objhist([seq[aai] for seq in align])
         if ignoreGaps and len(counts)>1:
             droppedGaps = counts.pop('-',0)
-        cons += max(counts.keys(), key=counts.get)
+        cons += max(list(counts.keys()), key=counts.get)
     return cons
 
 def identifyMindist(align, ignoreGaps=True):
@@ -207,7 +207,7 @@ def peptideSetCoverage(peptides1,peptides2,mmTolerance=1):
                 anyCover=True
         if anyCover:
             coveredPeps['tot'].append(pep2)
-    coverage={k:len(v)/len(peptides2) for k,v in coveredPeps.items()}
+    coverage={k:len(v)/len(peptides2) for k,v in list(coveredPeps.items())}
     return coverage
 
 
@@ -396,7 +396,7 @@ def alignmentEntropy(align, statistic = 'absolute', removeGaps = False, k = 1, l
         elif statistic == 'uniqueness':
             entropy[aai] = oh.uniqueness()
         elif statistic == 'uniquenum':
-            entropy[aai] = len(oh.keys())
+            entropy[aai] = len(list(oh.keys()))
     return entropy
 
 def generateAlignment(seqs):
@@ -430,7 +430,7 @@ def generateAlignment(seqs):
     if not result:
         outAlign = fasta2align(outFn)
     else:
-        print "Error in MUSCLE!"
+        print("Error in MUSCLE!")
         raise Exception("MUSCLEError")
     """Remove the temporary files"""
     os.remove(inFn)
@@ -444,12 +444,12 @@ def generateAlignment(seqs):
     """Check that all seqs are being returned in the correct order"""
     badSeqs = 0
     if not len(seqs) == len(outAlign):
-        print 'Different number of output seqs!'
+        print('Different number of output seqs!')
         badSeqs+=1
 
     for i,s1,s2 in zip(arange(len(seqs)),seqs,outAlign):
         if not s1.replace('-','') == s2.replace('-',''):
-            print '%d: %s != %s' % (i,s1,s2)
+            print('%d: %s != %s' % (i,s1,s2))
             badSeqs+=1
     if badSeqs>0:
         raise Exception('Output seqs are different than input seqs! (%d)' % badSeqs)
@@ -492,7 +492,7 @@ def catAlignments(alignA,alignB):
     if not result:
         outAlign=fasta2align(outFn)
     else:
-        print "Error in MUSCLE!"
+        print("Error in MUSCLE!")
         raise Exception("MUSCLEError")
    
     """
@@ -521,7 +521,7 @@ def aalogoheights(aahistObj, N=20):
     """For a objhist of AA frequencies, compute the heights
     of each AA for a logo plot"""
     aahistObj = deepcopy(aahistObj)
-    keys = aahistObj.keys()
+    keys = list(aahistObj.keys())
     for aa in BADAA:
         if aa in keys:
             dummy = aahistObj.pop(aa)
@@ -596,7 +596,7 @@ def _PD(alignA,alignB,subst,bySite,withinA):
     j=0
     for seq1,seq2 in allPairs:
         """This line is the bottleneck. I should try some optimization here. This would help with all distance functions"""
-        dist[j,:]=array([i for i in itertools.imap(lambda a,b: subst.get((a,b),subst.get((b,a))), seq1, seq2)])
+        dist[j,:]=array([i for i in map(lambda a,b: subst.get((a,b),subst.get((b,a))), seq1, seq2)])
         j+=1
     
     """Actually, pairwise diversity is a distance, not a similarity so identical AA should be counted as 0"""
@@ -705,7 +705,7 @@ def align2aamat(align):
         break
     aaMat = align2mat(align)
     aaFeat = np.zeros((len(align), L, len(AALPHABET)))
-    for seqi,sitei in itertools.product(xrange(aaFeat.shape[0]), range(aaFeat.shape[1])):
+    for seqi,sitei in itertools.product(range(aaFeat.shape[0]), list(range(aaFeat.shape[1]))):
         try:
             aai = AALPHABET.index(aaMat[seqi,sitei])
             aaFeat[seqi,sitei,aai] = 1.
@@ -723,7 +723,7 @@ def condenseGappyAlignment(a, thresh=0.9):
     smat = align2mat(a)
     gapSiteInd = mean(smat == '-', axis=0) >= thresh
     keepSeqInd = np.all(smat[:,gapSiteInd] == '-', axis=1)
-    print 'Removing %d of %d sites and %d of %d sequences from the alignment.' % (gapSiteInd.sum(),smat.shape[1],(~keepSeqInd).sum(),smat.shape[0])
+    print('Removing %d of %d sites and %d of %d sequences from the alignment.' % (gapSiteInd.sum(),smat.shape[1],(~keepSeqInd).sum(),smat.shape[0]))
 
     smat = smat[keepSeqInd,:]
     smat = smat[:,~gapSiteInd]
@@ -769,7 +769,7 @@ def generateSequences(a,N=1,useFreqs=True):
 
         outAlign = seqmat2align(smat[:actualN,:])
         if actualN<N:
-            print "Could not create N = %d unique sequences with %d attempts" % (N,counter*10)
+            print("Could not create N = %d unique sequences with %d attempts" % (N,counter*10))
             smat = smat[:actualN,:]
     outAlign = seqmat2align(smat)
     return outAlign
@@ -844,7 +844,7 @@ def kmerConsensus(align,k=9,verbose=False):
         """Pick off the most common kmer at that start position"""
         top1 = objhist(tmpA).topN(n=2)[0][0]
         if verbose:
-            print ' '*starti + top1
+            print(' '*starti + top1)
             #print ' '*starti + objhist(tmpA).topN(n=2)[1][0]
         """Add each AA in the most frequent kmer to the consensus"""
         for j,startj in enumerate(arange(starti,starti+k)):
@@ -853,10 +853,10 @@ def kmerConsensus(align,k=9,verbose=False):
             except KeyError:
                 full[startj][top1[j]] = 1
     """Consensus is the mode AA at each position in full"""
-    con = ''.join([max(pos.keys(),key=pos.get) for pos in full])
+    con = ''.join([max(list(pos.keys()),key=pos.get) for pos in full])
     if verbose:
-        print 'Seq1: true consensus'
-        print 'Seq2: %dmer consensus' % k
+        print('Seq1: true consensus')
+        print('Seq2: %dmer consensus' % k)
         compSeq(consensus(align),con)
     return con, full
 def pepComp(align,useConsensus=True):
@@ -913,7 +913,7 @@ def tree2pwdist(tree):
                     pwdist[i,j] = pdm(t1,t2)
                     pwdist[j,i] = pwdist[i,j]
     else:
-        print 'Tree type does not match Phylo.BaseTree.Tree or dendropy.Tree'
+        print('Tree type does not match Phylo.BaseTree.Tree or dendropy.Tree')
         return
     return pd.DataFrame(pwdist,index = names, columns = names)
 
@@ -981,7 +981,7 @@ def compSeq(s1, s2, lineL=50):
             outStr += s2[sitei]
         outStr += '\n\n'
     outStr += 'Seq1 (%d) and Seq2 (%d) are %1.1f%% similar\n\n' % (len(s1),len(s2),1e2*samecount/count)
-    print outStr
+    print(outStr)
 
 def getStartPos(peptide, seq, subst=None):
     """Align the peptide with seq using the supplied

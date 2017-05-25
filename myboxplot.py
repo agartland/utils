@@ -121,7 +121,7 @@ def myboxplot(data, x = 1, axh=None, width=0.8, boxcolor='black',scatterwidth=0.
                 sns.violinplot(data[subsetInd], color = boxcolor, positions = [x], alpha = 0.5)
             else:
                 bp = axh.boxplot(data[subsetInd], positions = [x], widths = width, sym = '')
-                for element in bp.keys():
+                for element in list(bp.keys()):
                     for b in bp[element]:
                         b.set_color(boxcolor)
 

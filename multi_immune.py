@@ -1,4 +1,4 @@
-from __future__ import division
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -94,7 +94,7 @@ def _clean_axis(ax):
     """Remove ticks, tick labels, and frame from axis"""
     ax.get_xaxis().set_ticks([])
     ax.get_yaxis().set_ticks([])
-    for sp in ax.spines.values():
+    for sp in list(ax.spines.values()):
         sp.set_visible(False)
     ax.grid(False)
     ax.set_axis_bgcolor('white')
@@ -136,7 +136,7 @@ def plotHeatmap(df, labels=None, titleStr=None, vRange=None, tickSz='small', cma
     _clean_axis(heatmapAX)
 
     if annotation:
-        for i,j in itertools.product(range(df.shape[0]), range(df.shape[1])):
+        for i,j in itertools.product(list(range(df.shape[0])), list(range(df.shape[1]))):
             v = df.values[i,j]
             heatmapAX.annotate('%1.2f' % v, xy=(i,j), size='x-large', weight='bold', color='white',ha='center',va='center')
 
@@ -273,20 +273,20 @@ def pivotDiagnostic(df, index, columns, values):
 
     try:
         p = df.pivot(index=index, columns=columns, values=values)
-        print 'Pivot success: return pivoted df'
+        print('Pivot success: return pivoted df')
         return p
     except ValueError:
-        if type(columns) in [str, basestring]:
+        if type(columns) in [str, str]:
             columns = [columns]
         if not type(columns) is list:
             columns = list(columns)
 
-        if type(values) in [str, basestring]:
+        if type(values) in [str, str]:
             values = [values]
         if not type(values) is list:
             values = list(values)
 
         dupInd = df[[index] + columns].duplicated(keep=False)
-        print 'Index contains %d duplicate entries, cannot reshape' % dupInd.sum()
-        print 'Returning duplicate rows'
+        print('Index contains %d duplicate entries, cannot reshape' % dupInd.sum())
+        print('Returning duplicate rows')
         return df[[index] + columns + values].loc[dupInd].sort_values(by=[index] + columns + values) 

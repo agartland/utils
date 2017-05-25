@@ -1,4 +1,4 @@
-from __future__ import division
+
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
@@ -93,7 +93,7 @@ def loadAbundance(filename, compositionNorm=True, truncate=True):
 
     cols = [c for c in df.columns if not c in ['sid']]
     
-    print 'Abundance data: %s samples, %s taxa' % (df.shape[0], len(cols))
+    print('Abundance data: %s samples, %s taxa' % (df.shape[0], len(cols)))
     return df, cols
 
 def ratios2otumat(otuDf, lrvec):

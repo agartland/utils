@@ -1,4 +1,4 @@
-from __future__ import division
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -134,7 +134,7 @@ def screeplot(df, method='pca', n_components=10, standardize=False, smatFunc=Non
     figh = plt.gcf()
     figh.clf()
     axh1 = figh.add_subplot(2,1,1)
-    axh1.bar(left=range(n_components),
+    axh1.bar(left=list(range(n_components)),
              height=pca.explained_variance_ratio_[:n_components],
              align='center')
     plt.ylabel('Fraction of\nvariance explained')
@@ -143,7 +143,7 @@ def screeplot(df, method='pca', n_components=10, standardize=False, smatFunc=Non
     axh2 = figh.add_subplot(2,1,2)
     for compi in range(n_components):
         bottom = 0
-        for dimi,col in zip(range(df.shape[1]), itertools.cycle(palettable.colorbrewer.qualitative.Set3_12.mpl_colors)):
+        for dimi,col in zip(list(range(df.shape[1])), itertools.cycle(palettable.colorbrewer.qualitative.Set3_12.mpl_colors)):
             height = pca.components_[compi,dimi]**2 / (pca.components_[compi,:]**2).sum()
             axh2.bar(left=compi, bottom=bottom, height=height, align='center', color=col)
             if height > 0.1:
@@ -151,7 +151,7 @@ def screeplot(df, method='pca', n_components=10, standardize=False, smatFunc=Non
                 note += '(+)' if pca.components_[compi,dimi] >= 0 else '(-)'
                 axh2.annotate(note, xy=(compi, bottom+height/2), ha='center', va='center',size='small')
             bottom += height
-    plt.xticks(range(n_components),['PC%d' % (i+1) for i in range(n_components)],rotation=90)
+    plt.xticks(list(range(n_components)),['PC%d' % (i+1) for i in range(n_components)],rotation=90)
     plt.ylim([0,1])
     plt.ylabel('Fraction of\ncomponent variance')
 

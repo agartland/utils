@@ -1,4 +1,4 @@
-from __future__ import division
+
 from functools import *
 import itertools
 import operator
@@ -59,7 +59,7 @@ def subst2mat(subst,alphabet = FULL_AALPHABET):
     """Converts a substitution dictionary
     (like those from Bio) into a numpy 2d substitution matrix"""
     mat = np.nan * np.zeros((len(alphabet),len(alphabet)), dtype = np.float64)
-    for (aa1,aa2),v in subst.items():
+    for (aa1,aa2),v in list(subst.items()):
         mat[alphabet.index(aa1),alphabet.index(aa2)] = v
     return mat
 
@@ -111,26 +111,26 @@ def hamming_distance(str1, str2, noConvert = False, **kwargs):
     Only finds distance over the length of the shorter string.
     **kwargs are so this can be plugged in place of a seq_distance() metric"""
     if noConvert:
-        return np.sum([i for i in itertools.imap(operator.__ne__, str1, str2)])
+        return np.sum([i for i in map(operator.__ne__, str1, str2)])
 
-    if isinstance(str1,basestring):
+    if isinstance(str1,str):
         str1 = string2byte(str1)
-    if isinstance(str2,basestring):
+    if isinstance(str2,str):
         str2 = string2byte(str2)
     return nb_hamming_distance(str1, str2)
 
 def aamismatch_distance(seq1,seq2, **kwargs):
-    if isinstance(seq1,basestring):
+    if isinstance(seq1,str):
         seq1 = seq2vec(seq1)
 
-    if isinstance(seq2,basestring):
+    if isinstance(seq2,str):
         seq2 = seq2vec(seq2)
     dist12 = nb_seq_similarity(seq1, seq2, substMat = binaryMat, normed = False, asDistance = True)
     return dist12
 
 def string2byte(s):
     """Convert string to byte array since numba can't handle strings"""
-    if isinstance(s,basestring):
+    if isinstance(s,str):
         s = np.array(s)
     dtype = s.dtype
     if dtype is np.dtype('byte'):
@@ -194,19 +194,19 @@ def addGapScores(subst, gapScores = None, minScorePenalty = False, returnMat = F
     """
     if minScorePenalty:
         gapScores = {('-','-') : 1,
-                     ('-','X') : np.min(subst.values()),
-                     ('X','-') : np.min(subst.values())}
+                     ('-','X') : np.min(list(subst.values())),
+                     ('X','-') : np.min(list(subst.values()))}
     elif gapScores is None:
         if subst is binarySubst:
-            print 'Using default binGapScores for binarySubst'
+            print('Using default binGapScores for binarySubst')
             gapScores = binGapScores
         elif subst is blosum90:
-            print 'Using default blosum90 gap scores'
+            print('Using default blosum90 gap scores')
             gapScores = blosum90GapScores
         else:
             raise Exception('Cannot determine which gap scores to use!')
     su = deepcopy(subst)
-    uAA = np.unique([k[0] for k in subst.keys()])
+    uAA = np.unique([k[0] for k in list(subst.keys())])
     su.update({('-',aa) : gapScores[('-','X')] for aa in uAA})
     su.update({(aa,'-') : gapScores[('X','-')] for aa in uAA})
     su.update({('-','-') : gapScores[('-','-')]})
@@ -257,7 +257,7 @@ def nb_seq_similarity(seq1, seq2, substMat, normed, asDistance):
 def np_seq_similarity(seq1, seq2, substMat, normed, asDistance):
     """Computes sequence similarity based on the substitution matrix."""
     if seq1.shape[0] != seq2.shape[0]:
-        raise IndexError, "Sequences must be the same length (%d != %d)." % (seq1.shape[0],seq2.shape[0])
+        raise IndexError("Sequences must be the same length (%d != %d)." % (seq1.shape[0],seq2.shape[0]))
 
     """Similarity between seq1 and seq2 using the substitution matrix subst"""
     sim12 = substMat[seq1,seq2]
@@ -298,16 +298,16 @@ def seq_similarity(seq1, seq2, subst = None, normed = True, asDistance = False):
         otherwise its just the sum of the raw score out of the subst matrix"""
 
     if subst is None:
-        print 'Using default binarySubst matrix with binGaps for seq_similarity'
+        print('Using default binarySubst matrix with binGaps for seq_similarity')
         subst = addGapScores(binarySubst, binGapScores)
 
     if isinstance(subst,dict):
         subst = subst2mat(subst)
 
-    if isinstance(seq1,basestring):
+    if isinstance(seq1,str):
         seq1 = seq2vec(seq1)
 
-    if isinstance(seq2,basestring):
+    if isinstance(seq2,str):
         seq2 = seq2vec(seq2)
 
     result = np_seq_similarity(seq1, seq2, substMat = subst, normed = normed, asDistance = asDistance)
@@ -341,11 +341,11 @@ def seq_similarity_old(seq1,seq2,subst=None,normed=True):
         return sim
 
     if subst is None:
-        print 'Using default binarySubst matrix with binGaps for seq_similarity'
+        print('Using default binarySubst matrix with binGaps for seq_similarity')
         subst = addGapScores(binarySubst,binGapScores)
 
     """Distance between seq1 and seq2 using the substitution matrix subst"""
-    sim12 = np.array([i for i in itertools.imap(lambda a,b: subst.get((a,b),subst.get((b,a))), seq1, seq2)])
+    sim12 = np.array([i for i in map(lambda a,b: subst.get((a,b),subst.get((b,a))), seq1, seq2)])
 
     if normed:
         siteN = np.sum(~np.isnan(sim12))
@@ -381,21 +381,21 @@ def unalign_similarity(seq1,seq2,subst=None):
 
 def _test_seq_similarity(subst=None,normed=True):
     def test_one(s,sname,n,seq1,seq2):
-        print seq1
-        print seq2
+        print(seq1)
+        print(seq2)
         try:
             sim = seq_similarity_old(seq1, seq2, subst=s, normed=n)
-            print 'Similarity: %f' % sim
+            print('Similarity: %f' % sim)
         except:
-            print 'Similarity: %s [%s]' % (sys.exc_info()[0],sys.exc_info()[1])
+            print('Similarity: %s [%s]' % (sys.exc_info()[0],sys.exc_info()[1]))
         
         #dist = seq_distance(seq1,seq2,subst=s)
         try:
             dist = seq_distance(seq1, seq2, subst=s)
-            print 'Distance: %f' % dist
+            print('Distance: %f' % dist)
         except:
-            print 'Distance: %s [%s]' % (sys.exc_info()[0],sys.exc_info()[1])
-        print
+            print('Distance: %s [%s]' % (sys.exc_info()[0],sys.exc_info()[1]))
+        print()
 
     seqs = ['AAAA',
             'AAAA',
@@ -413,7 +413,7 @@ def _test_seq_similarity(subst=None,normed=True):
                  'addGapScores(blosum90,blosum90GapScores)',
                  'addGapScores(blosum90,nanGapScores)']
         for s,sname in zip(subst,names):
-            print 'Using %s normed = %s' % (sname,normed)
+            print('Using %s normed = %s' % (sname,normed))
             for seq1,seq2 in itertools.combinations(seqs,2):
                 test_one(s,sname,normed,seq1,seq2)
     else:
@@ -480,7 +480,7 @@ def calcDistanceRectangle_old(row_seqs,col_seqs,normalize=False,symetric=False,m
     dist : ndarray of shape [len(row_seqs), len(col_seqs)]
         Contains all pairwise distances for seqs.
     """
-    if not 'normed' in kwargs.keys():
+    if not 'normed' in list(kwargs.keys()):
         kwargs['normed'] = False
     if metric is None:
         metric = seq_distance
@@ -497,7 +497,7 @@ def calcDistanceRectangle_old(row_seqs,col_seqs,normalize=False,symetric=False,m
         C = col_uSeqs
 
     dist = np.zeros((len(row_uSeqs),len(col_uSeqs)))
-    for i,j in itertools.product(range(len(row_uSeqs)),range(len(col_uSeqs))):
+    for i,j in itertools.product(list(range(len(row_uSeqs))),list(range(len(col_uSeqs)))):
         if not symetric:
             """If not assumed symetric, compute all distances"""
             dist[i,j] = metric(R[i],C[j],**kwargs)
@@ -555,7 +555,7 @@ def calcDistanceRectangle(row_seqs, col_seqs, subst=None, nb_metric=None, normal
     dist : ndarray of shape [len(row_seqs), len(col_seqs)]
         Contains all pairwise distances for seqs.
     """
-    if not 'normed' in kwargs.keys():
+    if not 'normed' in list(kwargs.keys()):
         kwargs['normed'] = False
     if metric is None:
         metric = seq_distance
@@ -572,7 +572,7 @@ def calcDistanceRectangle(row_seqs, col_seqs, subst=None, nb_metric=None, normal
         C = col_uSeqs
 
     dist = zeros((len(row_uSeqs),len(col_uSeqs)))
-    for i,j in itertools.product(range(len(row_uSeqs)),range(len(col_uSeqs))):
+    for i,j in itertools.product(list(range(len(row_uSeqs))),list(range(len(col_uSeqs)))):
         if not symetric:
             """If not assumed symetric, compute all distances"""
             dist[i,j] = metric(R[i],C[j],**kwargs)
@@ -669,8 +669,8 @@ def coverageDistance(epitope,peptide, mmTolerance = 1,**kwargs):
     if LEpitope > LPeptide:
         return 1
 
-    if isinstance(epitope, basestring):
-        min_dist = array([np.sum([i for i in itertools.imap(operator.__ne__, epitope, peptide[starti:starti+LEpitope])]) for starti in range(LPeptide-LEpitope+1)]).min()
+    if isinstance(epitope, str):
+        min_dist = array([np.sum([i for i in map(operator.__ne__, epitope, peptide[starti:starti+LEpitope])]) for starti in range(LPeptide-LEpitope+1)]).min()
     else:
         min_dist = array([(epitope != peptide[starti:starti+LEpitope]).sum() for starti in range(LPeptide-LEpitope+1)]).min()
     

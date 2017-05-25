@@ -326,7 +326,7 @@ def pwpartialcorr(df, rowVars=None, colVars=None, adjust=[], method='pearson', m
                 rho[i,j],pvalue[i,j] = 1,np.nan
             
     """Now only adjust using pvalues in the unique pair dict"""
-    keys = pairedPvalues.keys()
+    keys = list(pairedPvalues.keys())
     qvalueTmp = adjustnonnan([pairedPvalues[k] for k in keys], method=adjMethod)
     """Build a unique qvalue dict from teh same unique keys"""
     pairedQvalues = {k:q for k,q in zip(keys,qvalueTmp)}
@@ -467,8 +467,8 @@ def corrheatmap(df, rowVars=None, colVars=None, adjust=[], annotation=None, cuto
     else:
         rotation = 'horizontal'
 
-    _ = axh.set_xticklabels(map(lambda key: labelLookup.get(key,key),colVars),rotation=rotation,size=labelSize)
-    _ = axh.set_yticklabels(map(lambda key: labelLookup.get(key,key),rowVars),size=labelSize)
+    _ = axh.set_xticklabels([labelLookup.get(key,key) for key in colVars],rotation=rotation,size=labelSize)
+    _ = axh.set_yticklabels([labelLookup.get(key,key) for key in rowVars],size=labelSize)
 
     tmprho = rho.copy()
 
@@ -538,7 +538,7 @@ def scatterfit(x, y, method='pearson', adjustVars=[], labelLookup={}, plotLine=T
     model : statsmodels GLM object
         Optionally the fitted model, depending on returnModel."""
 
-    k = kwargs.keys()
+    k = list(kwargs.keys())
     if not 'mec' in k:
         kwargs.update({'mec':'k'})
     if not 'mfc' in k:

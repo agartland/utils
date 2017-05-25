@@ -6,7 +6,7 @@ import matplotlib.transforms as mtrans
 from matplotlib import transforms
 import skbio
 from objhist import objhist
-import StringIO
+import io
 
 __all__ = ['computeMotif',
            'plotMotif']
@@ -69,7 +69,7 @@ def computeMotif(seqs):
         totEntropy = np.log2(nAA) - ((-pNZ * np.log2(pNZ)).sum())
         heights[:,coli] = p * totEntropy
 
-    return pd.DataFrame(heights, columns=range(L), index=alphabet)
+    return pd.DataFrame(heights, columns=list(range(L)), index=alphabet)
 
 def plotMotif(x, y, motif, axh=None, fontsize=30, aa_colors='shapely'):
     """Sequence logo of the motif at data coordinates x,y using matplotlib.
@@ -100,7 +100,7 @@ def plotMotif(x, y, motif, axh=None, fontsize=30, aa_colors='shapely'):
         Full extent of the logo in data coodinates."""
 
     if aa_colors == 'shapely':
-        colorsDf = pd.read_csv(StringIO.StringIO(_shapely_colors), delimiter=',')
+        colorsDf = pd.read_csv(io.StringIO(_shapely_colors), delimiter=',')
         aa_colors = {aa:parseColor(aa, colorsDf=colorsDf) for aa in motif.index}
     else:
         """All AAs have the same color, specified by aa_colors"""
@@ -114,7 +114,7 @@ def plotMotif(x, y, motif, axh=None, fontsize=30, aa_colors='shapely'):
     for xi in range(motif.shape[1]):
         scores = motif.iloc[:, xi].sort_values()
         yshift = 0
-        for yi, (aa, score) in enumerate(scores.iteritems()):
+        for yi, (aa, score) in enumerate(scores.items()):
             if score > 0:
                 txt = axh.text(x + xshift,
                               y + yshift,

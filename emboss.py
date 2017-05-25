@@ -12,7 +12,7 @@ __all__ = ['needleall',
            'skbio2align']
 
 def align2skbio(align):
-    return skbio.TabularMSA([Sequence(s, metadata=dict(id=str(i))) for i,s in align.iteritems()])
+    return skbio.TabularMSA([Sequence(s, metadata=dict(id=str(i))) for i,s in align.items()])
 
 def skbio2align(seqColl):
     return pd.Series({s.metadata['id']:''.join(s.values) for s in seqColl})
@@ -85,7 +85,7 @@ def needleall(seqsA, seqsB=None, gop=5, gep=2):
             s = fh.read()
         resDf = _parseEMBOSSmarkx10(s)
     else:
-        print "Error in EMBOSS needleall!"
+        print("Error in EMBOSS needleall!")
         raise Exception("EMBOSSError")
     
     """Remove the temporary files"""
@@ -113,8 +113,8 @@ def needleall(seqsA, seqsB=None, gop=5, gep=2):
 def _parseEMBOSSmarkx10(s):
     allSeqs = np.array(re.findall(r'^([\w-]+)', s, flags=re.MULTILINE))
 
-    gseqA = allSeqs[range(0, len(allSeqs), 2)]
-    gseqB = allSeqs[range(1, len(allSeqs), 2)]
+    gseqA = allSeqs[list(range(0, len(allSeqs), 2))]
+    gseqB = allSeqs[list(range(1, len(allSeqs), 2))]
     nameA = re.findall('# 1: (.+)', s)
     nameB = re.findall('# 2: (.+)', s)
     length = np.array(re.findall('# Length: (.+)', s), dtype=int)

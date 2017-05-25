@@ -55,7 +55,7 @@ def bootstrapFeatures(dmat, clusterFunc, bootstraps = 100, rseed = 110820):
             rdmat = dmat[:,rind][rind,:]
         labels = clusterFunc(rdmat)
 
-        for rj,rk in itertools.product(range(N),range(N)):
+        for rj,rk in itertools.product(list(range(N)),list(range(N))):
             """Go through all pairs of variables (lower half of the pwdist matrix)"""
             
             """Keep track of indices into original dmat (j,k) and those into the
@@ -68,7 +68,7 @@ def bootstrapFeatures(dmat, clusterFunc, bootstraps = 100, rseed = 110820):
                         tmpRel[j,k] = 1
         pwrel += tmpRel
         tot += tmpTot
-    for j,k in itertools.product(range(N),range(N)):
+    for j,k in itertools.product(list(range(N)),list(range(N))):
         if j<k:
             pwrel[j,k] = pwrel[j,k] / tot[j,k]
             pwrel[k,j] = pwrel[j,k]
@@ -135,13 +135,13 @@ def bootstrapObservations(df, dmatFunc, clusterFunc, bootstraps = 100, rseed = 1
 
         labels = clusterFunc(rdmat)
 
-        for j,k in itertools.product(range(N),range(N)):
+        for j,k in itertools.product(list(range(N)),list(range(N))):
             """Go through all pairs of variables (lower half of the pwdist matrix)"""
             if j<k:
                 if labels[j] == labels[k]:
                     pwrel[j,k] += 1.
 
-    for j,k in itertools.product(range(N),range(N)):
+    for j,k in itertools.product(list(range(N)),list(range(N))):
         if j<k:
             pwrel[j,k] = pwrel[j,k] / bootstraps
             pwrel[k,j] = pwrel[j,k]

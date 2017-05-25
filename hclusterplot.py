@@ -26,7 +26,7 @@ def clean_axis(ax):
     """Remove ticks, tick labels, and frame from axis"""
     ax.get_xaxis().set_ticks([])
     ax.get_yaxis().set_ticks([])
-    for sp in ax.spines.values():
+    for sp in list(ax.spines.values()):
         sp.set_visible(False)
     ax.grid(False)
     ax.set_axis_bgcolor('white')
@@ -108,7 +108,7 @@ def plotCorrHeatmap(df=None, metric='pearson', rowInd=None, colInd=None, col_lab
     fig.clf()
 
     if dmat is None and df is None:
-        print 'Need to provide df or dmat'
+        print('Need to provide df or dmat')
         return
     elif df is None:
         rowLabels = dmat.index
@@ -188,7 +188,7 @@ def plotCorrHeatmap(df=None, metric='pearson', rowInd=None, colInd=None, col_lab
 def plotHColCluster(df=None, col_dmat=None, method='complete', metric='euclidean', col_labels=None, titleStr=None, vRange=None, tickSz='medium', cmap=None,  minN=1, K=None, labelCmap=None, noColorBar=False, interactive=False):
     """Perform hierarchical clustering on df columns and plot square heatmap of pairwise distances"""
     if col_dmat is None and df is None:
-        print 'Need to provide df or col_dmat'
+        print('Need to provide df or col_dmat')
         return
     elif df is None:
         columnLabels = col_dmat.columns
@@ -581,4 +581,4 @@ def labeledDendrogram(dmat, labels, method='complete', cmap=None):
                       origin='lower')
     clean_axis(cbAX)
 
-    colorLegend(lookup.values(), lookup.keys(), axh=denAX)
+    colorLegend(list(lookup.values()), list(lookup.keys()), axh=denAX)

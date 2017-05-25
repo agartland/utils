@@ -20,7 +20,7 @@ __all__ = ['muscle_align',
            'skbio2align']
 
 def align2skbio(align):
-    return skbio.TabularMSA([Sequence(s, metadata=dict(id=str(i))) for i,s in align.iteritems()])
+    return skbio.TabularMSA([Sequence(s, metadata=dict(id=str(i))) for i,s in align.items()])
 
 def skbio2align(seqColl):
     return pd.Series({s.metadata['id']:''.join(s.values) for s in seqColl})
@@ -75,7 +75,7 @@ def muscle_align(seqs):
         outAlign = skbio2align(skbio.read(outFn, format='fasta'))
         # outAign = skbio2align(skbio.TabularMSA.read(outFn, format='fasta'))
     else:
-        print "Error in MUSCLE!"
+        print("Error in MUSCLE!")
         raise Exception("MUSCLEError")
     
     """Remove the temporary files"""
@@ -91,12 +91,12 @@ def muscle_align(seqs):
     """Check that all seqs are being returned in the correct order"""
     badSeqs = 0
     if not len(seqs) == len(outAlign):
-        print 'Different number of output seqs!'
+        print('Different number of output seqs!')
         badSeqs += 1
 
-    for i,s1,s2 in zip(range(len(seqs)), seqs, outAlign):
+    for i,s1,s2 in zip(list(range(len(seqs))), seqs, outAlign):
         if not s1.replace('-', '') == s2.replace('-', ''):
-            print '%d: %s != %s' % (i,s1,s2)
+            print('%d: %s != %s' % (i,s1,s2))
             badSeqs += 1
     if badSeqs > 0:
         raise Exception('Output seqs are different than input seqs! (%d)' % badSeqs)

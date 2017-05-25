@@ -1,4 +1,4 @@
-from __future__ import division
+
 from scipy import stats
 import numpy as np
 import itertools
@@ -33,9 +33,9 @@ try:
             return (OR,res.left_tail)
         elif alternative == 'greater':
             return (OR,res.right_tail)
-    print "Using Cython-powered Fisher's exact test"
+    print("Using Cython-powered Fisher's exact test")
 except ImportError:
-    print "Using scipy.stats Fisher's exact test (slow)"
+    print("Using scipy.stats Fisher's exact test (slow)")
     fisherTest = stats.fisher_exact
 
 def veEndpointsRequired(rr0=1, rralt=0.5, targetpow=0.9, K=1, alpha=0.025):
@@ -121,7 +121,7 @@ def magnitudePower(mu, N, sigma=None, CV=None, alpha=0.05, paired=False, iterati
     Returns power, magnitude"""
     if sigma is None:
         if CV is None:
-            print 'Need to specify variability as sigma or CV!'
+            print('Need to specify variability as sigma or CV!')
             return
         else:
             sigma = [m*c for c,m in zip(CV,mu)]
@@ -131,7 +131,7 @@ def magnitudePower(mu, N, sigma=None, CV=None, alpha=0.05, paired=False, iterati
         if N[0] == N[1]:
             testFunc = stats.ttest_rel
         else:
-            print 'Need equal N for a paired sample t-test simulation!'
+            print('Need equal N for a paired sample t-test simulation!')
             return
     else:
         testFunc = stats.ttest_ind

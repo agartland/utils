@@ -17,17 +17,17 @@ def main():
     
     args = parser.parse_args()
     
-    print 'Processing sequences',
+    print('Processing sequences', end=' ')
     allMers = seq2nmers(args.fasta_filename,args.L)
-    print 'done'
-    print 'Filtering out bad mers...',
-    allMers=filter(lambda s: not re.search('[%s]' % BADAA,s),allMers)
-    print 'done\nWriting mer file...',
+    print('done')
+    print('Filtering out bad mers...', end=' ')
+    allMers=[s for s in allMers if not re.search('[%s]' % BADAA,s)]
+    print('done\nWriting mer file...', end=' ')
     
     with open(args.out_filename,'w') as f:
         for s in sorted(allMers):
             f.write('%s\n' % s)
-    print 'done'
+    print('done')
     
 def seq2nmers(filename,nmer=9):
     """Takes a fasta file and chops it up into a list of unique kmers"""
@@ -35,7 +35,7 @@ def seq2nmers(filename,nmer=9):
     allMers=set()
     for i,record in enumerate(inputFile):
         if i % 20 == 0:
-            print '.',
+            print('.', end=' ')
         """Get rid of gaps since those will never be useful mers"""
         allMers.update(set(aa2nmers(str(record.seq).replace('-',''),nmer)))
     return list(allMers)

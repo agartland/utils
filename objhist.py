@@ -1,4 +1,4 @@
-from __future__ import division
+
 import numpy as np
 from numpy.random import permutation,randint
 from scipy import stats, special
@@ -6,7 +6,7 @@ from scipy import stats, special
 try:
     from matplotlib.pyplot import plot, xticks,is_numlike,bar
 except ImportError:
-    print 'Imported objhist without matplotlib.'
+    print('Imported objhist without matplotlib.')
 
 __all__ = ['objhist',
            'countdict']
@@ -61,14 +61,14 @@ class countdict(dict):
 
     def sum(self):
         """Return the total counts over all categories"""
-        return np.sum(self.values())
+        return np.sum(list(self.values()))
     def freq(self):
         """Return the fraction of the total counts for each category"""
         tot = float(self.sum())
-        return {k:self.get(k)/tot for k in self.keys()}
+        return {k:self.get(k)/tot for k in list(self.keys())}
     def entropy(self,logFunc=np.log2):
         """Compute the entropy of the discrete distribution"""
-        return -np.array([p*logFunc(p) for p in self.freq().values()]).sum()
+        return -np.array([p*logFunc(p) for p in list(self.freq().values())]).sum()
     def simpsons_index(self, variant='D'):
         """Simpson's Index (D)
         Measures the probability that two individuals randomly selected from
@@ -86,7 +86,7 @@ class countdict(dict):
         the greater the diversity."""
 
         tot = float(self.sum())
-        p = np.array([self[k]/tot for k in self.keys()])
+        p = np.array([self[k]/tot for k in list(self.keys())])
         D = (p * p).sum()
 
         if variant == 'D':
@@ -114,7 +114,7 @@ class countdict(dict):
         -------
              : ndarray"""
 
-        keys = self.keys()
+        keys = list(self.keys())
         freq = self.freq()
         p = np.array([freq[k] for k in keys])
         q = np.array([reference.freq()[k] for k in keys])
@@ -125,7 +125,7 @@ class countdict(dict):
         """Compute Jensen-Shannon divergence between self and b (also an objhist).
         If keys from self are missing in b assume 0 counts."""
 
-        keys = np.unique(self.keys() + b.keys())
+        keys = np.unique(list(self.keys()) + list(b.keys()))
 
         avec = np.array([self[k] if k in self else 0 for k in keys])
         bvec = np.array([b[k] if k in b else 0 for k in keys])
@@ -133,7 +133,7 @@ class countdict(dict):
         return _jensen_shannon_divergence(avec, bvec)
 
     def morisita_horn_overlap(self, b):
-        keys = np.unique(self.keys() + b.keys())
+        keys = np.unique(list(self.keys()) + list(b.keys()))
 
         avec = np.array([self[k] if k in self else 0 for k in keys])
         bvec = np.array([b[k] if k in b else 0 for k in keys])
@@ -145,7 +145,7 @@ class countdict(dict):
         return len(self)/self.sum()
     def sortedKeys(self,reverse=False):
         """Returns a list of the keys sorted ascending by frequency"""
-        return sorted(self.keys(), key=self.get, reverse=reverse)
+        return sorted(list(self.keys()), key=self.get, reverse=reverse)
 
     def topN(self,n=5,reverse=True,returnFreq=False):
         """Returns a list of the top N most frequent keys/values as a list of tuples.
@@ -198,9 +198,9 @@ class countdict(dict):
         -------
         axh : matplotlib axes handle
         """
-        if all([is_numlike(k) for k in self.keys()]):
+        if all([is_numlike(k) for k in list(self.keys())]):
             """If keys are numbers then use the x-axis scale"""
-            if all([round(k)==k for k in self.keys()]):
+            if all([round(k)==k for k in list(self.keys())]):
                 xvec = [int(k) for k in sorted(self.keys())]
             else:
                 xvec = sorted(self.keys())
@@ -226,7 +226,7 @@ class countdict(dict):
         Frequencies are optionally based on the observed frequencies.
         Returns a list of length n."""
 
-        keys = self.keys()
+        keys = list(self.keys())
         if useFreqs:
             freqDict = self.freq()
             """Ensure that it sums to 1 for stats.rv_discrete()"""
@@ -243,7 +243,7 @@ class countdict(dict):
     def returnList(self):
         """Return a list of objs that correspond exactly to the observed counts."""
         out = []
-        for k in self.keys():
+        for k in list(self.keys()):
             out.extend([k for i in arange(self[k])])
         return out
 

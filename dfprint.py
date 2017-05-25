@@ -38,8 +38,8 @@ def toPNG(df, outFn, dpi=200, **kwargs):
 
 def toPDF(df,
           outFn,
-          titStr=u'',
-          float_format=u'%1.3g',
+          titStr='',
+          float_format='%1.3g',
           index=False,
           hideConsole=True,
           landscape=True,
@@ -60,7 +60,7 @@ def toPDF(df,
     if type(df) is pd.Series:
         df = pd.DataFrame(df)
     def repChar(s, c1, c2):
-        if not isinstance(s, basestring):
+        if not isinstance(s, str):
             return s
         else:
             return s.replace(c1, c2)
@@ -72,32 +72,32 @@ def toPDF(df,
             df = df.rename_axis(func, axis=1)
 
     texFn = outFn[:-3] + 'tex'
-    header = [u'\\documentclass[10pt]{article}',
-              u'\\usepackage{lmodern}',
-              u'\\usepackage{booktabs}',
-              u'\\usepackage{longtable}',
-              u'\\usepackage{geometry}',
-              u'\\usepackage[english]{babel}',
-              u'\\usepackage[utf8]{inputenc}',
-              u'\\usepackage{fancyhdr}',
-              u'\\geometry{%s, %s, margin=%1.1fin}' % (paper, orientation, margin),
-              u'\\pagestyle{fancy}',
-              u'\\fancyhf{}',
-              u'\\rhead{%s}' % time.ctime(),
-              u'\\chead{%s}' % titStr,
-              u'\\rfoot{Page \\thepage}',
-              u'\\begin{document}']
+    header = ['\\documentclass[10pt]{article}',
+              '\\usepackage{lmodern}',
+              '\\usepackage{booktabs}',
+              '\\usepackage{longtable}',
+              '\\usepackage{geometry}',
+              '\\usepackage[english]{babel}',
+              '\\usepackage[utf8]{inputenc}',
+              '\\usepackage{fancyhdr}',
+              '\\geometry{%s, %s, margin=%1.1fin}' % (paper, orientation, margin),
+              '\\pagestyle{fancy}',
+              '\\fancyhf{}',
+              '\\rhead{%s}' % time.ctime(),
+              '\\chead{%s}' % titStr,
+              '\\rfoot{Page \\thepage}',
+              '\\begin{document}']
     
-    footer = [u'\\end{document}']
+    footer = ['\\end{document}']
 
     with open(texFn,'w') as fh:
         for h in header:
-            fh.write(h + u'\n')
+            fh.write(h + '\n')
         sout = df.to_latex(float_format=lambda f: float_format % f,
                              longtable=True, index=index, escape=False)
         fh.write(sout)
         for f in footer:
-            fh.write(f + u'\n')
+            fh.write(f + '\n')
     cmd = ['latex',
            '-output-format=pdf',
            '-output-directory=%s' % folder,

@@ -5,7 +5,7 @@ Package that first attempts to load a cython version of the Fisher's exact test:
 But falls back to the scipy test if it cannot be found
 """
 
-from __future__ import division
+
 import numpy as np
 from copy import deepcopy
 
@@ -84,11 +84,11 @@ try:
         elif alternative == 'greater':
             return (OR,res[1])
 
-    print "Using Cython-powered Fisher's exact test"
+    print("Using Cython-powered Fisher's exact test")
 
 except ImportError:
     from scipy import stats
-    print "Using scipy.stats Fisher's exact test (slow)"
+    print("Using scipy.stats Fisher's exact test (slow)")
     
     fisherTest = stats.fisher_exact
 

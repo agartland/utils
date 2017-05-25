@@ -1,4 +1,4 @@
-from __future__ import division
+
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import networkx as nx
@@ -156,7 +156,7 @@ def catcorr(df, layout='spring', mode='mpl', titleStr='', testSig=0.05, sRange=(
     if layout == 'twopi':
         """If using this layout specify the most common node as the root"""
         freq = {n:d['freq'] for n,d in g.nodes(data=True)}
-        pos = nx.graphviz_layout(g,prog=layout, root=np.max(freq.keys(),key=freq.get))
+        pos = nx.graphviz_layout(g,prog=layout, root=np.max(list(freq.keys()),key=freq.get))
     elif layout == 'spring':
         pos = spring_layout(g)
     elif layout == 'spectral':
@@ -229,7 +229,7 @@ def catcorr(df, layout='spring', mode='mpl', titleStr='', testSig=0.05, sRange=(
             data.append(tmp)
         """May need to add sqrt() to match mpl plots"""
         nodesize = szscale(nodesize,mn=sRange[0],mx=sRange[1]) #Units for plotly.Scatter is (size in points)
-        for col in cmap.keys():
+        for col in list(cmap.keys()):
             ind = [nodei for nodei,node in enumerate(g.nodes()) if node[0]==col]
             tmp = pygo.Scatter(x=[pos[s][0] for nodei,s in enumerate(g.nodes()) if nodei in ind],
                     y=[pos[s][1] for nodei,s in enumerate(g.nodes()) if nodei in ind],
@@ -305,7 +305,7 @@ def cull_rows(df, cols, freq):
 
     for c in cols:
         oh = objhist(df[c]).freq()
-        keepers[c] = [v for v in oh.keys() if oh[v]>freq]
+        keepers[c] = [v for v in list(oh.keys()) if oh[v]>freq]
         
     """Keep rows that have a value in keepers for each column"""
     for c in cols:
@@ -340,16 +340,16 @@ def testEdge(df, node1, node2, verbose=False):
     """Add 1 to cells with zero"""
     if np.any(tab == 0):
         if verbose:
-            print 'Adding one to %d cells with zero counts.' % (ind.sum())
-            print
+            print('Adding one to %d cells with zero counts.' % (ind.sum()))
+            print()
     tab[tab==0] = 1
 
     OR,pvalue = fisherTest(tab)
 
     if verbose:
-        print 'Node1: %s, %s' % node1
-        print 'Node2: %s, %s' % node2
-        print
-        print pd.DataFrame(tab,index=['Node1(-)','Node1(+)'],columns = ['Node2(-)','Node2(+)'])
-        print '\nOR: %1.2f\nP-value: %1.3f' % (OR, pvalue)
+        print('Node1: %s, %s' % node1)
+        print('Node2: %s, %s' % node2)
+        print()
+        print(pd.DataFrame(tab,index=['Node1(-)','Node1(+)'],columns = ['Node2(-)','Node2(+)']))
+        print('\nOR: %1.2f\nP-value: %1.3f' % (OR, pvalue))
     return OR, pvalue

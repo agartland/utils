@@ -43,7 +43,7 @@ def PCA(dataMatrix, INITIAL_DIMS) :
     Performs PCA on data.
     Reduces the dimensionality to INITIAL_DIMS
     """
-    print 'Performing PCA'
+    print('Performing PCA')
 
     dataMatrix= dataMatrix-dataMatrix.mean(axis=0)
 
@@ -66,8 +66,8 @@ def writeDat(dataMatrix,NO_DIMS,PERPLEX,LANDMARKS):
     """
     Generates data.dat
     """
-    print 'Writing data.dat'
-    print 'Dimension of projection : %i \nPerplexity : %i \nLandmarks(ratio) : %f'%(NO_DIMS,PERPLEX,LANDMARKS)
+    print('Writing data.dat')
+    print('Dimension of projection : %i \nPerplexity : %i \nLandmarks(ratio) : %f'%(NO_DIMS,PERPLEX,LANDMARKS))
     n,d = dataMatrix.shape
     f = open(TSNE_DIR+'data.dat', 'wb')
     f.write(pack('=iiid',n,d,NO_DIMS,PERPLEX))
@@ -83,16 +83,16 @@ def tSNE():
     Calls the tsne c++ implementation depending on the platform
     """
     cmd=[TSNE_DIR+'tSNE.exe']
-    print 'Calling executable "%s"' % cmd[0]
+    print('Calling executable "%s"' % cmd[0])
 
     tsneProcess=subprocess.Popen(cmd,stdout=subprocess.PIPE,cwd=TSNE_DIR)
-    print tsneProcess.communicate()[0]
+    print(tsneProcess.communicate()[0])
 
 def readResult():
     """
     Reads result from result.dat
     """
-    print 'Reading result.dat'
+    print('Reading result.dat')
     f=open(TSNE_DIR+'result.dat','rb')
     n,ND=readbin('ii',f)
     Xmat=empty((n,ND))
@@ -109,7 +109,7 @@ def reOrder(Xmat, LM):
     Re-order the data in the original order
     Call only if LANDMARKS==1
     """
-    print 'Reordering results'
+    print('Reordering results')
     X=zeros(Xmat.shape)
     for i,lm in enumerate(LM):
         X[lm]=Xmat[i]
@@ -119,6 +119,6 @@ def clearData():
     """
     Clears files data.dat and result.dat
     """
-    print 'Clearing data.dat and result.dat'
+    print('Clearing data.dat and result.dat')
     os.system('rm %sdata.dat' % TSNE_DIR)
     os.system('rm %sresult.dat' % TSNE_DIR)
