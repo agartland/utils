@@ -1,4 +1,3 @@
-
 import pandas as pd
 import numpy as np
 from lifelines.estimation import KaplanMeierFitter, NelsonAalenFitter
@@ -8,7 +7,10 @@ from myfisher import *
 from scipy import stats
 
 __all__ = ['estCumTE',
-            'estCoxPHTE']
+            'estCoxPHTE',
+            'scoreci',
+            'AgrestiScoreVE',
+            'unconditionalVE']
 
 def estCumTE(df, treatment_col='treated', duration_col='dx', event_col='disease', followupT=None, alpha=0.05, H1=0, bootstraps=None):
     """Estimates treatment efficacy using cumulative incidence (CI) Nelson-Aalen (NA) estimators.
