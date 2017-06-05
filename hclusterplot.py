@@ -29,7 +29,7 @@ def clean_axis(ax):
     for sp in list(ax.spines.values()):
         sp.set_visible(False)
     ax.grid(False)
-    ax.set_axis_bgcolor('white')
+    ax.set_facecolor('white')
 
 def mapColors2Labels(labels, setStr='Set3', cmap=None, returnLookup=False):
     """Return pd.Series of colors based on labels"""
