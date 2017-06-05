@@ -118,13 +118,16 @@ def parseNAB(fn, uVars=['celltype', 'virusdilution', 'isolate'], mag='titer_num'
 def parseRx(rxFn, demFn=None):
     trtCols = ['ptid', 'arm', 'grp', 'protocol', 'rx_code', 'rx']
     tmp = pd.read_csv(rxFn)
-    tmp['ptid'] = tmp.Ptid
+    tmp = tmp.rename_axis({'Ptid': 'ptid'}, axis=1)
+    tmp.loc[:, 'ptid'] = tmp.ptid.str.replace('-', '')
     trtDf = tmp[trtCols].set_index('ptid')
     
     if not  demFn is None:
         demCols = ['ptid', 'site', 'sex']
         demDf = pd.read_csv(demFn)
-        #demDf['ptid'] = demDf.Ptid
+        demDf = demDf.rename_axis({'Ptid': 'ptid'}, axis=1)
+        demDf.loc[:, 'ptid'] = demDf.ptid.str.replace('-', '')
+        
         siteLists = dict(US = [121, 125, 126, 123, 127, 128, 129, 132, 133, 134, 167],
                         ZA = [138, 156, 157],
                         Lausanne = [168],
@@ -132,7 +135,9 @@ def parseRx(rxFn, demFn=None):
         siteTranslation = {}
         for k, v in list(siteLists.items()):
             siteTranslation.update({n:k for n in v})
+        
         demDf['site'] = demDf.DEMsitei.map(siteTranslation.get)
         demDf['sex'] = demDf.DEMsex
+        
         trtDf = trtDf.join(demDf[demCols].set_index('ptid'))
     return trtDf

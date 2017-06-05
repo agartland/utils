@@ -484,7 +484,7 @@ class smLogisticRegression(object):
 
     def fit(self, X, y):
         if self.fit_intercept:
-            exog = sm.add_constant(X)
+            exog = sm.add_constant(X, has_constant='add')
         else:
             exog = X
         self.res = sm.GLM(endog=y, exog=exog, family=sm.families.Binomial()).fit()
@@ -498,7 +498,7 @@ class smLogisticRegression(object):
 
     def predict(self, X):
         if self.fit_intercept:
-            exog = sm.add_constant(X)
+            exog = sm.add_constant(X, has_constant='add')
         else:
             exog = X
         pred = self.res.predict(exog)
