@@ -49,3 +49,4 @@ def argsort_rows(a):
     See unique_rows and http://stackoverflow.com/a/16971324/74616"""
     sorti = np.argsort(a.view(a.dtype.descr * a.shape[1]), axis=0).flatten()
     return sorti
+    
