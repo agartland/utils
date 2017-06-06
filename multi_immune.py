@@ -97,7 +97,7 @@ def _clean_axis(ax):
     for sp in list(ax.spines.values()):
         sp.set_visible(False)
     ax.grid(False)
-    ax.set_axis_bgcolor('white')
+    ax.set_facecolor('white')
 
 def plotHeatmap(df, labels=None, titleStr=None, vRange=None, tickSz='small', cmap=None, cmapLabel='', annotation=False, xtickRot=90):
     """Display a heatmap with labels."""
