@@ -20,6 +20,7 @@ __all__ = ['computeROC',
            'plotCVROC',
            'plotProb',
            'plot2Prob',
+           'plotLogisticL1Paths',
            'lassoVarSelect',
            'smLogisticRegression',
            'rocStats']
@@ -68,7 +69,7 @@ def computeROC(df, model, outcomeVar, predVars):
         acc = sklearn.metrics.accuracy_score(tmp[outcomeVar].values, np.round(prob), normalize=True)
         auc = sklearn.metrics.auc(fpr, tpr)
         tpr[0], tpr[-1] = 0, 1
-    except sm.tools.sm_exceptions.PerfectSeparationError:
+    except:
         print('PerfectSeparationError: %s (N = %d; %d predictors)' % (outcomeVar, tmp.shape[0], len(predVars)))
         acc = 1.
         fpr = np.zeros(5)
@@ -116,10 +117,10 @@ def computeCVROC(df, model, outcomeVar, predVars, nFolds=10):
     if not isinstance(predVars, list):
         predVars = list(predVars)
     tmp = df[[outcomeVar] + predVars].dropna()
-    cv = sklearn.cross_validation.KFold(n=tmp.shape[0],
-                                        n_folds=nFolds,
-                                        shuffle=True,
-                                        random_state=110820)
+    cv = sklearn.cross_validation.StratifiedKFold(y=tmp[outcomeVar].values,
+                                                    n_folds=nFolds,
+                                                    shuffle=True,
+                                                    random_state=110820)
     fpr = np.linspace(0, 1, 100)
     tpr = np.nan * np.zeros((fpr.shape[0], nFolds))
     acc = 0
@@ -336,7 +337,7 @@ def plotROC(fprL, tprL, aucL=None, accL=None, labelL=None, outcomeVar=''):
         plt.title('ROC')
     else:
         plt.title('ROC for %s' % outcomeVar)
-    plt.legend(loc="lower right")
+    plt.legend(loc="lower right", fontsize=10)
     plt.show()
 
 def plotProb(outcome, prob, **kwargs):
@@ -405,9 +406,46 @@ def plot2Prob(df, outcomeVar, prob, **kwargs):
     plt.xlabel('Predicted Pr(%s)' % outcomeVar[0])
     plt.show()
 
-def lassoVarSelect(df, outcomeVar, predVars, nFolds=10, LOO=False, alpha=None):
-    """Apply LASSO to df and return performance metrics,
-    optionally in a cross-validation framework to select alpha.
+def plotLogisticL1Paths(results, predVars, topN=None):
+    tmp = results.coefs_paths_[1].mean(axis=0)
+    if len(predVars) == (tmp.shape[1] - 1):
+        predVars = np.concatenate((np.array(predVars), ['Intercept']))
+    
+    plt.clf()
+    plt.plot(np.log10(results.Cs_), tmp, '-')
+    yl = plt.ylim()
+    xl = plt.xlim()
+    plt.plot(np.log10([results.C_]*2), yl, '--k')
+    plt.ylabel('Coefficient')
+    plt.xlabel('$log_{10} C$\n(lower is more regularized)')
+    
+    if topN is None:
+        # ci = np.nonzero(results.Cs_ == results.C_[0])[0][0]
+        # topi = np.nonzero((tmp[ci, :] != 0))[0]
+        topi = np.nonzero(results.coef_.ravel() != 0)[0]
+        plt.annotate(s='$N_{vars}=%d$' % len(topi),
+             xy=(np.log10(results.C_), yl[1]),
+             ha='left', va='top', size=10)
+
+    else:
+        topi = np.argsort((tmp == 0).mean(axis=0))[:topN]
+    for i in topi:
+        a = predVars[i]
+        cInd = np.where(tmp[:, i] != 0)[0][0]
+        
+        y = tmp[cInd+2, i]
+        x = np.log10(results.Cs[cInd+2])
+        plt.annotate(a, xy=(x, y), ha='left', va='center', size=7)
+
+        y = tmp[-1, i]
+        x = np.log10(results.Cs[-1])
+        plt.annotate(a, xy=(x, y), ha='left', va='center', size=7)
+
+    plt.show()
+
+def lassoVarSelect(df, outcomeVar, predVars, nFolds=10, LOO=False, Cs=10):
+    """Apply logistic regression with L1-regularization (LASSO) to df and 
+    return performance metrics in a cross-validation framework to select C.
 
     ROC metrics computed on all data.
 
@@ -422,12 +460,10 @@ def lassoVarSelect(df, outcomeVar, predVars, nFolds=10, LOO=False, alpha=None):
         N-fold cross-validation (not required for LOO)
     LOO : bool
         Use leave-one-out cross validation instead of n-fold
-    alpha : float
-        Constant that multiplies the L1 term (aka lambda)
-        Defaults to 1.0
-        alpha = 0 is equivalent to OLS
-        Use None to set to maximum value given by:
-            abs(X.T.dot(Y)).max() / X.shape[0]
+    Cs : int or list
+        Each of the values in Cs describes the inverse of regularization strength.
+        If Cs is as an int, then a grid of Cs values are chosen in a logarithmic
+        scale between 1e-4 and 1e4. Smaller values specify stronger regularization.
 
     Returns
     -------
@@ -445,37 +481,40 @@ def lassoVarSelect(df, outcomeVar, predVars, nFolds=10, LOO=False, alpha=None):
         Predicted probabilities with index from df
     varList : list
         Variables with non-zero coefficients
-    alpha : float
-        Optimal alpha value using coordinate descent path"""
+    C : float
+        Optimal Cs value in cross-validation"""
+    
     if not isinstance(predVars, list):
         predVars = list(predVars)
+    
     tmp = df[[outcomeVar] + predVars].dropna()
-    if nFolds == 1 or not alpha is None:
-        """Pre-specify alpha, no CV needed"""
-        if alpha is None:
-            """Use the theoretical max alpha (not sure this is right though)"""
-            alpha = np.abs(tmp[predVars].T.dot(tmp[outcomeVar])).max() / tmp.shape[0]
-        model = sklearn.linear_model.Lasso(alpha=alpha)
+
+    if LOO:
+        cv = sklearn.cross_validation.LeaveOneOut(n=tmp.shape[0])
     else:
-        if LOO:
-            cv = sklearn.cross_validation.LeaveOneOut(n=tmp.shape[0])
-        else:
-            cv = nFolds
-        model = sklearn.linear_model.LassoCV(cv=cv)# , alphas=np.linspace(0.001,0.1,50))
+        cv = nFolds
+    scorerFunc = sklearn.metrics.make_scorer(sklearn.metrics.log_loss,
+                                             greater_is_better=False,
+                                             needs_proba=True,
+                                             needs_threshold=False)
+    model = sklearn.linear_model.LogisticRegressionCV(Cs=Cs,
+                                                      cv=cv,
+                                                      penalty='l1',
+                                                      solver='liblinear',
+                                                      scoring=scorerFunc)
+
     results = model.fit(y=tmp[outcomeVar].astype(float), X=tmp[predVars].astype(float))
 
-    if hasattr(model, 'alpha_'):
-        optimalAlpha = model.alpha_
-    else:
-        optimalAlpha = model.alpha
+    optimalC = model.C_[0]
     
-    prob = results.predict(tmp[predVars].astype(float))
-    fpr, tpr, thresholds = sklearn.metrics.roc_curve(tmp[outcomeVar].values, prob)
-    acc = sklearn.metrics.accuracy_score(tmp[outcomeVar].values, np.round(prob), normalize=True)
+    prob = results.predict_proba(tmp[predVars].astype(float))
+    class1Ind = np.nonzero(results.classes_ == 1)[0][0]
+    fpr, tpr, thresholds = sklearn.metrics.roc_curve(tmp[outcomeVar].values, prob[:, class1Ind])
+    acc = sklearn.metrics.accuracy_score(tmp[outcomeVar].values, np.round(prob[:, class1Ind]), normalize=True)
     auc = sklearn.metrics.auc(fpr, tpr)
-    varList = np.array(predVars)[results.coef_ != 0].tolist()
-    probS = pd.Series(prob, index=tmp.index, name='Prob')
-    return fpr, tpr, auc, acc, results, probS, varList, optimalAlpha
+    varList = np.array(predVars)[results.coef_.ravel() != 0].tolist()
+    probS = pd.Series(prob[:, class1Ind], index=tmp.index, name='Prob')
+    return fpr, tpr, auc, acc, results, probS, varList, optimalC
 
 class smLogisticRegression(object):
     """A wrapper of statsmodels.GLM to use with sklearn interface"""
@@ -503,6 +542,7 @@ class smLogisticRegression(object):
             exog = X
         pred = self.res.predict(exog)
         return pred
+
 def rocStats(obs, pred, returnSeries=True):
     """Compute stats for a 2x2 table derived from
     observed and predicted data vectors
