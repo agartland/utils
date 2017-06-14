@@ -7,7 +7,7 @@ import itertools
 import statsmodels.api as sm
 import sklearn
 import sklearn.ensemble
-import sklearn.cross_validation
+from sklearn.model_selection import StratifiedKFold, cross_val_score, LeaveOneOut
 import sklearn.linear_model
 import palettable
 
@@ -117,7 +117,7 @@ def computeCVROC(df, model, outcomeVar, predVars, nFolds=10):
     if not isinstance(predVars, list):
         predVars = list(predVars)
     tmp = df[[outcomeVar] + predVars].dropna()
-    cv = sklearn.cross_validation.StratifiedKFold(y=tmp[outcomeVar].values,
+    cv = StratifiedKFold(y=tmp[outcomeVar].values,
                                                     n_folds=nFolds,
                                                     shuffle=True,
                                                     random_state=110820)
@@ -212,7 +212,7 @@ def computeLOOROC(df, model, outcomeVar, predVars):
         predVars = list(predVars)
     tmp = df[[outcomeVar] + predVars].dropna()
 
-    cv = sklearn.cross_validation.LeaveOneOut(n=tmp.shape[0])
+    cv = LeaveOneOut(n=tmp.shape[0])
     nFolds = tmp.shape[0]
 
     fpr = np.linspace(0, 1, 100)
@@ -490,7 +490,7 @@ def lassoVarSelect(df, outcomeVar, predVars, nFolds=10, LOO=False, Cs=10):
     tmp = df[[outcomeVar] + predVars].dropna()
 
     if LOO:
-        cv = sklearn.cross_validation.LeaveOneOut(n=tmp.shape[0])
+        cv = LeaveOneOut(n=tmp.shape[0])
     else:
         cv = nFolds
     scorerFunc = sklearn.metrics.make_scorer(sklearn.metrics.log_loss,
@@ -504,6 +504,8 @@ def lassoVarSelect(df, outcomeVar, predVars, nFolds=10, LOO=False, Cs=10):
                                                       scoring=scorerFunc)
 
     results = model.fit(y=tmp[outcomeVar].astype(float), X=tmp[predVars].astype(float))
+
+    nested_score = cross_val_score(clf, X=X_iris, y=y_iris, cv=outer_cv)
 
     optimalC = model.C_[0]
     
