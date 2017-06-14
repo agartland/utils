@@ -488,34 +488,81 @@ def lassoVarSelect(df, outcomeVar, predVars, nFolds=10, LOO=False, Cs=10):
         predVars = list(predVars)
     
     tmp = df[[outcomeVar] + predVars].dropna()
+    X,y = tmp[predVars].astype(float), tmp[outcomeVar].astype(float)
 
     if LOO:
-        cv = LeaveOneOut(n=tmp.shape[0])
+        innerCV = LeaveOneOut(n=tmp.shape[0])
+        outerCV = LeaveOneOut(n=tmp.shape[0])
     else:
-        cv = nFolds
+        innerCV = StratifiedKFold(n_folds=nFolds, shuffle=True)
+        outerCV = StratifiedKFold(n_folds=nFolds, shuffle=True)
+    
     scorerFunc = sklearn.metrics.make_scorer(sklearn.metrics.log_loss,
                                              greater_is_better=False,
                                              needs_proba=True,
                                              needs_threshold=False)
-    model = sklearn.linear_model.LogisticRegressionCV(Cs=Cs,
-                                                      cv=cv,
-                                                      penalty='l1',
-                                                      solver='liblinear',
-                                                      scoring=scorerFunc)
-
-    results = model.fit(y=tmp[outcomeVar].astype(float), X=tmp[predVars].astype(float))
-
-    nested_score = cross_val_score(clf, X=X_iris, y=y_iris, cv=outer_cv)
-
-    optimalC = model.C_[0]
     
-    prob = results.predict_proba(tmp[predVars].astype(float))
-    class1Ind = np.nonzero(results.classes_ == 1)[0][0]
-    fpr, tpr, thresholds = sklearn.metrics.roc_curve(tmp[outcomeVar].values, prob[:, class1Ind])
-    acc = sklearn.metrics.accuracy_score(tmp[outcomeVar].values, np.round(prob[:, class1Ind]), normalize=True)
-    auc = sklearn.metrics.auc(fpr, tpr)
+    fpr = np.linspace(0, 1, 100)
+    tpr = np.nan * np.zeros((fpr.shape[0], nFolds))
+    acc = 0
+    counter = 0
+    results = []
+    prob = []
+    for i, (trainInd, testInd) in enumerate(cv):
+        trainDf = tmp.iloc[trainInd]
+        testDf = tmp.iloc[testInd]
+
+
+    fpr = np.linspace(0, 1, 100)
+    tpr = np.nan * np.zeros((fpr.shape[0], nFolds))
+    acc = 0
+    results = []
+    prob = []
+
+    for outi, (trainInd, testInd) in enumerate(outerCV.split(X=X, y=y)):
+        Xtrain, Xtest = X.iloc[trainInd], X.iloc[testInd]
+        ytrain, ytest = y.iloc[trainInd], y.iloc[testInd]
+
+        model = sklearn.linear_model.LogisticRegressionCV(Cs=Cs,
+                                                          cv=innerCV,
+                                                          penalty='l1',
+                                                          solver='liblinear',
+                                                          scoring=scorerFunc,
+                                                          refit=True)
+
+        results = model.fit(X=Xtrain, y=ytrain)
+        prob = results.predict_proba(Xtest)
+        
+        class1Ind = np.nonzero(results.classes_ == 1)[0][0]
+        fprTest, tprTest, _ = sklearn.metrics.roc_curve(ytest, prob[:, class1Ind])
+
+        tpr[:, i] = np.interp(fpr, fprTest, tprTest)
+        acc += sklearn.metrics.accuracy_score(ytest, np.round(prob[:, class1Ind]), normalize=True)
+        results.append(res)
+        prob.append(pd.Series(prob[:, class1Ind], index=Xtest.index))
+    
+    meanTPR = np.mean(tpr, axis=1)
+    meanTPR[0], meanTPR[-1] = 0, 1
+    meanACC = acc / nFolds
+    meanAUC = sklearn.metrics.auc(fpr, meanTPR)
+    
+    """Compute mean probability over test predictions in CV"""
+    probS = pd.concat(prob).groupby(level=0).agg(np.mean)
+    probS.name = 'Prob'
+
+    optimalC = model.C_[0] # WORKING HERE TO FIND OPTIMAL C OVER INNER FOLDS
+
+    """Refit all the data with the optimal C for variable selection and 
+    classification of holdout data """
+    model = sklearn.linear_model.LogisticRegression(C=optimalC,
+                                                      penalty='l1',
+                                                      solver='liblinear')
+    results = model.fit(X=X, y=y)
+          
     varList = np.array(predVars)[results.coef_.ravel() != 0].tolist()
     probS = pd.Series(prob[:, class1Ind], index=tmp.index, name='Prob')
+    
+    """RETURN EVERYTHING RELEVANT IN A DICT, INCLUDING Cs AND SCORES OVER ALL INNER FOLDS (ORGANIZED BY INNER/OUTER FOLD_i)"""
     return fpr, tpr, auc, acc, results, probS, varList, optimalC
 
 class smLogisticRegression(object):
