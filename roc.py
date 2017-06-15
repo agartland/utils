@@ -7,13 +7,12 @@ import itertools
 import statsmodels.api as sm
 import sklearn
 import sklearn.ensemble
-from sklearn.model_selection import StratifiedKFold, cross_val_score, LeaveOneOut
+from sklearn.model_selection import StratifiedKFold, cross_val_score, LeaveOneOut, GridSearchCV
 import sklearn.linear_model
-import palettable
 
 sns.set(style='darkgrid', palette='muted', font_scale=1.5)
 
-__all__ = ['computeROC',
+"""__all__ = ['computeROC',
            'computeCVROC',
            'computeLOOROC',
            'plotROC',
@@ -23,7 +22,390 @@ __all__ = ['computeROC',
            'plotLogisticL1Paths',
            'lassoVarSelect',
            'smLogisticRegression',
+           'rocStats']"""
+__all__ = ['plotROC',
+           'plotProb',
+           'plotLogisticL1Paths',
+           'logisticL1NestedCV',
+           'plotLogisticL1NestedTuning',
+           'smLogisticRegression',
            'rocStats']
+
+def plotROCObj(**objD):
+    fprL = [o['fpr'] for o in objD.values()]
+    tprL = [o['tpr'] for o in objD.values()]
+    aucL = [o['AUC'].mean() for o in objD.values()]
+    accL = [o['ACC'].mean() for o in objD.values()]
+    labelL = objD.keys()
+    outcomeVar = [o['Yvar'] for o in objD.values()][0]
+    plotROC(fprL, tprL, aucL, accL, labelL, outcomeVar)
+
+def plotROC(fprL, tprL, aucL=None, accL=None, labelL=None, outcomeVar=''):
+    if labelL is None and aucL is None and accL is None:
+        labelL = ['Model %d' % i for i in range(len(fprL))]
+    else:
+        labelL = ['%s (AUC = %0.2f; ACC = %0.2f)' % (label, auc, acc) for label, auc, acc in zip(labelL, aucL, accL)]
+
+    colors = sns.color_palette('Set1', n_colors=len(fprL))
+
+    plt.clf()
+    plt.gca().set_aspect('equal')
+    for i, (fpr, tpr, label) in enumerate(zip(fprL, tprL, labelL)):
+        plt.plot(fpr, tpr, color=colors[i], lw=2, label=label)
+    plt.plot([0, 1], [0, 1], '--', color='gray', label='Chance')
+    plt.xlim([-0.05, 1.05])
+    plt.ylim([-0.05, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    if outcomeVar == '':
+        plt.title('ROC')
+    else:
+        plt.title('ROC for %s' % outcomeVar)
+    plt.legend(loc="lower right", fontsize=10)
+    plt.show()
+
+def plotProb(outcome, prob, **kwargs):
+    """Scatter plot of probabilities for one ourcome.
+
+    Parameters
+    ----------
+    outcome : pd.Series
+    prob : pd.Series
+        Predicted probabilities returned from computeROC or computeCVROC"""
+
+    colors = sns.color_palette('Set1', n_colors=2)
+
+    tmp = pd.concat((outcome, prob), join='inner', axis=1)
+    tmp = tmp.sort_values(by=[outcome.name, 'Prob'])
+    tmp['x'] = np.arange(tmp.shape[0])
+    
+    plt.clf()
+    for color, val in zip(colors, tmp[outcome.name].unique()):
+        ind = tmp[outcome.name] == val
+        lab = '%s = %1.0f (%d)' % (outcome.name, val, ind.sum())
+        plt.scatter(tmp.x.loc[ind], tmp.Prob.loc[ind], label=lab, color=color, **kwargs)
+    plt.plot([0, tmp.shape[0]], [0.5, 0.5], 'k--', lw=1)
+    plt.legend(loc='upper left')
+    plt.ylabel('Predicted Pr(%s)' % outcome.name)
+    plt.ylim((-0.05, 1.05))
+    plt.xlim(-1, tmp.shape[0])
+    plt.show()
+
+def plotLogisticL1Paths(lo):
+    tmp = lo['paths'].mean(axis=0)
+    
+    if len(lo['Xvars']) == (tmp.shape[1] - 1):
+        predVars = np.concatenate((np.array(lo['Xvars']), ['Intercept']))
+    else:
+        predVars = np.array(lo['Xvars'])
+    
+    plt.clf()
+    plt.plot(np.log10(lo['Cs']), tmp, '-')
+    yl = plt.ylim()
+    xl = plt.xlim()
+    plt.plot(np.log10([lo['optimalCs'].mean()]*2), yl, '--k')
+    plt.ylabel('Coefficient')
+    plt.xlabel('Regularization parameter ($log_{10} C$)\n(lower is more regularized)')
+    
+    topi = np.nonzero(lo['finalResult'].coef_.ravel() != 0)[0]
+    plt.annotate(s='$N_{vars}=%d$' % len(topi),
+         xy=(np.log10(lo['finalResult'].C), yl[1]),
+         ha='left', va='top', size=10)
+
+    for i in topi:
+        a = predVars[i]
+        cInd = np.where(tmp[:, i] != 0)[0][0]
+        
+        y = tmp[cInd+2, i]
+        x = np.log10(lo['Cs'][cInd+2])
+        plt.annotate(a, xy=(x, y), ha='left', va='center', size=7)
+
+        y = tmp[-1, i]
+        x = np.log10(lo['Cs'][-1])
+        plt.annotate(a, xy=(x, y), ha='left', va='center', size=7)
+
+    plt.show()
+
+def plotLogisticL1NestedTuning(lo):
+    plt.clf()
+    colors = sns.color_palette('Set1', n_colors=10)
+    for outi in range(lo['scores'].shape[0]):
+        sc = lo['scores'][outi, :, :].mean(axis=0)
+        plt.plot(np.log10(lo['Cs']), sc, '-', color=colors[outi])
+        mnmx = sc.min(), sc.max()
+        plt.plot(np.log10([lo['optimalCs'][outi]]*2), mnmx, '--', color=colors[outi])
+    plt.xlim(np.log10(lo['Cs'][[0, -1]]))
+    plt.ylabel('Score (log-likelihood)')
+    plt.xlabel('Regularization parameter ($log_{10} C$)\n(lower is more regularized)')
+    plt.title('Regularization tuning in nested CV')
+    plt.show()
+
+def plotLogisticL1Vars(lo):
+    pctSelection = 100 * (lo1['coefs'] != 0).mean(axis=0)
+    finalInd = (lo['finalResult'].coef_ != 0).ravel()
+    x = np.arange(len(pctSelection))
+    plt.clf()
+    plt.barh(width=pctSelection[finalInd], bottom=x[finalInd], align='center', color='red', label='Yes')
+    plt.barh(width=pctSelection[~finalInd], bottom=x[~finalInd], align='center', color='blue', label='No')
+    plt.yticks(range(len(pctSelection)), lo['Xvars'], size=10)
+    plt.ylabel('Predictors')
+    plt.xlabel('% times selected in 10-fold CV')
+    plt.legend(loc=0, title='Final model?')
+
+def logisticL1NestedCV(df, outcomeVar, predVars, nFolds=10, Cs=10):
+    """Apply logistic regression with L1-regularization (LASSO) to df.
+    Uses nested cross-validation framework with inner folds to optimize C
+    and outer test folds to evaluate performance.
+        
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Must contain outcome and predictor variables.
+    outcomeVar : str
+    predVars : ndarray or list
+        Predictor variables in the model.
+    nFolds : int
+        N-fold cross-validation
+    Cs : int or list
+        Each of the values in Cs describes the inverse of regularization strength.
+        If Cs is as an int, then a grid of Cs values are chosen in a logarithmic
+        scale between 1e-4 and 1e4. Smaller values specify stronger regularization.
+
+    Returns
+    -------
+    results : dict
+        Contains results as keys below:
+        fpr:            (100, ) average FPR for ROC
+        tpr:            (100, ) average TPR for ROC
+        AUC:            (outerFolds, ) AUC of ROC for each outer test fold
+        meanAUC:        (1, ) AUC of the average ROC
+        ACC:            (outerFolds, ) accuracy across outer test folds
+        scores:         (outerFolds, innerFolds, Cs) log-likelihood for each C across inner and outer CV folds
+        optimalCs:      (outerFolds, ) optimal C from each set of inner CV
+        finalResult:    final fitted model with predict() exposed
+        prob:           (N,) pd.Series of predicted probabilities avg over outer folds
+        varList:        (Nvars, ) list of vars with non-zero coef in final model
+        Cs:             (Cs, ) pre-specified grid of Cs
+        coefs:          (outerFolds, predVars) refit with optimalC in each fold
+        paths:          (outerFolds, Cs, predVars + intercept) avg across inner folds
+        XVars:          list of all vars in X
+        yVar:           name of outcome variable
+        N:              total number of rows/instances in the model"""
+    
+    if not isinstance(predVars, list):
+        predVars = list(predVars)
+    
+    tmp = df[[outcomeVar] + predVars].dropna()
+    X,y = tmp[predVars].astype(float), tmp[outcomeVar].astype(float)
+
+    innerCV = StratifiedKFold(n_splits=nFolds, shuffle=True)
+    outerCV = StratifiedKFold(n_splits=nFolds, shuffle=True)
+    
+    scorerFunc = sklearn.metrics.make_scorer(sklearn.metrics.log_loss,
+                                             greater_is_better=False,
+                                             needs_proba=True,
+                                             needs_threshold=False)
+    
+    fpr = np.linspace(0, 1, 100)
+    tpr = np.nan * np.zeros((fpr.shape[0], nFolds))
+    acc = np.nan * np.zeros(nFolds)
+    auc = np.nan * np.zeros(nFolds)
+    paths = []
+    coefs = []
+    probs = []
+    optimalCs = np.nan * np.zeros(nFolds)
+    scores = []
+
+    for outi, (trainInd, testInd) in enumerate(outerCV.split(X=X, y=y)):
+        Xtrain, Xtest = X.iloc[trainInd], X.iloc[testInd]
+        ytrain, ytest = y.iloc[trainInd], y.iloc[testInd]
+
+        model = sklearn.linear_model.LogisticRegressionCV(Cs=Cs,
+                                                          cv=innerCV,
+                                                          penalty='l1',
+                                                          solver='liblinear',
+                                                          scoring=scorerFunc,
+                                                          refit=True)
+        """With refit = True, the scores are averaged across all folds,
+        and the coefs and the C that corresponds to the best score is taken,
+        and a final refit is done using these parameters."""
+
+        results = model.fit(X=Xtrain, y=ytrain)
+        prob = results.predict_proba(Xtest)
+        
+        class1Ind = np.nonzero(results.classes_ == 1)[0][0]
+        fprTest, tprTest, _ = sklearn.metrics.roc_curve(ytest, prob[:, class1Ind])
+
+
+        tpr[:, outi] = np.interp(fpr, fprTest, tprTest)
+        auc[outi] = sklearn.metrics.auc(fprTest, tprTest)
+        acc[outi] = sklearn.metrics.accuracy_score(ytest, np.round(prob[:, class1Ind]), normalize=True)
+        optimalCs[outi] = results.C_[0]
+        scores.append(results.scores_[1])
+        paths.append(results.coefs_paths_[1])
+        coefs.append(results.coef_)
+        probs.append(pd.Series(prob[:, class1Ind], index=Xtest.index))
+    
+    meanTPR = np.mean(tpr, axis=1)
+    meanTPR[0], meanTPR[-1] = 0, 1
+    meanACC = np.mean(acc)
+    meanAUC = sklearn.metrics.auc(fpr, meanTPR)
+    meanC = 10**np.mean(np.log10(optimalCs))
+    paths = np.concatenate([p.mean(axis=0, keepdims=True) for p in paths], axis=0)
+    scores = np.concatenate([s[None, :, :] for s in scores], axis=0)
+    
+    """Compute mean probability over test predictions in CV"""
+    probS = pd.concat(probs).groupby(level=0).agg(np.mean)
+    probS.name = 'Prob'
+
+    """Refit all the data with the optimal C for variable selection and 
+    classification of holdout data"""
+    model = sklearn.linear_model.LogisticRegression(C=meanC,
+                                                    penalty='l1',
+                                                    solver='liblinear')
+    result = model.fit(X=X, y=y)
+    varList = np.array(predVars)[result.coef_.ravel() != 0].tolist()
+
+    rocRes = rocStats(y, np.round(probS))
+    
+    outD = {'fpr':fpr,                      # (100, ) average FPR for ROC
+            'tpr':meanTPR,                  # (100, ) average TPR for ROC
+            'AUC':auc,                      # (outerFolds, ) AUC of ROC for each outer test fold
+            'meanAUC': meanAUC,             # (1, ) AUC of the average ROC
+            'ACC':acc,                      # (outerFolds, ) accuracy across outer test folds
+            'scores': scores,               # (outerFolds, innerFolds, Cs) score for each C across inner and outer CV folds
+            'optimalCs':optimalCs,          # (outerFolds, ) optimal C from each set of inner CV
+            'finalResult': result,          # final fitted model with predict() exposed
+            'prob':probS,                   # (N,) pd.Series of predicted probabilities avg over outer folds
+            'varList':varList,              # list of vars with non-zero coef in final model
+            'Cs':Cs,                        # pre-specified grid of Cs
+            'coefs':np.concatenate(coefs),  # (outerFolds, predVars) refit with optimalC in each fold
+            'paths':paths,                  # (outerFolds, Cs, predVars + intercept) avg across inner folds 
+            'Xvars':predVars,
+            'Yvar':outcomeVar,
+            'N':tmp.shape[0]}                  
+    outD.update(rocRes[['Sensitivity', 'Specificity']].to_dict())
+    return outD
+
+def nestedCVClassifier(df, outcomeVar, predVars, model, params={}, nFolds=10, scorer='log_loss'):
+    """Apply model to df in nested cross-validation framework
+    with inner folds to optimize hyperparameters.
+    and outer test folds to evaluate performance.
+        
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Must contain outcome and predictor variables.
+    outcomeVar : str
+    predVars : ndarray or list
+        Predictor variables in the model.
+    model : sklearn model
+    nFolds : int
+        N-fold cross-validation
+    params : dict
+        Keys of model hyperparameters withe values to try in
+        a grid search.
+
+    Returns
+    -------
+    results : dict
+        Contains results as keys below:
+        fpr:            (100, ) average FPR for ROC
+        tpr:            (100, ) average TPR for ROC
+        AUC:            (outerFolds, ) AUC of ROC for each outer test fold
+        meanAUC:        (1, ) AUC of the average ROC
+        ACC:            (outerFolds, ) accuracy across outer test folds
+        scores:         (outerFolds, innerFolds, Cs) log-likelihood for each C across inner and outer CV folds
+        optimalCs:      (outerFolds, ) optimal C from each set of inner CV
+        finalResult:    final fitted model with predict() exposed
+        prob:           (N,) pd.Series of predicted probabilities avg over outer folds
+        varList:        (Nvars, ) list of vars with non-zero coef in final model
+        Cs:             (Cs, ) pre-specified grid of Cs
+        coefs:          (outerFolds, predVars) refit with optimalC in each fold
+        paths:          (outerFolds, Cs, predVars + intercept) avg across inner folds
+        XVars:          list of all vars in X
+        yVar:           name of outcome variable
+        N:              total number of rows/instances in the model"""
+    
+    if not isinstance(predVars, list):
+        predVars = list(predVars)
+    
+    tmp = df[[outcomeVar] + predVars].dropna()
+    X,y = tmp[predVars].astype(float), tmp[outcomeVar].astype(float)
+
+    innerCV = StratifiedKFold(n_splits=nFolds, shuffle=True)
+    outerCV = StratifiedKFold(n_splits=nFolds, shuffle=True)
+    
+    if scorer == 'log_loss':
+        scorerFunc = sklearn.metrics.make_scorer(sklearn.metrics.log_loss,
+                                                 greater_is_better=False,
+                                                 needs_proba=True,
+                                                 needs_threshold=False)
+    elif scorer == 'accuracy':
+        scorerFunc = sklearn.metrics.make_scorer(sklearn.metrics.accuracy_score,
+                                                 greater_is_better=True,
+                                                 needs_proba=False,
+                                                 needs_threshold=False)
+    
+    fpr = np.linspace(0, 1, 100)
+    tpr = np.nan * np.zeros((fpr.shape[0], nFolds))
+    acc = np.nan * np.zeros(nFolds)
+    auc = np.nan * np.zeros(nFolds)
+    probs = []
+    optimalParams = []
+    optimalScores = []
+    cvResults = []
+
+    for outi, (trainInd, testInd) in enumerate(outerCV.split(X=X, y=y)):
+        Xtrain, Xtest = X.iloc[trainInd], X.iloc[testInd]
+        ytrain, ytest = y.iloc[trainInd], y.iloc[testInd]
+
+        clf = GridSearchCV(estimator=model, param_grid=params, cv=innerCV, refit=True, scoring=scorerFunc)
+        clf.fit(X, y)
+        cvResults.append(clf.cv_results_)
+        optimalParams.append(clf.best_params_)
+        optimalScores.append(clf.best_score_)
+
+        prob = clf.predict_proba(Xtest)
+        fprTest, tprTest, _ = sklearn.metrics.roc_curve(ytest, prob[:, 1])
+        tpr[:, outi] = np.interp(fpr, fprTest, tprTest)
+        auc[outi] = sklearn.metrics.auc(fprTest, tprTest)
+        acc[outi] = sklearn.metrics.accuracy_score(ytest, np.round(prob[:, 1]), normalize=True)
+        
+        probs.append(pd.Series(prob[:, 1], index=Xtest.index))
+    
+    meanTPR = np.mean(tpr, axis=1)
+    meanTPR[0], meanTPR[-1] = 0, 1
+    meanACC = np.mean(acc)
+    meanAUC = sklearn.metrics.auc(fpr, meanTPR)
+    meanC = 10**np.mean(np.log10(optimalCs))
+    
+    """Compute mean probability over test predictions in CV"""
+    probS = pd.concat(probs).groupby(level=0).agg(np.mean)
+    probS.name = 'Prob'
+
+    optP = {k:np.array([o[k] for o in optimalParams]).mean() for k in optimalParams[0].keys()}
+    result = model.fit(X=X, y=y, **optP)
+    rocRes = rocStats(y, np.round(probS))
+    
+    outD = {'fpr':fpr,                     
+            'tpr':meanTPR,               
+            'AUC':auc,                   
+            'meanAUC': meanAUC,          
+            'ACC':acc,                   
+            'optimalScores': np.array(optimalScores),
+            'finalResult': result,          # final fitted model with predict() exposed
+            'prob':probS,                   # (N,) pd.Series of predicted probabilities avg over outer folds
+            'Xvars':predVars,
+            'Yvar':outcomeVar,
+            'N':tmp.shape[0]}                  
+    outD.update(rocRes[['Sensitivity', 'Specificity']].to_dict())
+    return outD
+
+svr = SVC(kernel='rbf', probability=True)
+p_grid = {'C': [1, 10, 100],
+          'gamma': [.01, .1]}
+nestedCVClassifier(tmp, outcomeVar, allCyVars, svr, params=p_grid, nFolds=10, scorer='log_loss')
 
 def computeROC(df, model, outcomeVar, predVars):
     """Apply model to df and return performance metrics.
@@ -58,11 +440,11 @@ def computeROC(df, model, outcomeVar, predVars):
     tmp = df[[outcomeVar] + predVars].dropna()
 
     try:
-        results = model.fit(X=tmp[predVars].astype(float), y=tmp[outcomeVar].astype(float))
+        results = model.fit(X=tmp[predVars], y=tmp[outcomeVar])
         if hasattr(results, 'predict_proba'):
-            prob = results.predict_proba(tmp[predVars].astype(float))[:, 1]
+            prob = results.predict_proba(tmp[predVars])[:, 1]
         else:
-            prob = results.predict(tmp[predVars].astype(float))
+            prob = results.predict(tmp[predVars])
             results.predict_proba = results.predict
         fpr, tpr, thresholds = sklearn.metrics.roc_curve(tmp[outcomeVar].values, prob)
 
@@ -79,9 +461,15 @@ def computeROC(df, model, outcomeVar, predVars):
         auc = 1.
         results = None
     assert acc <= 1
-    return fpr, tpr, auc, acc, results, pd.Series(prob, index=tmp.index, name='Prob')
+    outD = {'fpr':fpr,
+            'tpr':tpr,
+            'AUC':auc,
+            'ACC':acc,
+            'result':results,
+            'probs':pd.Series(prob, index=tmp.index, name='Prob')}
+    return outD
 
-def computeCVROC(df, model, outcomeVar, predVars, nFolds=10):
+def computeCVROC(df, model, outcomeVar, predVars, nFolds=10, LOO=False):
     """Apply model to df and return performance metrics in a cross-validation framework.
 
     Parameters
@@ -114,376 +502,6 @@ def computeCVROC(df, model, outcomeVar, predVars, nFolds=10):
     success : bool
         An indicator of whether the cross-validation was completed."""
 
-    if not isinstance(predVars, list):
-        predVars = list(predVars)
-    tmp = df[[outcomeVar] + predVars].dropna()
-    cv = StratifiedKFold(y=tmp[outcomeVar].values,
-                                                    n_folds=nFolds,
-                                                    shuffle=True,
-                                                    random_state=110820)
-    fpr = np.linspace(0, 1, 100)
-    tpr = np.nan * np.zeros((fpr.shape[0], nFolds))
-    acc = 0
-    counter = 0
-    results = []
-    prob = []
-    for i, (trainInd, testInd) in enumerate(cv):
-        trainDf = tmp.iloc[trainInd]
-        testDf = tmp.iloc[testInd]
-        trainFPR, trainTPR, trainAUC, trainACC, res, trainProb = computeROC(trainDf,
-                                                                            model,
-                                                                            outcomeVar,
-                                                                            predVars)
-        if not res is None:
-            counter += 1
-            testProb = res.predict_proba(testDf[predVars].astype(float))[:, 1]
-            testFPR, testTPR, _ = sklearn.metrics.roc_curve(testDf[outcomeVar].values, testProb)
-            tpr[:, i] = np.interp(fpr, testFPR, testTPR)
-            acc += sklearn.metrics.accuracy_score(testDf[outcomeVar].values, np.round(testProb), normalize=True)
-            results.append(res)
-            prob.append(pd.Series(testProb, index=testDf.index))
-    
-    if counter == nFolds:
-        meanTPR = np.nanmean(tpr, axis=1)
-        meanTPR[0], meanTPR[-1] = 0, 1
-        meanACC = acc / counter
-        meanAUC = sklearn.metrics.auc(fpr, meanTPR)
-        """Compute mean probability over test predictions in CV"""
-        probS = pd.concat(prob).groupby(level=0).agg(np.mean)
-        probS.name = 'Prob'
-        assert probS.shape[0] == tmp.shape[0]
-        success = True
-    else:
-        print('ROC: did not finish all folds (%d of %d)' % (counter, nFolds))
-        """If we get a PerfectSeparation error on one fold then report model fit to all data"""
-        print("Returning metrics from fitting complete dataset (no CV)")
-
-        testFPR, testTPR, meanAUC, meanACC, res, probS = computeROC(tmp,
-                                                                    model,
-                                                                    outcomeVar,
-                                                                    predVars)
-        meanTPR = np.interp(fpr, testFPR, testTPR)
-        meanTPR[0], meanTPR[-1] = 0, 1
-        results = [res]
-        success = False
-        '''
-        meanTPR = np.nan * fpr
-        meanTPR[0], meanTPR[-1] = 0,1
-        meanACC = np.nan
-        meanAUC = np.nan
-        """Compute mean probability over test predictions in CV"""
-        probS = np.nan
-        '''
-    assert meanACC <= 1
-    return fpr, meanTPR, meanAUC, meanACC, results, probS, success
-
-def computeLOOROC(df, model, outcomeVar, predVars):
-    """Apply model to df and return performance metrics in a cross-validation framework.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Must contain outcome and predictor variables.
-    model : sklearn or other model
-        Model must have fit and predict methods.
-    outcomeVar : str
-    predVars : ndarray or list
-        Predictor variables in the model.
-
-    Returns
-    -------
-    fpr : np.ndarray
-        Pre-specified vector of FPR thresholds for interpolation
-        fpr = np.linspace(0, 1, 100)
-    tpr : np.ndarray
-        Mean true-positive rate in test fraction.
-    auc : float
-        Area under the mean ROC curve.
-    acc : float
-        Mean accuracy score in test fraction.
-    results : returned by model.fit()
-        Training model results object for each fold
-    prob : pd.Series
-        Mean predicted probabilities on test data with index from df
-    success : bool
-        An indicator of whether the cross-validation was completed."""
-
-    if not isinstance(predVars, list):
-        predVars = list(predVars)
-    tmp = df[[outcomeVar] + predVars].dropna()
-
-    cv = LeaveOneOut(n=tmp.shape[0])
-    nFolds = tmp.shape[0]
-
-    fpr = np.linspace(0, 1, 100)
-    prob = np.nan * np.ones(tmp.shape[0])
-    outcome = np.nan * np.ones(tmp.shape[0])
-    ids = []
-    results = []
-    
-    """Fit model to all the data for use in cases when there is perfect separation"""
-    try:
-        wholeRes = model.fit(X=tmp[predVars].astype(float), y=tmp[outcomeVar].astype(float))
-        if not hasattr(wholeRes, 'predict_proba'):
-            wholeRes.predict_proba = wholeRes.predict
-        wholeProb = wholeRes.predict_proba(tmp[predVars].astype(float))[:, 1]
-    except sm.tools.sm_exceptions.PerfectSeparationError:
-        print('PerfectSeparationError on complete dataset: %s (N = %d; %d predictors)' % (outcomeVar, tmp.shape[0], len(predVars)))
-        outcome = tmp[outcomeVar]
-        prob = outcome
-        results = [None] * tmp.shape[0]
-
-        testFPR, testTPR, thresholds = sklearn.metrics.roc_curve(outcome, prob)
-        tpr = np.interp(fpr, testFPR, testTPR)
-        acc = 1
-        auc = 1
-        tpr[0], tpr[-1] = 0, 1
-
-        probS = pd.Series(prob, index=tmp.index)
-        probS.name = 'Prob'
-        assert probS.shape[0] == tmp.shape[0]
-        success = False
-        return fpr, tpr, auc, acc, results, probS, success
-
-    for i, (trainInd, testInd) in enumerate(cv):
-        trainDf = tmp.iloc[trainInd]
-        testDf = tmp.iloc[testInd]
-        outcome[i] = testDf[outcomeVar].astype(float).iloc[0]
-        ids.append(tmp.index[testInd[0]])
-        try:
-            res = model.fit(X=trainDf[predVars].astype(float), y=trainDf[outcomeVar].astype(float))
-            results.append(res)
-            if not hasattr(res, 'predict_proba'):
-                res.predict_proba = res.predict
-            prob[i] = res.predict_proba(testDf[predVars].astype(float))[0, 1]
-        except sm.tools.sm_exceptions.PerfectSeparationError:
-            print('PerfectSeparationError: %s (N = %d; %d predictors)' % (outcomeVar, tmp.shape[0], len(predVars)))
-            prob[i] = wholeProb[i]
-            results.append(None)
-    
-    testFPR, testTPR, thresholds = sklearn.metrics.roc_curve(outcome, prob)
-    tpr = np.interp(fpr, testFPR, testTPR)
-    acc = sklearn.metrics.accuracy_score(outcome, np.round(prob), normalize=True)
-    auc = sklearn.metrics.auc(testFPR, testTPR)
-    tpr[0], tpr[-1] = 0, 1
-
-    probS = pd.Series(prob, index=ids)
-    probS.name = 'Prob'
-    assert probS.shape[0] == tmp.shape[0]
-    success = True
-    return fpr, tpr, auc, acc, results, probS, success
-
-def plotCVROC(df, model, outcomeVar, predictorsList, predictorLabels=None, rocFunc=computeLOOROC, **rocKwargs):
-    """Plot of multiple ROC curves using same model and same outcomeVar with
-    different sets of predictors.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Must contain outcome and predictor variables.
-    model : sklearn or other model
-        Model must have fit and predict methods.
-    outcomeVar : str
-    predictorsList : list
-        List of lists of predictor variables for each model.
-    predictorLabels : list
-        List of labels for the models (optional)
-    rocFunc : computeCVROC or computeROC or computeLOOROC
-        Function for computing the ROC
-    rocKwargs : kwargs
-        Additional arguments for rocFunc"""
-    
-    if predictorLabels is None:
-        predictorLabels = [' + '.join(predVars) for predVars in predictorsList]
-    
-    colors = palettable.colorbrewer.qualitative.Set1_8.mpl_colors
-
-    fprList, tprList, labelList = [], [], []
-
-    for predVarsi, predVars in enumerate(predictorsList):
-        fpr, tpr, auc, acc, res, probS, success = rocFunc(df,
-                                                         model,
-                                                         outcomeVar,
-                                                         predVars,
-                                                         **rocKwargs)
-
-        if success:
-            label = '%s (AUC = %0.2f; ACC = %0.2f)' % (predictorLabels[predVarsi], auc, acc)
-        else:
-            label = '%s (AUC* = %0.2f; ACC* = %0.2f)' % (predictorLabels[predVarsi], auc, acc)
-        labelList.append(label)
-        fprList.append(fpr)
-        tprList.append(tpr)
-    plotROC(fprList, tprList, labelL=labelList)
-
-def plotROC(fprL, tprL, aucL=None, accL=None, labelL=None, outcomeVar=''):
-    if labelL is None and aucL is None and accL is None:
-        labelL = ['Model %d' % i for i in range(len(fprL))]
-    else:
-        labelL = ['%s (AUC = %0.2f; ACC = %0.2f)' % (label, auc, acc) for label, auc, acc in zip(labelL, aucL, accL)]
-
-    colors = palettable.colorbrewer.qualitative.Set1_8.mpl_colors
-
-    plt.clf()
-    plt.gca().set_aspect('equal')
-    for i, (fpr, tpr, label) in enumerate(zip(fprL, tprL, labelL)):
-        plt.plot(fpr, tpr, color=colors[i], lw=2, label=label)
-    plt.plot([0, 1], [0, 1], '--', color='gray', label='Chance')
-    plt.xlim([-0.05, 1.05])
-    plt.ylim([-0.05, 1.05])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    if outcomeVar == '':
-        plt.title('ROC')
-    else:
-        plt.title('ROC for %s' % outcomeVar)
-    plt.legend(loc="lower right", fontsize=10)
-    plt.show()
-
-def plotProb(outcome, prob, **kwargs):
-    """Scatter plot of probabilities for one ourcome.
-
-    Parameters
-    ----------
-    outcome : pd.Series
-    prob : pd.Series
-        Predicted probabilities returned from computeROC or computeCVROC"""
-
-    colors = palettable.colorbrewer.qualitative.Set1_3.mpl_colors
-
-    tmp = pd.concat((outcome, prob), join='inner', axis=1)
-    tmp = tmp.sort_values(by=[outcome.name, 'Prob'])
-    tmp['x'] = np.arange(tmp.shape[0])
-    
-    plt.clf()
-    for color, val in zip(colors, tmp[outcome.name].unique()):
-        ind = tmp[outcome.name] == val
-        lab = '%s = %1.0f (%d)' % (outcome.name, val, ind.sum())
-        plt.scatter(tmp.x.loc[ind], tmp.Prob.loc[ind], label=lab, color=color, **kwargs)
-    plt.plot([0, tmp.shape[0]], [0.5, 0.5], 'k--', lw=1)
-    plt.legend(loc='upper left')
-    plt.ylabel('Predicted Pr(%s)' % outcome.name)
-    plt.ylim((-0.05, 1.05))
-    plt.xlim(-1, tmp.shape[0])
-    plt.show()
-
-def plot2Prob(df, outcomeVar, prob, **kwargs):
-    """Scatter plot of probabilities for two outcomes.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Must contain two outcome variables.
-    model : sklearn or other model
-        Model must have fit and predict methods.
-    outcomeVar : list
-        Contains two outcomeVar for comparison
-    prob : list
-        Contains two pd.Series with predicted probabilities
-        from computeROC or computeCVROC"""
-    labels = {(0, 0):'Neither',
-              (1, 1):'Both',
-              (0, 1):'%s only' % outcomeVar[1],
-              (1, 0):'%s only' % outcomeVar[0]}
-    markers = ['o', 's', '^', 'x']
-    colors = palettable.colorbrewer.qualitative.Set1_5.mpl_colors
-    tmp = df[outcomeVar].join(prob[0], how='inner').join(prob[1], how='inner', rsuffix='_Y')
-
-    plt.clf()
-    plt.gca().set_aspect('equal')
-    prodIter = itertools.product(tmp[outcomeVar[0]].unique(), tmp[outcomeVar[1]].unique())
-    for color, m, val in zip(colors, markers, prodIter):
-        valx, valy = val
-        ind = (tmp[outcomeVar[0]] == valx) & (tmp[outcomeVar[1]] == valy)
-        lab = labels[val] + ' (%d)' % ind.sum()
-        plt.scatter(tmp.Prob.loc[ind], tmp.Prob_Y.loc[ind], label=lab, color=color, marker=m, **kwargs)
-    plt.plot([0.5, 0.5], [0, 1], 'k--', lw=1)
-    plt.plot([0, 1], [0.5, 0.5], 'k--', lw=1)
-    plt.ylim((-0.05, 1.05))
-    plt.xlim((-0.05, 1.05))
-    plt.legend(loc='upper left')
-    plt.ylabel('Predicted Pr(%s)' % outcomeVar[1])
-    plt.xlabel('Predicted Pr(%s)' % outcomeVar[0])
-    plt.show()
-
-def plotLogisticL1Paths(results, predVars, topN=None):
-    tmp = results.coefs_paths_[1].mean(axis=0)
-    if len(predVars) == (tmp.shape[1] - 1):
-        predVars = np.concatenate((np.array(predVars), ['Intercept']))
-    
-    plt.clf()
-    plt.plot(np.log10(results.Cs_), tmp, '-')
-    yl = plt.ylim()
-    xl = plt.xlim()
-    plt.plot(np.log10([results.C_]*2), yl, '--k')
-    plt.ylabel('Coefficient')
-    plt.xlabel('$log_{10} C$\n(lower is more regularized)')
-    
-    if topN is None:
-        # ci = np.nonzero(results.Cs_ == results.C_[0])[0][0]
-        # topi = np.nonzero((tmp[ci, :] != 0))[0]
-        topi = np.nonzero(results.coef_.ravel() != 0)[0]
-        plt.annotate(s='$N_{vars}=%d$' % len(topi),
-             xy=(np.log10(results.C_), yl[1]),
-             ha='left', va='top', size=10)
-
-    else:
-        topi = np.argsort((tmp == 0).mean(axis=0))[:topN]
-    for i in topi:
-        a = predVars[i]
-        cInd = np.where(tmp[:, i] != 0)[0][0]
-        
-        y = tmp[cInd+2, i]
-        x = np.log10(results.Cs[cInd+2])
-        plt.annotate(a, xy=(x, y), ha='left', va='center', size=7)
-
-        y = tmp[-1, i]
-        x = np.log10(results.Cs[-1])
-        plt.annotate(a, xy=(x, y), ha='left', va='center', size=7)
-
-    plt.show()
-
-def lassoVarSelect(df, outcomeVar, predVars, nFolds=10, LOO=False, Cs=10):
-    """Apply logistic regression with L1-regularization (LASSO) to df and 
-    return performance metrics in a cross-validation framework to select C.
-
-    ROC metrics computed on all data.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Must contain outcome and predictor variables.
-    outcomeVar : str
-    predVars : ndarray or list
-        Predictor variables in the model.
-    nFolds : int
-        N-fold cross-validation (not required for LOO)
-    LOO : bool
-        Use leave-one-out cross validation instead of n-fold
-    Cs : int or list
-        Each of the values in Cs describes the inverse of regularization strength.
-        If Cs is as an int, then a grid of Cs values are chosen in a logarithmic
-        scale between 1e-4 and 1e4. Smaller values specify stronger regularization.
-
-    Returns
-    -------
-    fpr : np.ndarray
-        False-positive rate.
-    meanTPR : np.ndarray
-        True-positive rate.
-    auc : float
-        Area under the ROC curve.
-    acc : float
-        Sccuracy score
-    results : returned by Lasso.fit()
-        Model results object
-    prob : pd.Series
-        Predicted probabilities with index from df
-    varList : list
-        Variables with non-zero coefficients
-    C : float
-        Optimal Cs value in cross-validation"""
-    
     if not isinstance(predVars, list):
         predVars = list(predVars)
     
@@ -491,44 +509,23 @@ def lassoVarSelect(df, outcomeVar, predVars, nFolds=10, LOO=False, Cs=10):
     X,y = tmp[predVars].astype(float), tmp[outcomeVar].astype(float)
 
     if LOO:
-        innerCV = LeaveOneOut(n=tmp.shape[0])
-        outerCV = LeaveOneOut(n=tmp.shape[0])
+        cv = LeaveOneOut()
+        nFolds = cv.get_n_splits(y)
+        cv_iter = cv.split(y=y)
     else:
-        innerCV = StratifiedKFold(n_folds=nFolds, shuffle=True)
-        outerCV = StratifiedKFold(n_folds=nFolds, shuffle=True)
-    
-    scorerFunc = sklearn.metrics.make_scorer(sklearn.metrics.log_loss,
-                                             greater_is_better=False,
-                                             needs_proba=True,
-                                             needs_threshold=False)
+        cv = StratifiedKFold(n_splits=nFolds, shuffle=True)
+        cv_iter = cv.split(X=X, y=y)
     
     fpr = np.linspace(0, 1, 100)
     tpr = np.nan * np.zeros((fpr.shape[0], nFolds))
-    acc = 0
-    counter = 0
-    results = []
-    prob = []
-    for i, (trainInd, testInd) in enumerate(cv):
-        trainDf = tmp.iloc[trainInd]
-        testDf = tmp.iloc[testInd]
+    acc = np.nan * np.zeros(nFolds)
+    auc = np.nan * np.zeros(nFolds)
+    coefs = []
+    probs = []
 
-
-    fpr = np.linspace(0, 1, 100)
-    tpr = np.nan * np.zeros((fpr.shape[0], nFolds))
-    acc = 0
-    results = []
-    prob = []
-
-    for outi, (trainInd, testInd) in enumerate(outerCV.split(X=X, y=y)):
+    for outi, (trainInd, testInd) in enumerate():
         Xtrain, Xtest = X.iloc[trainInd], X.iloc[testInd]
         ytrain, ytest = y.iloc[trainInd], y.iloc[testInd]
-
-        model = sklearn.linear_model.LogisticRegressionCV(Cs=Cs,
-                                                          cv=innerCV,
-                                                          penalty='l1',
-                                                          solver='liblinear',
-                                                          scoring=scorerFunc,
-                                                          refit=True)
 
         results = model.fit(X=Xtrain, y=ytrain)
         prob = results.predict_proba(Xtest)
@@ -536,39 +533,47 @@ def lassoVarSelect(df, outcomeVar, predVars, nFolds=10, LOO=False, Cs=10):
         class1Ind = np.nonzero(results.classes_ == 1)[0][0]
         fprTest, tprTest, _ = sklearn.metrics.roc_curve(ytest, prob[:, class1Ind])
 
-        tpr[:, i] = np.interp(fpr, fprTest, tprTest)
-        acc += sklearn.metrics.accuracy_score(ytest, np.round(prob[:, class1Ind]), normalize=True)
-        results.append(res)
-        prob.append(pd.Series(prob[:, class1Ind], index=Xtest.index))
+        tpr[:, outi] = np.interp(fpr, fprTest, tprTest)
+        auc[outi] = sklearn.metrics.auc(fprTest, tprTest)
+        acc[outi] = sklearn.metrics.accuracy_score(ytest, np.round(prob[:, class1Ind]), normalize=True)
+        coefs.append(results.coef_[None,:])
+        probs.append(pd.Series(prob[:, class1Ind], index=Xtest.index))
     
     meanTPR = np.mean(tpr, axis=1)
     meanTPR[0], meanTPR[-1] = 0, 1
-    meanACC = acc / nFolds
+    meanACC = np.mean(acc)
     meanAUC = sklearn.metrics.auc(fpr, meanTPR)
     
     """Compute mean probability over test predictions in CV"""
-    probS = pd.concat(prob).groupby(level=0).agg(np.mean)
+    probS = pd.concat(probs).groupby(level=0).agg(np.mean)
     probS.name = 'Prob'
 
-    optimalC = model.C_[0] # WORKING HERE TO FIND OPTIMAL C OVER INNER FOLDS
+    """Refit all the data for final model"""
+    result = model.fit(X=X, y=y)
 
-    """Refit all the data with the optimal C for variable selection and 
-    classification of holdout data """
-    model = sklearn.linear_model.LogisticRegression(C=optimalC,
-                                                      penalty='l1',
-                                                      solver='liblinear')
-    results = model.fit(X=X, y=y)
-          
-    varList = np.array(predVars)[results.coef_.ravel() != 0].tolist()
-    probS = pd.Series(prob[:, class1Ind], index=tmp.index, name='Prob')
+    rocRes = rocStats(y, np.round(probS))
     
-    """RETURN EVERYTHING RELEVANT IN A DICT, INCLUDING Cs AND SCORES OVER ALL INNER FOLDS (ORGANIZED BY INNER/OUTER FOLD_i)"""
-    return fpr, tpr, auc, acc, results, probS, varList, optimalC
+    outD = {'fpr':fpr,                      # (100, ) average FPR for ROC
+            'tpr':meanTPR,                  # (100, ) average TPR for ROC
+            'AUC':auc,                      # (CVfolds, ) AUC of ROC for each outer test fold
+            'meanAUC': meanAUC,             # (1, ) AUC of the average ROC
+            'ACC':acc,                      # (CVfolds, ) accuracy across outer test folds
+            'finalResult': result,          # final fitted model with predict() exposed
+            'prob':probS,                   # (N,) pd.Series of predicted probabilities avg over outer folds
+            'coefs':np.concatenate(coefs),  # (CVfolds, predVars)
+            'Xvars':predVars,
+            'Yvar':outcomeVar,
+            'nFolds':nFolds,
+            'LOO':'Yes' if LOO else 'No',
+            'N':tmp.shape[0]}                  
+    outD.update(rocRes[['Sensitivity', 'Specificity']].to_dict())
+    return outD
 
 class smLogisticRegression(object):
     """A wrapper of statsmodels.GLM to use with sklearn interface"""
     def __init__(self, fit_intercept=True):
         self.fit_intercept = fit_intercept
+        self.classes_ = np.array([0., 1.])
 
     def fit(self, X, y):
         if self.fit_intercept:
@@ -576,6 +581,7 @@ class smLogisticRegression(object):
         else:
             exog = X
         self.res = sm.GLM(endog=y, exog=exog, family=sm.families.Binomial()).fit()
+        self.coef_ = self.res.params[X.columns].values.ravel()
         return self
 
     def predict_proba(self, X):
@@ -647,4 +653,87 @@ def rocStats(obs, pred, returnSeries=True):
     return out
 
 
+"""Code below here is old but I may still update at some point"""
 
+def plotCVROC(df, model, outcomeVar, predictorsList, predictorLabels=None, rocFunc=computeLOOROC, **rocKwargs):
+    """Plot of multiple ROC curves using same model and same outcomeVar with
+    different sets of predictors.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Must contain outcome and predictor variables.
+    model : sklearn or other model
+        Model must have fit and predict methods.
+    outcomeVar : str
+    predictorsList : list
+        List of lists of predictor variables for each model.
+    predictorLabels : list
+        List of labels for the models (optional)
+    rocFunc : computeCVROC or computeROC or computeLOOROC
+        Function for computing the ROC
+    rocKwargs : kwargs
+        Additional arguments for rocFunc"""
+    
+    if predictorLabels is None:
+        predictorLabels = [' + '.join(predVars) for predVars in predictorsList]
+    
+    colors = sns.color_palette('Set1', n_colors=8)
+
+    fprList, tprList, labelList = [], [], []
+
+    for predVarsi, predVars in enumerate(predictorsList):
+        fpr, tpr, auc, acc, res, probS, success = rocFunc(df,
+                                                         model,
+                                                         outcomeVar,
+                                                         predVars,
+                                                         **rocKwargs)
+
+        if success:
+            label = '%s (AUC = %0.2f; ACC = %0.2f)' % (predictorLabels[predVarsi], auc, acc)
+        else:
+            label = '%s (AUC* = %0.2f; ACC* = %0.2f)' % (predictorLabels[predVarsi], auc, acc)
+        labelList.append(label)
+        fprList.append(fpr)
+        tprList.append(tpr)
+    plotROC(fprList, tprList, labelL=labelList)
+
+
+def plot2Prob(df, outcomeVar, prob, **kwargs):
+    """Scatter plot of probabilities for two outcomes.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Must contain two outcome variables.
+    model : sklearn or other model
+        Model must have fit and predict methods.
+    outcomeVar : list
+        Contains two outcomeVar for comparison
+    prob : list
+        Contains two pd.Series with predicted probabilities
+        from computeROC or computeCVROC"""
+    labels = {(0, 0):'Neither',
+              (1, 1):'Both',
+              (0, 1):'%s only' % outcomeVar[1],
+              (1, 0):'%s only' % outcomeVar[0]}
+    markers = ['o', 's', '^', 'x']
+    colors = sns.color_palette('Set1', n_colors=4)
+    tmp = df[outcomeVar].join(prob[0], how='inner').join(prob[1], how='inner', rsuffix='_Y')
+
+    plt.clf()
+    plt.gca().set_aspect('equal')
+    prodIter = itertools.product(tmp[outcomeVar[0]].unique(), tmp[outcomeVar[1]].unique())
+    for color, m, val in zip(colors, markers, prodIter):
+        valx, valy = val
+        ind = (tmp[outcomeVar[0]] == valx) & (tmp[outcomeVar[1]] == valy)
+        lab = labels[val] + ' (%d)' % ind.sum()
+        plt.scatter(tmp.Prob.loc[ind], tmp.Prob_Y.loc[ind], label=lab, color=color, marker=m, **kwargs)
+    plt.plot([0.5, 0.5], [0, 1], 'k--', lw=1)
+    plt.plot([0, 1], [0.5, 0.5], 'k--', lw=1)
+    plt.ylim((-0.05, 1.05))
+    plt.xlim((-0.05, 1.05))
+    plt.legend(loc='upper left')
+    plt.ylabel('Predicted Pr(%s)' % outcomeVar[1])
+    plt.xlabel('Predicted Pr(%s)' % outcomeVar[0])
+    plt.show()
