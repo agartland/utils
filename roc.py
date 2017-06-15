@@ -378,7 +378,6 @@ def nestedCVClassifier(df, outcomeVar, predVars, model, params={}, nFolds=10, sc
     meanTPR[0], meanTPR[-1] = 0, 1
     meanACC = np.mean(acc)
     meanAUC = sklearn.metrics.auc(fpr, meanTPR)
-    meanC = 10**np.mean(np.log10(optimalCs))
     
     """Compute mean probability over test predictions in CV"""
     probS = pd.concat(probs).groupby(level=0).agg(np.mean)
