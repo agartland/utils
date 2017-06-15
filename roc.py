@@ -23,11 +23,14 @@ sns.set(style='darkgrid', palette='muted', font_scale=1.5)
            'lassoVarSelect',
            'smLogisticRegression',
            'rocStats']"""
-__all__ = ['plotROC',
+__all__ = ['plotROC', 'plotROCObj',
            'plotProb',
            'plotLogisticL1Paths',
            'logisticL1NestedCV',
            'plotLogisticL1NestedTuning',
+           'nestedCVClassifier',
+           'computeROC',
+           'computeCVROC',
            'smLogisticRegression',
            'rocStats']
 
@@ -152,7 +155,7 @@ def plotLogisticL1Vars(lo):
     plt.xlabel('% times selected in 10-fold CV')
     plt.legend(loc=0, title='Final model?')
 
-def logisticL1NestedCV(df, outcomeVar, predVars, nFolds=10, Cs=10):
+def logisticL1NestedCV(df, outcomeVar, predVars, nFolds=10, Cs=10, n_jobs=1):
     """Apply logistic regression with L1-regularization (LASSO) to df.
     Uses nested cross-validation framework with inner folds to optimize C
     and outer test folds to evaluate performance.
@@ -225,7 +228,8 @@ def logisticL1NestedCV(df, outcomeVar, predVars, nFolds=10, Cs=10):
                                                           penalty='l1',
                                                           solver='liblinear',
                                                           scoring=scorerFunc,
-                                                          refit=True)
+                                                          refit=True,
+                                                          n_jobs=n_jobs)
         """With refit = True, the scores are averaged across all folds,
         and the coefs and the C that corresponds to the best score is taken,
         and a final refit is done using these parameters."""
@@ -271,10 +275,12 @@ def logisticL1NestedCV(df, outcomeVar, predVars, nFolds=10, Cs=10):
     outD = {'fpr':fpr,                      # (100, ) average FPR for ROC
             'tpr':meanTPR,                  # (100, ) average TPR for ROC
             'AUC':auc,                      # (outerFolds, ) AUC of ROC for each outer test fold
-            'meanAUC': meanAUC,             # (1, ) AUC of the average ROC
+            'mAUC': meanAUC,                # (1, ) AUC of the average ROC
             'ACC':acc,                      # (outerFolds, ) accuracy across outer test folds
+            'mACC':np.mean(acc),
             'scores': scores,               # (outerFolds, innerFolds, Cs) score for each C across inner and outer CV folds
             'optimalCs':optimalCs,          # (outerFolds, ) optimal C from each set of inner CV
+            'C':meanC,
             'finalResult': result,          # final fitted model with predict() exposed
             'prob':probS,                   # (N,) pd.Series of predicted probabilities avg over outer folds
             'varList':varList,              # list of vars with non-zero coef in final model
@@ -287,7 +293,7 @@ def logisticL1NestedCV(df, outcomeVar, predVars, nFolds=10, Cs=10):
     outD.update(rocRes[['Sensitivity', 'Specificity']].to_dict())
     return outD
 
-def nestedCVClassifier(df, outcomeVar, predVars, model, params={}, nFolds=10, scorer='log_loss'):
+def nestedCVClassifier(df, outcomeVar, predVars, model, params={}, nFolds=10, scorer='log_loss', n_jobs=1):
     """Apply model to df in nested cross-validation framework
     with inner folds to optimize hyperparameters.
     and outer test folds to evaluate performance.
@@ -360,8 +366,8 @@ def nestedCVClassifier(df, outcomeVar, predVars, model, params={}, nFolds=10, sc
         Xtrain, Xtest = X.iloc[trainInd], X.iloc[testInd]
         ytrain, ytest = y.iloc[trainInd], y.iloc[testInd]
 
-        clf = GridSearchCV(estimator=model, param_grid=params, cv=innerCV, refit=True, scoring=scorerFunc)
-        clf.fit(X, y)
+        clf = GridSearchCV(estimator=model, param_grid=params, cv=innerCV, refit=True, scoring=scorerFunc, n_jobs=n_jobs)
+        clf.fit(Xtrain, ytrain)
         cvResults.append(clf.cv_results_)
         optimalParams.append(clf.best_params_)
         optimalScores.append(clf.best_score_)
@@ -383,16 +389,26 @@ def nestedCVClassifier(df, outcomeVar, predVars, model, params={}, nFolds=10, sc
     probS = pd.concat(probs).groupby(level=0).agg(np.mean)
     probS.name = 'Prob'
 
-    optP = {k:np.array([o[k] for o in optimalParams]).mean() for k in optimalParams[0].keys()}
-    result = model.fit(X=X, y=y, **optP)
+    """Select "outer" optimal param for final model"""
+    avgFunc = lambda v: 10**np.mean(np.log10(v))
+    # avgFunc = lambda v: np.mean(v)
+    optP = {k:avgFunc([o[k] for o in optimalParams]) for k in optimalParams[0].keys()}
+    
+    for k,v in optP.items():
+        setattr(model, k, v)
+    result = model.fit(X=X, y=y)
+    
     rocRes = rocStats(y, np.round(probS))
     
     outD = {'fpr':fpr,                     
             'tpr':meanTPR,               
             'AUC':auc,                   
-            'meanAUC': meanAUC,          
-            'ACC':acc,                   
+            'mAUC': meanAUC,          
+            'mACC':np.mean(acc),
+            'ACC':acc,
+            'CVres':cvResults,          
             'optimalScores': np.array(optimalScores),
+            'finalParams':optP,
             'finalResult': result,          # final fitted model with predict() exposed
             'prob':probS,                   # (N,) pd.Series of predicted probabilities avg over outer folds
             'Xvars':predVars,
@@ -400,11 +416,6 @@ def nestedCVClassifier(df, outcomeVar, predVars, model, params={}, nFolds=10, sc
             'N':tmp.shape[0]}                  
     outD.update(rocRes[['Sensitivity', 'Specificity']].to_dict())
     return outD
-
-svr = SVC(kernel='rbf', probability=True)
-p_grid = {'C': [1, 10, 100],
-          'gamma': [.01, .1]}
-nestedCVClassifier(tmp, outcomeVar, allCyVars, svr, params=p_grid, nFolds=10, scorer='log_loss')
 
 def computeROC(df, model, outcomeVar, predVars):
     """Apply model to df and return performance metrics.
@@ -522,7 +533,7 @@ def computeCVROC(df, model, outcomeVar, predVars, nFolds=10, LOO=False):
     coefs = []
     probs = []
 
-    for outi, (trainInd, testInd) in enumerate():
+    for outi, (trainInd, testInd) in enumerate(cv_iter):
         Xtrain, Xtest = X.iloc[trainInd], X.iloc[testInd]
         ytrain, ytest = y.iloc[trainInd], y.iloc[testInd]
 
@@ -555,7 +566,8 @@ def computeCVROC(df, model, outcomeVar, predVars, nFolds=10, LOO=False):
     outD = {'fpr':fpr,                      # (100, ) average FPR for ROC
             'tpr':meanTPR,                  # (100, ) average TPR for ROC
             'AUC':auc,                      # (CVfolds, ) AUC of ROC for each outer test fold
-            'meanAUC': meanAUC,             # (1, ) AUC of the average ROC
+            'mAUC': meanAUC,                # (1, ) AUC of the average ROC
+            'mACC': np.mean(acc),
             'ACC':acc,                      # (CVfolds, ) accuracy across outer test folds
             'finalResult': result,          # final fitted model with predict() exposed
             'prob':probS,                   # (N,) pd.Series of predicted probabilities avg over outer folds
@@ -654,7 +666,7 @@ def rocStats(obs, pred, returnSeries=True):
 
 """Code below here is old but I may still update at some point"""
 
-def plotCVROC(df, model, outcomeVar, predictorsList, predictorLabels=None, rocFunc=computeLOOROC, **rocKwargs):
+def plotCVROC(df, model, outcomeVar, predictorsList, predictorLabels=None, rocFunc=computeCVROC, **rocKwargs):
     """Plot of multiple ROC curves using same model and same outcomeVar with
     different sets of predictors.
 
@@ -669,7 +681,7 @@ def plotCVROC(df, model, outcomeVar, predictorsList, predictorLabels=None, rocFu
         List of lists of predictor variables for each model.
     predictorLabels : list
         List of labels for the models (optional)
-    rocFunc : computeCVROC or computeROC or computeLOOROC
+    rocFunc : computeCVROC or computeROC
         Function for computing the ROC
     rocKwargs : kwargs
         Additional arguments for rocFunc"""
