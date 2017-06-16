@@ -1,4 +1,3 @@
-
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -12,27 +11,19 @@ import sklearn.linear_model
 
 sns.set(style='darkgrid', palette='muted', font_scale=1.5)
 
-"""__all__ = ['computeROC',
-           'computeCVROC',
-           'computeLOOROC',
-           'plotROC',
-           'plotCVROC',
-           'plotProb',
-           'plot2Prob',
-           'plotLogisticL1Paths',
-           'lassoVarSelect',
-           'smLogisticRegression',
-           'rocStats']"""
 __all__ = ['plotROC', 'plotROCObj',
            'plotProb',
            'plotLogisticL1Paths',
+           'plotLogisticL1Vars',
            'logisticL1NestedCV',
            'plotLogisticL1NestedTuning',
            'nestedCVClassifier',
            'computeROC',
            'computeCVROC',
            'smLogisticRegression',
-           'rocStats']
+           'rocStats',
+           'plotNestedCVParams',
+           'plotNestedCVScores']
 
 def plotROCObj(**objD):
     fprL = [o['fpr'] for o in objD.values()]
@@ -144,13 +135,13 @@ def plotLogisticL1NestedTuning(lo):
     plt.show()
 
 def plotLogisticL1Vars(lo):
-    pctSelection = 100 * (lo1['coefs'] != 0).mean(axis=0)
+    pctSelection = 100 * (lo['coefs'] != 0).mean(axis=0)
     finalInd = (lo['finalResult'].coef_ != 0).ravel()
     x = np.arange(len(pctSelection))
     plt.clf()
     plt.barh(width=pctSelection[finalInd], bottom=x[finalInd], align='center', color='red', label='Yes')
     plt.barh(width=pctSelection[~finalInd], bottom=x[~finalInd], align='center', color='blue', label='No')
-    plt.yticks(range(len(pctSelection)), lo['Xvars'], size=10)
+    plt.yticks(range(len(pctSelection)), lo['Xvars'], size=8)
     plt.ylabel('Predictors')
     plt.xlabel('% times selected in 10-fold CV')
     plt.legend(loc=0, title='Final model?')
@@ -408,14 +399,81 @@ def nestedCVClassifier(df, outcomeVar, predVars, model, params={}, nFolds=10, sc
             'ACC':acc,
             'CVres':cvResults,          
             'optimalScores': np.array(optimalScores),
+            'optimalParams': optimalParams,
             'finalParams':optP,
             'finalResult': result,          # final fitted model with predict() exposed
             'prob':probS,                   # (N,) pd.Series of predicted probabilities avg over outer folds
             'Xvars':predVars,
             'Yvar':outcomeVar,
-            'N':tmp.shape[0]}                  
+            'N':tmp.shape[0],
+            'params':params}                  
     outD.update(rocRes[['Sensitivity', 'Specificity']].to_dict())
     return outD
+
+def plotNestedCVScores(lo):
+    scores = _reshape(lo, 'mean_test_score').mean(axis=0)
+
+    paramKeys = sorted(lo['params'].keys())
+    plt.clf()
+    plt.subplots_adjust(left=.2, right=0.95, bottom=0.15, top=0.95)
+    """plt.imshow(scores, interpolation='nearest', cmap=plt.cm.hot,
+               norm=MidpointNormalize(vmin=0.2, midpoint=0.92))"""
+    plt.pcolormesh(scores)
+    plt.xlabel('$log_{10} %s$' % paramKeys[1])
+    plt.ylabel('$log_{10} %s$' % paramKeys[0])
+    plt.colorbar()
+    plt.yticks(np.arange(len(lo['params'][paramKeys[0]]))[::2] + 0.5,
+               np.round(np.log10(lo['params'][paramKeys[0]])[::2], 2))
+    plt.xticks(np.arange(len(lo['params'][paramKeys[1]]))[::2] + 0.5,
+               np.round(np.log10(lo['params'][paramKeys[1]])[::2], 2))
+    plt.title('Mean score over outer CV')
+    plt.show()
+
+def _reshape(lo, key):
+    paramKeys = sorted(lo['params'].keys())
+    paramL = [len(lo['params'][k]) for k in paramKeys]
+    tmp = [lo['CVres'][i][key][None, :] for i in range(len(lo['CVres']))]
+    folds = len(tmp)
+    tmp = [np.array(t, dtype=float) for t in tmp]
+    tmp = np.concatenate(tmp, axis=0)
+    rs = (folds, paramL[0], paramL[1])
+    return tmp.reshape(rs)
+
+def plotNestedCVParams(lo):
+    """Shows variability in the outer folds"""
+    scores = _reshape(lo, 'mean_test_score')
+
+    paramKeys = sorted(lo['params'].keys())
+    nFolds = scores.shape[0]
+    colors = sns.color_palette('Set1', n_colors=nFolds)
+    
+    plt.clf()
+    ax1 = plt.subplot(1,2,1)
+    for foldi in range(nFolds):
+        y = scores.mean(axis=2)[foldi,:]
+        plt.plot(np.log10(lo['params'][paramKeys[0]]), y, color=colors[foldi])
+        plt.plot(np.log10([lo['optimalParams'][foldi][paramKeys[0]]]*2), [np.min(y), np.max(y)], '--', color=colors[foldi])
+    x = np.log10([lo['finalParams'][paramKeys[0]]]*2)
+    yl = plt.ylim()
+    plt.plot(x, yl, '--k')
+    plt.xlabel('$log_{10} %s$' % paramKeys[0])
+    plt.ylabel('Score')
+    ax2 = plt.subplot(1,2,2)
+    for foldi in range(nFolds):
+        y = scores.mean(axis=1)[foldi,:]
+        plt.plot(np.log10(lo['params'][paramKeys[1]]), y, color=colors[foldi])
+        plt.plot(np.log10([lo['optimalParams'][foldi][paramKeys[1]]]*2), [np.min(y), np.max(y)], '--', color=colors[foldi])
+    x = np.log10([lo['finalParams'][paramKeys[1]]]*2)
+    yl = plt.ylim()
+    plt.plot(x, yl, '--k')
+    plt.xlabel('$log_{10} %s$' % paramKeys[1])
+
+    ylim1 = ax1.get_ylim()
+    ylim2 = ax2.get_ylim()
+    yl = (min(ylim1[0], ylim2[0]), max(ylim1[1], ylim2[1]))
+    ax1.set_ylim(yl)
+    ax2.set_ylim(yl)
+    plt.show()
 
 def computeROC(df, model, outcomeVar, predVars):
     """Apply model to df and return performance metrics.
