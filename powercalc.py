@@ -3,7 +3,7 @@ from scipy import stats
 import numpy as np
 import itertools
 from functools import partial
-from scikits_bootstrap import ci
+from scikits.bootstrap import ci
 
 __all_ = ['veEndpointsRequired',
           'eventRatePower',
@@ -16,7 +16,10 @@ __all_ = ['veEndpointsRequired',
           'spearmanCI',
           'correlationCI',
           'statDistByN',
-          'sumAnyNBinom']
+          'sumAnyNBinom',
+          'sensitivityCI',
+          'specificityCI',
+          'rocStats']
 
 """NOTE: Many of these were hacked together in very short time, but they code may still be useful for next time."""
 
@@ -332,6 +335,58 @@ def RRCI(a, b, c, d, alpha=0.05):
     lb = np.exp(np.log(rr) - delta)
     return rr, lb, ub
 
+
+def sensitivityCI(a, b, c, d, alpha=0.05):
+    """Compute sensitivity and confidence interval,
+    given counts in each square of a 2 x 2 table.
+
+    Parameters
+    ----------
+    a,b,c,d : int
+        Counts from a 2 x 2 table starting in upper-left and going clockwise.
+    alpha : float
+        Specifies the (1 - alpha)% confidence interval
+
+    Returns
+    -------
+    sens : float
+        Relative-risk
+    lb : float
+        Lower-bound
+    ub : float
+        Upper-bound"""
+    if np.isscalar(a):
+        a = np.array([a])
+    sens = a / (a+b)
+    lb, ub = eventCI(countVec=a, N=a+b, alpha=alpha)
+    return sens, lb, ub
+
+def specificityCI(a, b, c, d, alpha=0.05):
+    """Compute specificity and confidence interval,
+    given counts in each square of a 2 x 2 table.
+
+    Parameters
+    ----------
+    a,b,c,d : int
+        Counts from a 2 x 2 table starting in upper-left and going clockwise.
+    alpha : float
+        Specifies the (1 - alpha)% confidence interval
+
+    Returns
+    -------
+    spec : float
+        Relative-risk
+    lb : float
+        Lower-bound
+    ub : float
+        Upper-bound"""
+
+    if np.isscalar(d):
+        d = np.array([d])
+    spec = d / (c+d)
+    lb, ub = eventCI(countVec=d, N=c+d, alpha=alpha)
+    return spec, lb, ub
+
 def computeRR(df, outcome, predictor, alpha=0.05):
     """RR point-estimate, CI and p-value, without conditioning on the total number of events.
 
@@ -364,3 +419,50 @@ def computeRR(df, outcome, predictor, alpha=0.05):
     pvalue = stats.norm.cdf(np.log(rr)/se)
 
     return  pd.Series([rr, ci[0], ci[1], pvalue], index=['RR', 'LL', 'UL', 'pvalue'])
+
+
+def rocStats(a, b, c, d, returnSeries=True):
+    """Compute stats for a 2x2 table.
+
+    Parameters
+    ----------
+    a,b,c,d : int
+        Counts from a 2 x 2 table starting in upper-left and going clockwise.
+
+    Optionally return a series with quantities labeled.
+
+    Returns
+    -------
+    sens : float
+        Sensitivity (1 - false-negative rate)
+    spec : float
+        Specificity (1 - false-positive rate)
+    ppv : float
+        Positive predictive value (1 - false-discovery rate)
+    npv : float
+        Negative predictive value
+    acc : float
+        Accuracy
+    OR : float
+        Odds-ratio of the observed event in the two predicted groups.
+    rr : float
+        Relative rate of the observed event in the two predicted groups.
+    nnt : float
+        Number needed to treat, to prevent one case.
+        (assuming all predicted positives were "treated")"""
+
+    sens = a / (a+b)
+    spec = d / (c+d)
+    ppv = a / (a+c)
+    npv = d / (b+d)
+    nnt = 1 / (a/(a+c) - b/(b+d))
+    acc = (a + d)/n
+    rr = (a / (a+c)) / (b / (b+d))
+    OR = (a/b) / (c/d)
+
+    if returnSeries:
+        vec = [sens, spec, ppv, npv, nnt, acc, rr, OR]
+        out = pd.Series(vec, name='ROC', index=['Sensitivity', 'Specificity', 'PPV', 'NPV', 'NNT', 'ACC', 'RR', 'OR'])
+    else:
+        out = (sens, spec, ppv, npv, nnt, acc, rr, OR)
+    return out
