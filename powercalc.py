@@ -207,14 +207,73 @@ def probGTEX(x, N, prob):
     N trials and per trial probability prob"""
     return 1 - stats.binom.cdf(x-1, N, prob)
 
-def eventCI(countVec, N, alpha=0.05):
+def eventCI(countVec, N, alpha=0.05, method='score'):
     """Return confidence interval on observing number of events in countVec
     given N trials (Agresti and Coull  2 sided 95% CI)
-    Returns lower and upper confidence limits (lcl,ucl)"""
+    Returns lower and upper confidence limits (lcl,ucl)
+
+    Code has been checked against R binom package. "Score" was derived
+    from the Agresti paper and is equivalent to Wilson (copied from the R package).
+    From the paper this seems to be the best in most situations.
+
+    A. Agresti, B. A. Coull, T. A. Statistician, N. May,
+    Approximate Is Better than "Exact" for Interval Estimation of Binomial Proportions,
+    52, 119–126 (2007)."""
+
+    countVec = np.asarray(countVec)
     p = countVec/N
     z = stats.norm.ppf(1.-alpha/2.)
-    lcl= (p + (z**2)/(2*N) - z*np.sqrt((p*(1-p)+z**2/(4*N))/N)) / (1 + (z**2)/N)
-    ucl= (p + (z**2)/(2*N) + z*np.sqrt((p*(1-p)+z**2/(4*N))/N)) / (1 + (z**2)/N)
+    if method == 'score':
+        lcl= (p + (z**2)/(2*N) - z*np.sqrt((p*(1-p)+z**2/(4*N))/N)) / (1 + (z**2)/N)
+        ucl= (p + (z**2)/(2*N) + z*np.sqrt((p*(1-p)+z**2/(4*N))/N)) / (1 + (z**2)/N)
+    elif method == 'wilson':
+        """p1 <- p + 0.5 * z2/n
+            p2 <- z * sqrt((p * (1 - p) + 0.25 * z2/n)/n)
+            p3 <- 1 + z2/n
+            lcl <- (p1 - p2)/p3
+            ucl <- (p1 + p2)/p3"""
+        p1 = p + 0.5 * (z**2 / N)
+        p2 = z * np.sqrt((p * (1 - p) + 0.25 * z**2/N)/N)
+        p3 = 1 + z**2 / N
+        lcl = (p1 - p2)/p3
+        ucl = (p1 + p2)/p3
+    elif method == 'agresti-coull':
+        """.x <- x + 0.5 * z2
+        .n <- n + z2
+        .p <- .x/.n
+        lcl <- .p - z * sqrt(.p * (1 - .p)/.n)
+        ucl <- .p + z * sqrt(.p * (1 - .p)/.n)"""
+        xtmp = countVec + 0.5 * z**2
+        ntmp = N + z**2
+        ptmp = xtmp / ntmp
+        se = np.sqrt(ptmp * (1 - ptmp)/ntmp)
+        lcl = ptmp - z * se
+        ucl = ptmp + z * se
+    elif method == 'exact':
+        """Clopper-Pearson (1934)"""
+        """ x1 <- x == 0
+            x2 <- x == n
+            lb <- ub <- x
+            lb[x1] <- 1
+            ub[x2] <- n[x2] - 1
+            lcl <- 1 - qbeta(1 - alpha2, n + 1 - x, lb)
+            ucl <- 1 - qbeta(alpha2, n - ub, x + 1)
+            if(any(x1)) lcl[x1] <- rep(0, sum(x1))
+            if(any(x2)) ucl[x2] <- rep(1, sum(x2))"""
+        lb = countVec.copy()
+        ub = countVec.copy()
+        lb[countVec == 0] = 1
+        ub[countVec == N] = N - 1
+
+        lcl = 1 - stats.beta.ppf(1 - alpha/2, N + 1 - countVec, lb)
+        ucl = 1 - stats.beta.ppf(alpha/2, N - ub, countVec + 1)
+
+        lcl[countVec == 0] = 0
+        ucl[countVec == N] = 1
+    elif method == 'wald':
+        se = np.sqrt(p*(1-p)/N)
+        ucl = p + z * se
+        lcl = p - z * se
     return lcl, ucl
 
 def correlationCI(N, rho=None, alpha=0.05, bootstraps=None):
