@@ -207,8 +207,8 @@ def probGTEX(x, N, prob):
     N trials and per trial probability prob"""
     return 1 - stats.binom.cdf(x-1, N, prob)
 
-def eventCI(countVec, N, alpha=0.05, method='score'):
-    """Return confidence interval on observing number of events in countVec
+def eventCI(x, N, alpha=0.05, method='score'):
+    """Return confidence interval on observing number of events in x
     given N trials (Agresti and Coull  2 sided 95% CI)
     Returns lower and upper confidence limits (lcl,ucl)
 
@@ -220,8 +220,8 @@ def eventCI(countVec, N, alpha=0.05, method='score'):
     Approximate Is Better than "Exact" for Interval Estimation of Binomial Proportions,
     52, 119–126 (2007)."""
 
-    countVec = np.asarray(countVec)
-    p = countVec/N
+    x = np.asarray(x)
+    p = x/N
     z = stats.norm.ppf(1.-alpha/2.)
     if method == 'score':
         lcl= (p + (z**2)/(2*N) - z*np.sqrt((p*(1-p)+z**2/(4*N))/N)) / (1 + (z**2)/N)
@@ -243,7 +243,7 @@ def eventCI(countVec, N, alpha=0.05, method='score'):
         .p <- .x/.n
         lcl <- .p - z * sqrt(.p * (1 - .p)/.n)
         ucl <- .p + z * sqrt(.p * (1 - .p)/.n)"""
-        xtmp = countVec + 0.5 * z**2
+        xtmp = x + 0.5 * z**2
         ntmp = N + z**2
         ptmp = xtmp / ntmp
         se = np.sqrt(ptmp * (1 - ptmp)/ntmp)
@@ -260,16 +260,16 @@ def eventCI(countVec, N, alpha=0.05, method='score'):
             ucl <- 1 - qbeta(alpha2, n - ub, x + 1)
             if(any(x1)) lcl[x1] <- rep(0, sum(x1))
             if(any(x2)) ucl[x2] <- rep(1, sum(x2))"""
-        lb = countVec.copy()
-        ub = countVec.copy()
-        lb[countVec == 0] = 1
-        ub[countVec == N] = N - 1
+        lb = x.copy()
+        ub = x.copy()
+        lb[x == 0] = 1
+        ub[x == N] = N - 1
 
-        lcl = 1 - stats.beta.ppf(1 - alpha/2, N + 1 - countVec, lb)
-        ucl = 1 - stats.beta.ppf(alpha/2, N - ub, countVec + 1)
+        lcl = 1 - stats.beta.ppf(1 - alpha/2, N + 1 - x, lb)
+        ucl = 1 - stats.beta.ppf(alpha/2, N - ub, x + 1)
 
-        lcl[countVec == 0] = 0
-        ucl[countVec == N] = 1
+        lcl[x == 0] = 0
+        ucl[x == N] = 1
     elif method == 'wald':
         se = np.sqrt(p*(1-p)/N)
         ucl = p + z * se
@@ -376,6 +376,11 @@ def RRCI(a, b, c, d, alpha=0.05):
     ----------
     a,b,c,d : int
         Counts from a 2 x 2 table starting in upper-left and going clockwise.
+        a = TP
+        b = FN
+        c = FP
+        d = TN
+
     alpha : float
         Specifies the (1 - alpha)% confidence interval
 
@@ -387,13 +392,12 @@ def RRCI(a, b, c, d, alpha=0.05):
         Lower-bound
     ub : float
         Upper-bound"""
-    se = np.sqrt((1/a + 1/c) - (1/(a+b) + 1/(c+d)))
-    rr = a*(c+d)/(c*(a+b))
+    se = np.sqrt((1/a + 1/b) - (1/(a+c) + 1/(b+d)))
+    rr = (a / (a+c)) / (b / (b+d))
     delta = stats.norm.ppf(1 - alpha/2) * se
     ub = np.exp(np.log(rr) + delta)
     lb = np.exp(np.log(rr) - delta)
     return rr, lb, ub
-
 
 def sensitivityCI(a, b, c, d, alpha=0.05):
     """Compute sensitivity and confidence interval,
@@ -403,6 +407,11 @@ def sensitivityCI(a, b, c, d, alpha=0.05):
     ----------
     a,b,c,d : int
         Counts from a 2 x 2 table starting in upper-left and going clockwise.
+        a = TP
+        b = FN
+        c = FP
+        d = TN
+
     alpha : float
         Specifies the (1 - alpha)% confidence interval
 
@@ -417,7 +426,7 @@ def sensitivityCI(a, b, c, d, alpha=0.05):
     if np.isscalar(a):
         a = np.array([a])
     sens = a / (a+b)
-    lb, ub = eventCI(countVec=a, N=a+b, alpha=alpha)
+    lb, ub = eventCI(x=a, N=a+b, alpha=alpha)
     return sens, lb, ub
 
 def specificityCI(a, b, c, d, alpha=0.05):
@@ -428,6 +437,11 @@ def specificityCI(a, b, c, d, alpha=0.05):
     ----------
     a,b,c,d : int
         Counts from a 2 x 2 table starting in upper-left and going clockwise.
+        a = TP
+        b = FN
+        c = FP
+        d = TN
+
     alpha : float
         Specifies the (1 - alpha)% confidence interval
 
@@ -443,7 +457,7 @@ def specificityCI(a, b, c, d, alpha=0.05):
     if np.isscalar(d):
         d = np.array([d])
     spec = d / (c+d)
-    lb, ub = eventCI(countVec=d, N=c+d, alpha=alpha)
+    lb, ub = eventCI(x=d, N=c+d, alpha=alpha)
     return spec, lb, ub
 
 def computeRR(df, outcome, predictor, alpha=0.05):
@@ -453,12 +467,16 @@ def computeRR(df, outcome, predictor, alpha=0.05):
     --------------
     nneg : int
         Number of outcomes in the covariate negative group
+        (false-negatives)
     Nneg : int
         Total number of participants in the covariate negative group
+        (false-negatives + true-negatives)
     npos : int
         Number of outcomes in the covariate positive group
+        (true-positives)
     Npos : int
-        Total number of participants in the covariate positive group"""
+        Total number of participants in the covariate positive group
+        (true-positives + false-negatives)"""
 
     tmp = df[[outcome, predictor]].dropna()
     nneg = tmp[outcome].loc[tmp[predictor] == 0].sum()
@@ -487,6 +505,10 @@ def rocStats(a, b, c, d, returnSeries=True):
     ----------
     a,b,c,d : int
         Counts from a 2 x 2 table starting in upper-left and going clockwise.
+        a = TP
+        b = FN
+        c = FP
+        d = TN
 
     Optionally return a series with quantities labeled.
 

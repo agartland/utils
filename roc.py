@@ -700,10 +700,10 @@ def rocStats(obs, pred, returnSeries=True):
     assert obs.shape[0] == pred.shape[0]
 
     n = obs.shape[0]
-    a = (obs.astype(bool) & pred.astype(bool)).sum()
-    b = (obs.astype(bool) & (~pred.astype(bool))).sum()
-    c = ((~obs.astype(bool)) & pred.astype(bool)).sum()
-    d = ((~obs.astype(bool)) & (~pred.astype(bool))).sum()
+    a = (obs.astype(bool) & pred.astype(bool)).sum() # TP
+    b = (obs.astype(bool) & (~pred.astype(bool))).sum() # FN
+    c = ((~obs.astype(bool)) & pred.astype(bool)).sum() # FP
+    d = ((~obs.astype(bool)) & (~pred.astype(bool))).sum() # TN 
 
     sens = a / (a+b)
     spec = d / (c+d)
