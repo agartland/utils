@@ -59,7 +59,7 @@ def plotROC(fprL, tprL, aucL=None, accL=None, labelL=None, outcomeVar=''):
     plt.show()
 
 def plotProb(outcome, prob, **kwargs):
-    """Scatter plot of probabilities for one ourcome.
+    """Scatter plot of probabilities for one outcome.
 
     Parameters
     ----------

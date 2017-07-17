@@ -261,7 +261,7 @@ def plotHColCluster(df=None, col_dmat=None, method='complete', metric='euclidean
     
     """Column dendrogaram but along the rows"""
     plt.sca(col_denAX)
-    col_denD = sch.dendrogram(col_clusters, color_threshold=np.inf, orientation='right')
+    col_denD = sch.dendrogram(col_clusters, color_threshold=np.inf, orientation='left')
     colInd = col_denD['leaves']
     clean_axis(col_denAX)
 
@@ -417,12 +417,12 @@ def plotHCluster(df, method='complete', metric='euclidean', clusterBool=[True, T
 
         """Dendrogarams"""
         row_denAX = fig.add_subplot(heatmapGS[2, 0])
-        row_denD = sch.dendrogram(row_clusters, color_threshold=np.inf, orientation='right')
+        row_denD = sch.dendrogram(row_clusters, color_threshold=np.inf, orientation='left')
         clean_axis(row_denAX)
 
-        rowInd=row_denD['leaves']
+        rowInd = row_denD['leaves']
     else:
-        rowInd=np.arange(df.shape[0])
+        rowInd = np.arange(df.shape[0])
 
     """Row colorbar"""
     if not row_labels is None:
@@ -430,7 +430,7 @@ def plotHCluster(df, method='complete', metric='euclidean', clusterBool=[True, T
         row_cbSE = mapColors2Labels(row_labels, 'Set1')
         row_cbAX = fig.add_subplot(heatmapGS[2, 1])
 
-        row_axi = row_cbAX.imshow([[x] for x in row_cbSE.iloc[rowInd].values ], interpolation='nearest', aspect='auto', origin='lower')
+        row_axi = row_cbAX.imshow([[x] for x in row_cbSE.iloc[rowInd].values], interpolation='nearest', aspect='auto', origin='lower')
         clean_axis(row_cbAX)
 
     if clusterBool[1]:
@@ -458,7 +458,7 @@ def plotHCluster(df, method='complete', metric='euclidean', clusterBool=[True, T
     heatmapAX = fig.add_subplot(heatmapGS[2, 2])
     axi = heatmapAX.imshow(df.iloc[rowInd, colInd], interpolation='nearest', aspect='auto', origin='lower', norm=my_norm, cmap=cmap)
     clean_axis(heatmapAX)
-    heatmapAX.grid(True)
+    heatmapAX.grid(False)
 
     """Row tick labels"""
     heatmapAX.set_yticks(np.arange(df.shape[0]))
@@ -570,7 +570,7 @@ def labeledDendrogram(dmat, labels, method='complete', cmap=None):
     cbAX =  figh.add_axes([0.25, 0.05, 0.05, 0.9])
 
     plt.sca(denAX)
-    denD = sch.dendrogram(Z, color_threshold=np.inf, orientation='right')
+    denD = sch.dendrogram(Z, color_threshold=np.inf, orientation='left')
     ind = denD['leaves']
     clean_axis(denAX)
     

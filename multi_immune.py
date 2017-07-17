@@ -16,6 +16,8 @@ from scipy import stats
 import seaborn as sns
 from objhist import objhist
 
+from sklearn.preprocessing import Imputer
+
 sns.set(style='darkgrid', palette='muted', font_scale=1.75)
 
 __all__ = ['corrDmatFunc',
