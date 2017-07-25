@@ -8,7 +8,8 @@ __all__ = ['parseICS',
            'unstackIR',
            'irLabels',
            'icsTicks',
-           'icsTickLabels']
+           'icsTickLabels',
+           'imputeNA']
 
 icsTicks = np.log10([0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1])
 icsTickLabels = ['0.01', '0.025', '0.05', '0.1', '0.25', '0.5', '1']
@@ -141,3 +142,46 @@ def parseRx(rxFn, demFn=None):
         
         trtDf = trtDf.join(demDf[demCols].set_index('ptid'))
     return trtDf
+
+def imputeNA(df, method='median', dropThresh=0.):
+    """Impute missing values in a pd.DataFrame
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Data containing missing values.
+    method : str
+        Method fo imputation: median, mean, sample, regression
+    dropThres : float
+        Threshold for dropping rows: drop rows with fewer than 90% non-nan values
+
+    Returns
+    -------
+    df : pd.DataFrame
+        Copy of the input data with no missing values."""
+        
+    outDf = df.dropna(axis=0, thresh=np.round(df.shape[1] * dropThresh)).copy()
+    if method == 'sample':
+        for col in outDf.columns:
+            naInd = outDf[col].isnull()
+            outDf.loc[naInd, col] = outDf.loc[~naInd, col].sample(naInd.sum(), replace=True).values
+    elif method == 'mean':
+        for col in outDf.columns:
+            naInd = outDf[col].isnull()
+            outDf.loc[naInd, col] = outDf.loc[~naInd, col].mean()
+    elif method == 'median':
+        for col in outDf.columns:
+            naInd = outDf[col].isnull()
+            outDf.loc[naInd, col] = outDf.loc[~naInd, col].median()
+    elif method == 'regression':
+        naInds = []
+        for col in outDf.columns:
+            naInd = outDf[col].isnull()
+            outDf.loc[naInd, col] = outDf.loc[~naInd, col].mean()
+            naInds.append(naInd)
+        for naInd,col in zip(naInds, outDf.columns):
+            if naInd.sum() > 0:
+                otherCols = [c for c in outDf.columns if not c == col]
+                mod = sklearn.linear_model.LinearRegression().fit(outDf[otherCols], outDf[col])
+                outDf.loc[naInd, col] = mod.predict(outDf.loc[naInd, otherCols])
+    return outDf
