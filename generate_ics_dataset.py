@@ -168,3 +168,66 @@ tmp = tmp.rename_axis({'Ptid': 'ptid'}, axis=1)
 tmp.loc[:, 'ptid'] = tmp.ptid.str.replace('-', '')
 trtDf = tmp[trtCols].set_index('ptid')
 trtDf.to_csv('hvtn505_ics_rowmeta_24Jul2017.csv')
+
+
+"""Formulating polyfunctionality distance as a min cost flow problem"""
+def _distnorm(v):
+    v[v<0] = 0
+    v = v/v.sum()
+    return v
+
+def ics_example():
+    cytokines = ['IFNg', 'IL2', 'TNFa']
+    nodeLabels = [c for c in itertools.product((0,1), repeat=len(cytokines))]
+    nodes = list(range(len(nodeLabels)))
+
+    def _cost(n1, n2):
+        """Hamming distance between two node labels"""
+        return int(np.sum(np.abs(np.array(nodeLabels[n1]) - np.array(nodeLabels[n2]))))
+
+    np.random.seed(110820)
+    popA = _distnorm(np.random.randn(len(nodes)) + 0.5)
+    popB = _distnorm(np.random.randn(len(nodes)) + 0.5)
+    diffv = popA - popB
+    diffv = (diffv*100).astype(int)
+    diffv[0] -= diffv.sum()
+
+    posNodes = np.nonzero(diffv > 0)[0]
+    negNodes = np.nonzero(diffv < 0)[0]
+
+    tmp = np.array([o for o in itertools.product(posNodes, negNodes)])
+    startNodes = tmp[:,0].tolist()
+    endNodes = tmp[:,1].tolist()
+
+    """Set capacity to max possible"""
+    capacities = diffv[startNodes].tolist()
+    costs = [_cost(n1,n2) for n1,n2 in zip(startNodes, endNodes)]
+    supplies = diffv.tolist()
+
+    # Instantiate a SimpleMinCostFlow solver.
+    min_cost_flow = pywrapgraph.SimpleMinCostFlow()
+
+    # Add each arc.
+    for i in range(len(startNodes)):
+        min_cost_flow.AddArcWithCapacityAndUnitCost(startNodes[i], endNodes[i],
+                                                    capacities[i], costs[i])
+
+    # Add node supplies.
+    for i in range(len(supplies)):
+        min_cost_flow.SetNodeSupply(i, supplies[i])
+
+    # Find the minimum cost flow
+    if min_cost_flow.Solve() == min_cost_flow.OPTIMAL:
+        print('Minimum cost:', min_cost_flow.OptimalCost())
+        print('')
+        print('  Arc    Flow / Capacity  Cost')
+        for i in range(min_cost_flow.NumArcs()):
+            cost = min_cost_flow.Flow(i) * min_cost_flow.UnitCost(i)
+            print('%1s -> %1s   %3s  / %3s       %3s' % (
+                  min_cost_flow.Tail(i),
+                  min_cost_flow.Head(i),
+                  min_cost_flow.Flow(i),
+                  min_cost_flow.Capacity(i),
+                  cost))
+    else:
+        print('There was an issue with the min cost flow input.')
