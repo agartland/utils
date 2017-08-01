@@ -2,11 +2,13 @@
 import pandas as pd
 import numpy as np
 import re
-import sns
+import seaborn as sns
 
 """Read in the raw ICS data"""
 # fn = '/trials/vaccine/p505/analysis/lab/pdata/ics/e505ics_fh/csvfiles/e505ics_fh_p.csv'
 fn = GIT_PATH + 'e505ics_fh_p.csv'
+# fn = 'T:/vaccine/p505/analysis/lab/pdata/ics/e505ics_fh/csvfiles/e505ics_fh_p.csv'
+
 ctrlCols = ['ptid', 'visitday', 'tcellsub', 'cytokine']
 indexCols = ctrlCols + ['antigen']
 uAg = ['CMV',
@@ -186,8 +188,14 @@ def _distnorm(v):
 
 def testMCFData(factor=1000):
     np.random.seed(110820)
-    popA = _distnorm(np.random.randn(len(nodes)) + 0.5)
-    popB = _distnorm(np.random.randn(len(nodes)) + 0.5)
+    nodeVecs = [o for o in itertools.product((0,1), repeat=4)]
+
+    def _cost(n1, n2):
+        """Hamming distance between two node labels"""
+        return int(np.sum(np.abs(np.array(nodeVecs[n1]) - np.array(nodeVecs[n2]))))
+    
+    popA = _distnorm(np.random.randn(len(nodeVecs)) + 0.5)
+    popB = _distnorm(np.random.randn(len(nodeVecs)) + 0.5)
     diffv = popA - popB
     diffv = (diffv*factor).astype(int)
     diffv[0] -= diffv.sum()
@@ -305,7 +313,11 @@ def nxMCF(startNodes, endNodes, capacities, costs, supplies):
                    capacity=capacities[edgei])
 
     cost, flow = nx.network_simplex(G, demand='demand', capacity='capacity', weight='weight')
-    return cost, flow
+    totalFlow = 0
+    for k1,v1 in flow.items():
+        for k2,v2 in v1.items():
+            totalFlow += v2
+    return cost, totalFlow
 
 samples = cdf[['ptid','tcellsub','antigen']].drop_duplicates()
 freqs = []
@@ -329,10 +341,10 @@ group1 = cdf.ptid.unique()[:20].tolist()
 group2 = cdf.ptid.unique()[20:50].tolist()
 
 freq1Df = cdf.loc[cdf.ptid.isin(group1)].groupby('cytokine')['mag'].agg(np.mean)
-freq1Df = freq1Df.drop(vec2subset((0,0,0,0)), axis=0)
+# freq1Df = freq1Df.drop(vec2subset((0,0,0,0)), axis=0)
 
 freq2Df = cdf.loc[cdf.ptid.isin(group2)].groupby('cytokine')['mag'].agg(np.mean)
-freq2Df = freq2Df.drop(vec2subset((0,0,0,0)), axis=0)
+# freq2Df = freq2Df.drop(vec2subset((0,0,0,0)), axis=0)
 
 mcfData = prepICSData(freq1Df, freq2Df, factor=1000)
 
