@@ -235,7 +235,7 @@ def computePWDist(series1, series2, dfunc, symetric=True):
         Items for comparison. Will compute all pairs of distances
         between items in series1 and series2.
     dfunc : function
-        Function takes 2 parameters and returns a float
+        Function takes 2 items and returns a float
     symetric : bool
         If True, only compute half the distance matrix and duplicate.
 

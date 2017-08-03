@@ -71,9 +71,9 @@ def corrDmatFunc(df, metric='pearson-signed', dfunc=None, minN=10):
     return pd.DataFrame(dmat, columns = df.columns, index = df.columns)
 
 def hierClusterFunc(dmatDf, K=6, method='complete', returnLinkageMat=False):
-    hclusters = sch.linkage(dmatDf.values, method = method)
-    labelsVec = sch.fcluster(hclusters, K, criterion = 'maxclust')
-    labels = pd.Series(labelsVec, index = dmatDf.columns)
+    hclusters = sch.linkage(dmatDf.values, method=method)
+    labelsVec = sch.fcluster(hclusters, K, criterion='maxclust')
+    labels = pd.Series(labelsVec, index=dmatDf.columns)
     if not returnLinkageMat:
         return labels
     else:

@@ -75,8 +75,28 @@ def embedDistanceMatrix(dmatDf, method='kpca', n_components=2):
         xyDf.explained_variance_ = pcaObj.lambdas_[:n_components]/pcaObj.lambdas_[pcaObj.lambdas_>0].sum()
     return xyDf
 
-def computePWDist(df, metric='pearson-signed', dfunc=None, minN=10):
-    """Compute pairwise distance matrix using correlation or arbitrary function."""
+def computePWDist(df, metric='pearson-signed', dfunc=None, minN=10, symetric=True):
+    """Compute pairwise distance matrix using correlation or arbitrary function.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Samples along the rows and features along the columns.
+    metric : str
+        Possible values: pearson-signed, pearson, spearman-signed, spearman
+        or any other scipy distance
+    dfunc : function(pd.Series, pd.Series)
+        Function will override the metric string.
+        Called with two rows of df (e.g. df.iloc[:, i])
+    minN : int
+        Requires minimum number of non-NA rows to have a non-NA distance.
+    symetric : bool
+        Assume that the distance is symetric.
+
+    Returns
+    -------
+    dmatDf : pd.DataFrame
+        Distance matrix with index and columns matching input df.index"""
     if dfunc is None:
         if metric in ['spearman', 'pearson']:
             """Anti-correlations are also considered as high similarity and will cluster together"""
@@ -98,7 +118,7 @@ def computePWDist(df, metric='pearson-signed', dfunc=None, minN=10):
         for i in range(nrows):
             for j in range(nrows):
                 """Assume distance is symetric"""
-                if i <= j:
+                if symetric and i <= j:
                     tmpdf = df.iloc[:, [i, j]]
                     tmpdf = tmpdf.dropna()
                     if tmpdf.shape[0] >= minN:
@@ -107,6 +127,15 @@ def computePWDist(df, metric='pearson-signed', dfunc=None, minN=10):
                         d = np.nan
                     dmat[i, j] = d
                     dmat[j, i] = d
+                else:
+                    tmpdf = df.iloc[:, [i, j]]
+                    tmpdf = tmpdf.dropna()
+                    if tmpdf.shape[0] >= minN:
+                        d = dfunc(df.iloc[:, i], df.iloc[:, j])
+                    else:
+                        d = np.nan
+                    dmat[i, j] = d
+
     return pd.DataFrame(dmat, columns=df.index, index=df.index)
 
 def plotEmbedding(dmatDf,
