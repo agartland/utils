@@ -51,7 +51,7 @@ def ICSDist(freq1Df, freq2Df):
         return 0.
     else:
         cost, flow = googleMCF(**mcfData, verbose=False, withConstraints=False)
-    return flow/1000
+    return cost/1000
 
 def pwICSDist(cdf, indexCols=['ptid', 'visitday', 'tcellsub', 'antigen']):
     d = {ptid:tmpdf.set_index('cytokine')['mag'] for ptid, tmpdf in cdf.groupby('ptid')}
@@ -98,7 +98,7 @@ def testMCFData(factor=1000):
            'supplies':supplies}
     return out
 
-def prepICSData(freq1, freq2, factor=1000):
+def prepMCFData(freq1, freq2, factor=1000):
     nodeLabels = freq1.index.tolist()
     nodeVecs = [subset2vec(m) for m in nodeLabels]
     # nodes = list(range(len(nodeLabels)))
