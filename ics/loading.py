@@ -104,6 +104,7 @@ def parseRaw(fn):
                                  'nsub':np.int,
                                  'cytnum':np.int,
                                  'nrepl':np.int},
+                          converters={'ptid':_parsePTID},
                           index_col=indexCols).sort_index()
 
     uAg = [ag for ag in rdf.index.levels[-1] if not np.any([ag.find(s) >= 0 for s in ['negctrl', 'phactrl']])]
