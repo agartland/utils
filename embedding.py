@@ -150,9 +150,11 @@ def plotEmbedding(dmatDf,
                   alpha=0.8,
                   sz=50,
                   mxSz=500,
-                  marker='o',
+                  markers=None,
                   plotLegend=True,
-                  colors=None):
+                  colors=None,
+                  markerLabels=None,
+                  continuousLabel=False):
     """Two-dimensional plot of embedded distance matrix, colored by labels"""
     
     if labels is None:
@@ -175,7 +177,9 @@ def plotEmbedding(dmatDf,
                      alpha=alpha,
                      sz=sz,
                      mxSz=mxSz,
-                     marker=marker,
+                     markerLabels=markerLabels,
+                     markers=markers,
+                     continuousLabel=continuousLabel,
                      colors=colors)
    
     if plotLabels:
@@ -204,21 +208,81 @@ def clusteredScatter(xyDf,
                      alpha=0.8,
                      sz=50,
                      mxSz=500,
-                     marker='o',
-                     colors=None):
+                     markerLabels=None,
+                     markers=None,
+                     colors=None,
+                     continuousLabel=False):
+    """Produce a scatter plot with axes, shaded by values in labels and with specified markers
+
+    Parameters
+    ----------
+    xyDf : pd.DataFrame
+        One column for each plot dimension specified
+    labels : pd.Series
+        Holds categorical or continuous metadata used for coloring
+    plotDims : list len 2
+        Specifies the columns in xyDf for plotting on X and Y axes
+    plotElipse : bool
+        Indicates whether a colored elipse should be plotted for the
+        categorical labels. Ellipse is 2 standard deviations wide along each axis
+    weights : pd.Series
+        Relative weights that are mapped for sizing each symbol
+    alpha : float
+        Transparency of each point
+    sz : float
+        Size of each symbol or minimum size of a symbol if there are weights
+    mxSz : float
+        Maximum size of a symbol if there are weights
+    markerLabels : pd.Series
+        Holds categorical labels used for plotting different symbols
+    markers : list
+        List of marker symbols to use. Defaults to: "ov8sp*hDPX"
+    colors : list
+        List of colors to use for categorical labels or a colormap
+        for a continuousLabel. Defaults to colors from Set1 or the YlOrRd colormap
+    continuousLabel : bool
+        Indicates whether labels are categorical or continuous"""
     if weights is None:
         sVec = sz * pd.Series(np.ones(xyDf.shape[0]), index=xyDf.index)
     else:
         sVec = weights * mxSz + sz
-
-    oh = objhist(labels)
-    uLabels = sorted(np.unique(labels), key=oh.get, reverse=True)
     
-    if colors is None:
-        nColors = min(max(len(uLabels), 3), 9)
-        colors = palettable.colorbrewer.get_map('Set1', 'Qualitative', nColors).mpl_colors
-    elif isinstance(colors, pd.Series):
-        colors = colors[uLabels].values
+    if labels is None:
+        labels = pd.Series(np.ones(xyDf.shape[0]), index=xyDf.index)
+        useColors = False
+    else:
+        useColors = True
+
+    if continuousLabel:
+        if not colors is None:
+            cmap = colors
+        else:
+            cmap = palettable.colorbrewer.sequential.YlOrRd_9.mpl_colormap
+    else:
+        cmap = None
+        oh = objhist(labels)
+        uLabels = sorted(np.unique(labels), key=oh.get, reverse=True)
+        
+        if colors is None:
+            nColors = min(max(len(uLabels), 3), 9)
+            colors = palettable.colorbrewer.get_map('Set1', 'Qualitative', nColors).mpl_colors
+        elif isinstance(colors, pd.Series):
+            colors = colors[uLabels].values
+
+    if markerLabels is None:
+        markerLabels = pd.Series(np.ones(xyDf.shape[0]), index=xyDf.index)
+        useMarkers = False
+    else:
+        useMarkers = True
+
+    oh = objhist(markerLabels)
+    uMLabels = sorted(np.unique(markerLabels), key=oh.get, reverse=True)
+    
+    if markers is None:
+        nMarkers = len(uMLabels)
+        markers = ['o', 'v', '8', 's', 'p', '*', 'h', 'D', 'P', 'X'][:nMarkers]
+    elif isinstance(markers, pd.Series):
+        markers = markers[uMLabels].values
 
     figh = plt.gcf()
     plt.clf()
@@ -227,19 +291,47 @@ def clusteredScatter(xyDf,
     # axh.axis('off')
     figh.patch.set_facecolor('white')
 
-    for vi, v in enumerate(uLabels):
-        ind = (labels == v)
-        plt.scatter(xyDf.loc[ind, plotDims[0]],
-                    xyDf.loc[ind, plotDims[1]],
-                    marker=marker,
-                    s=sVec.loc[ind],
-                    alpha=alpha,
-                    c=[colors[vi % len(colors)], ] * ind.sum(),
-                    label='%s (N=%d)' % (v, ind.sum()))
-        if ind.sum() > 2 and plotElipse:
-            Xvar = xyDf[plotDims].loc[ind].values
-            plot_point_cov(Xvar, ax=axh, color=colors[vi % len(colors)], alpha=0.2)
-    axh.set_xticks(())
+    if continuousLabel:
+        for mi, m in enumerate(uMLabels):
+            ind = markerLabels == m
+            if useMarkers:
+                labS = '%s (N=%d)' % (m, ind.sum())
+            else:
+                labS = None
+            
+            plt.scatter(xyDf.loc[ind, plotDims[0]],
+                        xyDf.loc[ind, plotDims[1]],
+                        marker=markers[mi],
+                        s=sVec.loc[ind],
+                        alpha=alpha,
+                        c=labels,
+                        label=labS,
+                        cmap=cmap)
+    else:
+        for vi, v in enumerate(uLabels):
+            for mi, m in enumerate(uMLabels):
+                ind = (labels == v) & (markerLabels == m)
+                if useMarkers and useColors:
+                    labS = '%s|%s (N=%d)' % (v, m, ind.sum())
+                elif useColors:
+                    labS = '%s (N=%d)' % (v, ind.sum())
+                elif useMarkers:
+                    labS = '%s (N=%d)' % (m, ind.sum())
+                else:
+                    labS = None
+                
+                plt.scatter(xyDf.loc[ind, plotDims[0]],
+                            xyDf.loc[ind, plotDims[1]],
+                            marker=markers[mi],
+                            s=sVec.loc[ind],
+                            alpha=alpha,
+                            c=[colors[vi % len(colors)], ] * ind.sum(),
+                            label=labS,
+                            cmap=cmap)
+            if ind.sum() > 2 and plotElipse:
+                Xvar = xyDf[plotDims].loc[ind].values
+                plot_point_cov(Xvar, ax=axh, color=colors[vi % len(colors)], alpha=0.2)
+        axh.set_xticks(())
     axh.set_yticks(())
     plt.show()
     

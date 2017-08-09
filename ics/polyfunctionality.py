@@ -11,7 +11,7 @@ from .loading import subset2vec, vec2subset, compressSubsets
 
 __all__ = ['ICSDist',
            'pwICSDist',
-           'prepMCFData',
+           'prepICSData',
            'googleMCF',
            'nxMCF',
            'computeMarginals']
@@ -42,7 +42,9 @@ def computeMarginals(df, indexCols, magCol='mag'):
         marg = compressSubsets(df, indexCols=indexCols, subset=[cy], magCol=magCol)
         marg = marg.loc[marg.cytokine == cy + '+']
         out.append(marg)
-    return pd.concat(out, axis=0)
+    out = pd.concat(out, axis=0)
+    out.loc[:, magCol] = out
+    return 
 
 def ICSDist(freq1Df, freq2Df):
     mcfData = prepICSData(freq1Df, freq2Df, factor=1000)
