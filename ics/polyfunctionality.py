@@ -44,7 +44,7 @@ def computeMarginals(df, indexCols, magCol='mag'):
         out.append(marg)
     out = pd.concat(out, axis=0)
     out.loc[:, magCol] = out
-    return 
+    return out
 
 def ICSDist(freq1Df, freq2Df):
     mcfData = prepICSData(freq1Df, freq2Df, factor=1000)
@@ -100,7 +100,7 @@ def testMCFData(factor=1000):
            'supplies':supplies}
     return out
 
-def prepMCFData(freq1, freq2, factor=1000):
+def prepICSData(freq1, freq2, factor=1000):
     nodeLabels = freq1.index.tolist()
     nodeVecs = [subset2vec(m) for m in nodeLabels]
     # nodes = list(range(len(nodeLabels)))

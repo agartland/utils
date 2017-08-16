@@ -23,7 +23,7 @@ __all__ = [ 'embedDistanceMatrix',
             'plotEmbedding',
             'clusteredScatter']
 
-def embedDistanceMatrix(dmatDf, method='kpca', n_components=2):
+def embedDistanceMatrix(dmatDf, method='kpca', n_components=2, **kwargs):
     """Two-dimensional embedding of sequence distances in dmatDf,
     returning Nx2 x,y-coords: tsne, isomap, pca, mds, kpca, sklearn-tsne"""
     if isinstance(dmatDf, pd.DataFrame):
@@ -32,7 +32,7 @@ def embedDistanceMatrix(dmatDf, method='kpca', n_components=2):
         dmat = dmatDf
 
     if method == 'tsne':
-        xy = tsne.run_tsne(dmat, no_dims=n_components)
+        xy = tsne.run_tsne(dmat, no_dims=n_components, perplexity=kwargs['perplexity'])
     elif method == 'isomap':
         isoObj = Isomap(n_neighbors=10, n_components=n_components)
         xy = isoObj.fit_transform(dmat)
@@ -61,7 +61,7 @@ def embedDistanceMatrix(dmatDf, method='kpca', n_components=2):
         lle = manifold.LocallyLinearEmbedding(n_neighbors=30, n_components=n_components, method='standard')
         xy = lle.fit_transform(dist)
     elif method == 'sklearn-tsne':
-        tsneObj = TSNE(n_components=n_components, metric='precomputed', random_state=0)
+        tsneObj = TSNE(n_components=n_components, metric='precomputed', random_state=0, perplexity=kwargs['perplexity'])
         xy = tsneObj.fit_transform(dmat)
     else:
         print('Method unknown: %s' % method)
@@ -189,8 +189,16 @@ def plotEmbedding(dmatDf,
                 axh.annotate(col, xy=(xyDf.loc[col, plotDims[0]], xyDf.loc[col, plotDims[1]]), **annotationParams)
 
     if len(uLabels) > 1 and plotLegend:
-        plt.legend(loc=0)
-        # colorLegend(colors[:len(uLabels)], uLabels)
+        if labels is None and markerLabels is None:
+            pass
+        else:
+            if labels is None:
+                legTit = markerLabels.name
+            elif markerLabels is None:
+                legTit = abels.name
+            else:
+                legTit = '%s | %s' % (labels.name, markerLabels.name)
+            plt.legend(loc=0, title=legTit)
     if hasattr(xyDf, 'explained_variance_'):
         plt.xlabel('KPCA %1.0f (%1.0f%% variance explained)' % (plotDims[0]+1, 100*xyDf.explained_variance_[plotDims[0]]))
         plt.ylabel('KPCA %1.0f (%1.0f%% variance explained)' % (plotDims[1]+1, 100*xyDf.explained_variance_[plotDims[1]]))
@@ -304,7 +312,7 @@ def clusteredScatter(xyDf,
                         marker=markers[mi],
                         s=sVec.loc[ind],
                         alpha=alpha,
-                        c=labels,
+                        c=labels.loc[ind],
                         label=labS,
                         cmap=cmap)
     else:
@@ -334,4 +342,3 @@ def clusteredScatter(xyDf,
         axh.set_xticks(())
     axh.set_yticks(())
     plt.show()
-    

@@ -96,16 +96,15 @@ def parseRaw(fn):
     indexCols = ctrlCols + ['antigen']
 
     rdf = pd.read_csv(fn, usecols=indexCols + ['nsub', 'cytnum', 'nrepl'],
-                          dtype={'ptid':object,
-                                 'visitday':np.int,
+                          dtype={'visitday':np.int,
                                  'tcellsub':object,
                                  'cytokine':object,
                                  'antigen':object,
                                  'nsub':np.int,
                                  'cytnum':np.int,
                                  'nrepl':np.int},
-                          converters={'ptid':_parsePTID},
-                          index_col=indexCols).sort_index()
+                          converters={'ptid':_parsePTID})
+    rdf = rdf.set_index(indexCols).sort_index()
 
     uAg = [ag for ag in rdf.index.levels[-1] if not np.any([ag.find(s) >= 0 for s in ['negctrl', 'phactrl']])]
 
