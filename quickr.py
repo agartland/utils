@@ -13,9 +13,9 @@ def runRscript(Rcmd, inDf=None, outputFile=False, removeTempFiles=None):
     ------
     Rcmd : str
         String containing the R-script to run.
-    inDf : pd.DataFrame
+    inDf : pd.DataFrame or list of pd.DataFrame's
         Data to be passed to the R script via a CSV file.
-        Object should be referenced in the script as "INPUTDF"
+        Object should be referenced in the script as "INPUTDF" or "INPUTDF0" etc. if list
     outputFile : bool
         If True, an output CSV file is available for writing by the R-script
         and the contents of the file are returned as a pd.DataFrame.
@@ -34,12 +34,22 @@ def runRscript(Rcmd, inDf=None, outputFile=False, removeTempFiles=None):
 
     """Write data to a tempfile if required"""
     if not inDf is None:
-        inputH, inputFn = tempfile.mkstemp(suffix='.csv', prefix='tmp-Rinput-', text=True)
-        readCmd = 'INPUTDF <- read.csv("%s")\n' % inputFn
-        Rcmd = readCmd + Rcmd
-        os.close(inputH)
-        inDf.to_csv(inputFn)
-
+        if not type(inDf) is list:
+            inputH, inputFn = tempfile.mkstemp(suffix='.csv', prefix='tmp-Rinput-', text=True)
+            readCmd = 'INPUTDF <- read.csv("%s")\n' % inputFn
+            Rcmd = readCmd + Rcmd
+            os.close(inputH)
+            inDf.to_csv(inputFn)
+        else:
+            inputFilenames = []
+            for i, idf in enumerate(inDf):
+                inputH, inputFn = tempfile.mkstemp(suffix='.csv', prefix='tmp-Rinput%d-' % i, text=True)
+                readCmd = 'INPUTDF%d <- read.csv("%s")\n' % (i, inputFn)
+                Rcmd = readCmd + Rcmd
+                os.close(inputH)
+                idf.to_csv(inputFn)
+                inputFilenames.append(inputFn)
+                
     """Set up an output file if required"""
     if outputFile:
         outputH, outputFn = tempfile.mkstemp(suffix='.txt', prefix='tmp-Routput-', text=True)
@@ -81,7 +91,11 @@ def runRscript(Rcmd, inDf=None, outputFile=False, removeTempFiles=None):
         os.remove(scriptFn)
 
         if not inDf is None:
-            os.remove(inputFn)
+            if not type(inDf) is list:
+                os.remove(inputFn)
+            else:
+                for inputFn in inputFilenames:
+                    os.remove(inputFn)
 
     if not outputFile:
         return res.decode('utf-8')
