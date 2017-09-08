@@ -23,7 +23,7 @@ __all__ = [ 'embedDistanceMatrix',
             'plotEmbedding',
             'clusteredScatter']
 
-def embedDistanceMatrix(dmatDf, method='kpca', n_components=2):
+def embedDistanceMatrix(dmatDf, method='kpca', n_components=2, **kwargs):
     """Two-dimensional embedding of sequence distances in dmatDf,
     returning Nx2 x,y-coords: tsne, isomap, pca, mds, kpca, sklearn-tsne"""
     if isinstance(dmatDf, pd.DataFrame):
@@ -32,7 +32,7 @@ def embedDistanceMatrix(dmatDf, method='kpca', n_components=2):
         dmat = dmatDf
 
     if method == 'tsne':
-        xy = tsne.run_tsne(dmat, no_dims=n_components)
+        xy = tsne.run_tsne(dmat, no_dims=n_components, perplexity=kwargs['perplexity'])
     elif method == 'isomap':
         isoObj = Isomap(n_neighbors=10, n_components=n_components)
         xy = isoObj.fit_transform(dmat)
@@ -61,7 +61,7 @@ def embedDistanceMatrix(dmatDf, method='kpca', n_components=2):
         lle = manifold.LocallyLinearEmbedding(n_neighbors=30, n_components=n_components, method='standard')
         xy = lle.fit_transform(dist)
     elif method == 'sklearn-tsne':
-        tsneObj = TSNE(n_components=n_components, metric='precomputed', random_state=0)
+        tsneObj = TSNE(n_components=n_components, metric='precomputed', random_state=0, perplexity=kwargs['perplexity'])
         xy = tsneObj.fit_transform(dmat)
     else:
         print('Method unknown: %s' % method)
@@ -75,8 +75,28 @@ def embedDistanceMatrix(dmatDf, method='kpca', n_components=2):
         xyDf.explained_variance_ = pcaObj.lambdas_[:n_components]/pcaObj.lambdas_[pcaObj.lambdas_>0].sum()
     return xyDf
 
-def computePWDist(df, metric='pearson-signed', dfunc=None, minN=10):
-    """Compute pairwise distance matrix using correlation or arbitrary function."""
+def computePWDist(df, metric='pearson-signed', dfunc=None, minN=10, symetric=True):
+    """Compute pairwise distance matrix using correlation or arbitrary function.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Samples along the rows and features along the columns.
+    metric : str
+        Possible values: pearson-signed, pearson, spearman-signed, spearman
+        or any other scipy distance
+    dfunc : function(pd.Series, pd.Series)
+        Function will override the metric string.
+        Called with two rows of df (e.g. df.iloc[:, i])
+    minN : int
+        Requires minimum number of non-NA rows to have a non-NA distance.
+    symetric : bool
+        Assume that the distance is symetric.
+
+    Returns
+    -------
+    dmatDf : pd.DataFrame
+        Distance matrix with index and columns matching input df.index"""
     if dfunc is None:
         if metric in ['spearman', 'pearson']:
             """Anti-correlations are also considered as high similarity and will cluster together"""
@@ -98,7 +118,7 @@ def computePWDist(df, metric='pearson-signed', dfunc=None, minN=10):
         for i in range(nrows):
             for j in range(nrows):
                 """Assume distance is symetric"""
-                if i <= j:
+                if symetric and i <= j:
                     tmpdf = df.iloc[:, [i, j]]
                     tmpdf = tmpdf.dropna()
                     if tmpdf.shape[0] >= minN:
@@ -107,6 +127,15 @@ def computePWDist(df, metric='pearson-signed', dfunc=None, minN=10):
                         d = np.nan
                     dmat[i, j] = d
                     dmat[j, i] = d
+                else:
+                    tmpdf = df.iloc[:, [i, j]]
+                    tmpdf = tmpdf.dropna()
+                    if tmpdf.shape[0] >= minN:
+                        d = dfunc(df.iloc[:, i], df.iloc[:, j])
+                    else:
+                        d = np.nan
+                    dmat[i, j] = d
+
     return pd.DataFrame(dmat, columns=df.index, index=df.index)
 
 def plotEmbedding(dmatDf,
@@ -121,9 +150,11 @@ def plotEmbedding(dmatDf,
                   alpha=0.8,
                   sz=50,
                   mxSz=500,
-                  marker='o',
+                  markers=None,
                   plotLegend=True,
-                  colors=None):
+                  colors=None,
+                  markerLabels=None,
+                  continuousLabel=False):
     """Two-dimensional plot of embedded distance matrix, colored by labels"""
     
     if labels is None:
@@ -146,7 +177,9 @@ def plotEmbedding(dmatDf,
                      alpha=alpha,
                      sz=sz,
                      mxSz=mxSz,
-                     marker=marker,
+                     markerLabels=markerLabels,
+                     markers=markers,
+                     continuousLabel=continuousLabel,
                      colors=colors)
    
     if plotLabels:
@@ -156,8 +189,16 @@ def plotEmbedding(dmatDf,
                 axh.annotate(col, xy=(xyDf.loc[col, plotDims[0]], xyDf.loc[col, plotDims[1]]), **annotationParams)
 
     if len(uLabels) > 1 and plotLegend:
-        plt.legend(loc=0)
-        # colorLegend(colors[:len(uLabels)], uLabels)
+        if labels is None and markerLabels is None:
+            pass
+        else:
+            if labels is None:
+                legTit = markerLabels.name
+            elif markerLabels is None:
+                legTit = abels.name
+            else:
+                legTit = '%s | %s' % (labels.name, markerLabels.name)
+            plt.legend(loc=0, title=legTit)
     if hasattr(xyDf, 'explained_variance_'):
         plt.xlabel('KPCA %1.0f (%1.0f%% variance explained)' % (plotDims[0]+1, 100*xyDf.explained_variance_[plotDims[0]]))
         plt.ylabel('KPCA %1.0f (%1.0f%% variance explained)' % (plotDims[1]+1, 100*xyDf.explained_variance_[plotDims[1]]))
@@ -175,21 +216,81 @@ def clusteredScatter(xyDf,
                      alpha=0.8,
                      sz=50,
                      mxSz=500,
-                     marker='o',
-                     colors=None):
+                     markerLabels=None,
+                     markers=None,
+                     colors=None,
+                     continuousLabel=False):
+    """Produce a scatter plot with axes, shaded by values in labels and with specified markers
+
+    Parameters
+    ----------
+    xyDf : pd.DataFrame
+        One column for each plot dimension specified
+    labels : pd.Series
+        Holds categorical or continuous metadata used for coloring
+    plotDims : list len 2
+        Specifies the columns in xyDf for plotting on X and Y axes
+    plotElipse : bool
+        Indicates whether a colored elipse should be plotted for the
+        categorical labels. Ellipse is 2 standard deviations wide along each axis
+    weights : pd.Series
+        Relative weights that are mapped for sizing each symbol
+    alpha : float
+        Transparency of each point
+    sz : float
+        Size of each symbol or minimum size of a symbol if there are weights
+    mxSz : float
+        Maximum size of a symbol if there are weights
+    markerLabels : pd.Series
+        Holds categorical labels used for plotting different symbols
+    markers : list
+        List of marker symbols to use. Defaults to: "ov8sp*hDPX"
+    colors : list
+        List of colors to use for categorical labels or a colormap
+        for a continuousLabel. Defaults to colors from Set1 or the YlOrRd colormap
+    continuousLabel : bool
+        Indicates whether labels are categorical or continuous"""
     if weights is None:
         sVec = sz * pd.Series(np.ones(xyDf.shape[0]), index=xyDf.index)
     else:
         sVec = weights * mxSz + sz
-
-    oh = objhist(labels)
-    uLabels = sorted(np.unique(labels), key=oh.get, reverse=True)
     
-    if colors is None:
-        nColors = min(max(len(uLabels), 3), 9)
-        colors = palettable.colorbrewer.get_map('Set1', 'Qualitative', nColors).mpl_colors
-    elif isinstance(colors, pd.Series):
-        colors = colors[uLabels].values
+    if labels is None:
+        labels = pd.Series(np.ones(xyDf.shape[0]), index=xyDf.index)
+        useColors = False
+    else:
+        useColors = True
+
+    if continuousLabel:
+        if not colors is None:
+            cmap = colors
+        else:
+            cmap = palettable.colorbrewer.sequential.YlOrRd_9.mpl_colormap
+    else:
+        cmap = None
+        oh = objhist(labels)
+        uLabels = sorted(np.unique(labels), key=oh.get, reverse=True)
+        
+        if colors is None:
+            nColors = min(max(len(uLabels), 3), 9)
+            colors = palettable.colorbrewer.get_map('Set1', 'Qualitative', nColors).mpl_colors
+        elif isinstance(colors, pd.Series):
+            colors = colors[uLabels].values
+
+    if markerLabels is None:
+        markerLabels = pd.Series(np.ones(xyDf.shape[0]), index=xyDf.index)
+        useMarkers = False
+    else:
+        useMarkers = True
+
+    oh = objhist(markerLabels)
+    uMLabels = sorted(np.unique(markerLabels), key=oh.get, reverse=True)
+    
+    if markers is None:
+        nMarkers = len(uMLabels)
+        markers = ['o', 'v', '8', 's', 'p', '*', 'h', 'D', 'P', 'X'][:nMarkers]
+    elif isinstance(markers, pd.Series):
+        markers = markers[uMLabels].values
 
     figh = plt.gcf()
     plt.clf()
@@ -198,19 +299,46 @@ def clusteredScatter(xyDf,
     # axh.axis('off')
     figh.patch.set_facecolor('white')
 
-    for vi, v in enumerate(uLabels):
-        ind = (labels == v)
-        plt.scatter(xyDf.loc[ind, plotDims[0]],
-                    xyDf.loc[ind, plotDims[1]],
-                    marker=marker,
-                    s=sVec.loc[ind],
-                    alpha=alpha,
-                    c=[colors[vi % len(colors)], ] * ind.sum(),
-                    label='%s (N=%d)' % (v, ind.sum()))
-        if ind.sum() > 2 and plotElipse:
-            Xvar = xyDf[plotDims].loc[ind].values
-            plot_point_cov(Xvar, ax=axh, color=colors[vi % len(colors)], alpha=0.2)
-    axh.set_xticks(())
+    if continuousLabel:
+        for mi, m in enumerate(uMLabels):
+            ind = markerLabels == m
+            if useMarkers:
+                labS = '%s (N=%d)' % (m, ind.sum())
+            else:
+                labS = None
+            
+            plt.scatter(xyDf.loc[ind, plotDims[0]],
+                        xyDf.loc[ind, plotDims[1]],
+                        marker=markers[mi],
+                        s=sVec.loc[ind],
+                        alpha=alpha,
+                        c=labels.loc[ind],
+                        label=labS,
+                        cmap=cmap)
+    else:
+        for vi, v in enumerate(uLabels):
+            for mi, m in enumerate(uMLabels):
+                ind = (labels == v) & (markerLabels == m)
+                if useMarkers and useColors:
+                    labS = '%s|%s (N=%d)' % (v, m, ind.sum())
+                elif useColors:
+                    labS = '%s (N=%d)' % (v, ind.sum())
+                elif useMarkers:
+                    labS = '%s (N=%d)' % (m, ind.sum())
+                else:
+                    labS = None
+                
+                plt.scatter(xyDf.loc[ind, plotDims[0]],
+                            xyDf.loc[ind, plotDims[1]],
+                            marker=markers[mi],
+                            s=sVec.loc[ind],
+                            alpha=alpha,
+                            c=[colors[vi % len(colors)], ] * ind.sum(),
+                            label=labS,
+                            cmap=cmap)
+            if ind.sum() > 2 and plotElipse:
+                Xvar = xyDf[plotDims].loc[ind].values
+                plot_point_cov(Xvar, ax=axh, color=colors[vi % len(colors)], alpha=0.2)
+        axh.set_xticks(())
     axh.set_yticks(())
     plt.show()
-    
