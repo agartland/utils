@@ -224,8 +224,8 @@ def eventCI(x, N, alpha=0.05, method='score'):
     p = x/N
     z = stats.norm.ppf(1.-alpha/2.)
     if method == 'score':
-        lcl= (p + (z**2)/(2*N) - z*np.sqrt((p*(1-p)+z**2/(4*N))/N)) / (1 + (z**2)/N)
-        ucl= (p + (z**2)/(2*N) + z*np.sqrt((p*(1-p)+z**2/(4*N))/N)) / (1 + (z**2)/N)
+        lcl = (p + (z**2)/(2*N) - z*np.sqrt((p*(1-p)+z**2/(4*N))/N)) / (1 + (z**2)/N)
+        ucl = (p + (z**2)/(2*N) + z*np.sqrt((p*(1-p)+z**2/(4*N))/N)) / (1 + (z**2)/N)
     elif method == 'wilson':
         """p1 <- p + 0.5 * z2/n
             p2 <- z * sqrt((p * (1 - p) + 0.25 * z2/n)/n)
@@ -436,7 +436,7 @@ def specificityCI(a, b, c, d, alpha=0.05):
     Parameters
     ----------
     a,b,c,d : int
-        Counts from a 2 x 2 table starting in upper-left and going clockwise.
+        Counts from a 2 x 2 table
         a = TP
         b = FN
         c = FP
