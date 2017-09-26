@@ -12,7 +12,6 @@ import tempfile
 import os
 from aacolors import hydrophobicity, chemistry, taylor
 from adjustwithin import adjustnonnan
-from utilHelpers import mutual_information
 from sympy import binomial
 import sys
 import numpy as np
@@ -1034,3 +1033,41 @@ def getStartPosMapper(seq, subst=None):
                                protein=True,
                                substitution_matrix=subst)
     return findPos
+
+def mutual_information(x, y, logfunc=np.log2, nperms=1e4):
+    """Calculates mutual information between the paired iterables x and y
+    Returns M(x,y), p-value, and entropy of x, y, and zip(x,y)
+    Methods are all described in Gilbert et al. (AIDS 2005)"""
+    def entropy(freqDict):
+        return -np.array([p*logFunc(p) for p in freqDict.values()]).sum()
+    freqx = objhist(x)
+    freqy = objhist(y)
+   
+    Hx = freqx.entropy()
+    Hy = freqy.entropy()
+    Hxy = objhist(zip(x,y)).entropy()
+    M = Hx + Hy - Hxy
+    Mstar = 2*M / (Hx+Hy)
+
+    if len(freqx)==1 or len(freqy)==1:
+        p = 1
+    elif np.all([xi==yi for xi,yi in zip(x,y)]):
+        p = 0
+    else:
+        Mperms = np.array([Hx + Hy - objhist(zip(permutation(x),y)).entropy() for i in np.arange(nperms)])
+        p = (Mperms >= M).sum() / nperms
+
+    return M, Mstar, p, Hx, Hy, Hxy
+
+def kl(p, q):
+    """Kullback-Leibler divergence D(P || Q) for discrete distributions
+
+    Parameters
+    ----------
+    p, q : array-like, dtype=float, shape=n
+        Discrete probability distributions.
+    """
+    p = np.asarray(p, dtype=float)
+    q = np.asarray(q, dtype=float)
+
+    return np.where(p != 0, p * np.log(p / q), 0).sum()
