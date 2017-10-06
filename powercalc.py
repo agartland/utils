@@ -366,11 +366,11 @@ def sumAnyNBinom(p, anyN=1):
             tot[eventi] = np.prod(tmp)
     return tot.sum()
 
-def RRCI(a, b, c, d, alpha=0.05):
+def RRCI(a, b, c, d, alpha=0.05, RR0=1, method='katz'):
     """Compute relative-risk and confidence interval,
     given counts in each square of a 2 x 2 table.
 
-    Assumes normal distribution of log-RR.
+    Katz method and adj-log assume normal distribution of log-RR.
 
             OUTCOME
              +   -
@@ -379,6 +379,10 @@ def RRCI(a, b, c, d, alpha=0.05):
     PRED   |-------|
          - | c | d |
            ---------
+
+    Fagerland MW, Lydersen S, Laake P. Recommended confidence intervals
+        for two independent binomial proportions. Stat Methods Med Res. 2011
+    
 
     Parameters
     ----------
@@ -391,6 +395,10 @@ def RRCI(a, b, c, d, alpha=0.05):
 
     alpha : float
         Specifies the (1 - alpha)% confidence interval
+    RR0 : float
+        Null hypothesis for Wald test p-value
+    method : str
+        Currently support katz or adj-log which can handle 0s
 
     Returns
     -------
@@ -402,25 +410,31 @@ def RRCI(a, b, c, d, alpha=0.05):
         Upper-bound
     pvalue : float
         P-value by inverting the Wald CI"""
-    try:
-        rr = (a / (a+b)) / (c / (c+d))
-    except ZeroDivisionError:
-        if a+b == 0 or c+d==0:
-            rr = np.nan
-        elif c == 0:
-            rr = np.inf
-    
-    try:
-        se = np.sqrt((1/a + 1/c) - (1/(a+b) + 1/(c+d)))
-    except ZeroDivisionError:
-        se = np.inf
-    
+    if method.lower() == 'katz':
+        """Standard normal approximation of RR CI"""
+        try:
+            rr = (a / (a+b)) / (c / (c+d))
+        except ZeroDivisionError:
+            if a+b == 0 or c+d==0:
+                rr = np.nan
+            elif c == 0:
+                rr = np.inf
+        
+        try:
+            se = np.sqrt((1/a + 1/c) - (1/(a+b) + 1/(c+d)))
+        except ZeroDivisionError:
+            se = np.inf
+    elif method == 'adj-log':
+        """Add 1/2 count to each square"""
+        rr = ((a+0.5) / (a + b + 1)) / ((c+0.5) / (c + d + 1))
+        se = np.sqrt((1/(a+0.5) + 1/(c+0.5)) - (1/(a + b + 1) + 1/(c + d + 1)))
+        
     delta = stats.norm.ppf(1 - alpha/2) * se
     ub = np.exp(np.log(rr) + delta)
     lb = np.exp(np.log(rr) - delta)
 
-    """Wald CI?"""
-    pvalue = stats.norm.cdf(np.log(rr)/se)
+    """Invert CI for H0: RR = 1"""
+    pvalue = 1 - stats.norm.cdf(np.abs(np.log(rr) - np.log(RR0))/se)
 
     return rr, lb, ub, pvalue
 
