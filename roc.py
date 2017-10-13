@@ -764,6 +764,10 @@ def rocStats2x2(a, b, c, d):
         Marginal prevalence of the predictor."""
 
     n = a + b + c + d
+    a = a / n
+    b = b / n
+    c = c / n
+    d = d / n
 
     sens = a / (a+c)
     spec = d / (b+d)
@@ -776,8 +780,12 @@ def rocStats2x2(a, b, c, d):
     prevOut = a + c
     prevPred = a + b
 
-    vec = [sens, spec, ppv, npv, nnt, acc, rr, OR, prevOut, prevPred]
-    labels = ['Sensitivity', 'Specificity', 'PPV', 'NPV', 'NNT', 'ACC', 'RR', 'OR', 'prevOut', 'prevPred']
+    vec = [sens, spec, ppv, npv, nnt, acc, rr, OR, prevOut, prevPred, a, b, c, d]
+    labels = ['Sensitivity', 'Specificity',
+                'PPV', 'NPV', 'NNT',
+                'ACC', 'RR', 'OR',
+                'prevOut', 'prevPred',
+                'A', 'B', 'C', 'D']
     if np.isscalar(a):
         out = pd.Series(vec, name='ROC', index=labels)
     else:
@@ -821,6 +829,56 @@ def compute2x2FromSensSpecPrev(sens, spec, prev, returnSeries=True):
     assert prev == a + c
 
     return pd.Series([a, b, c, d,], index=['A', 'B', 'C', 'D'])
+
+
+def possibleProbFromMarginals(outPrev, predPrev):
+    """Fix the marginals of the outcome and biomarker prevalence
+    and compute possible 2x2 joint probabilities for which all 
+    probabilities are on the interval [0, 1]"""
+    def fixB(n):
+        b = np.linspace(0, 1, n)
+        a = predPrev - b
+        c = outPrev - a
+        d = 1 - a - b - c
+        return a, b, c, d
+    def fixA(n):
+        a = np.linspace(0, 1, n)
+        b = predPrev - a
+        c = outPrev - a
+        d = 1 - a - b - c
+        return a, b, c, d
+    def fixC(n):
+        c = np.linspace(0, 1, n)
+        a = outPrev - c
+        b = predPrev - a
+        d = 1 - a - b - c
+        return a, b, c, d
+    def fixD(n):
+        d = np.linspace(0, 1, n)
+        c = (1 - predPrev) - d
+        a = outPrev - c
+        b = predPrev - a
+        return a, b, c, d
+
+    out = []
+    for f in [fixA, fixB, fixC, fixD]:
+        fLab = f.__qualname__.split('.')[-1]
+        a, b, c, d = f(10000)
+        abcd = np.concatenate((a[:, None], b[:, None], c[:, None], d[:, None]), axis=1)
+        anyNan = np.any((abcd < 0) | (abcd > 1), axis=1)
+        abcd = abcd[~anyNan, :]
+        resDf = rocStats2x2(abcd[:, 0], abcd[:, 1], abcd[:, 2], abcd[:, 3])
+        resDf.loc[:, 'A'] = abcd[:, 0]
+        resDf.loc[:, 'B'] = abcd[:, 1]
+        resDf.loc[:, 'C'] = abcd[:, 2]
+        resDf.loc[:, 'D'] = abcd[:, 3]
+        if resDf.shape[0] > 0:
+            resDf.loc[:, 'Meth'] = fLab
+            out.append(resDf)
+
+    return pd.concat(out).drop_duplicates()
+
+
 
 """Code below here is old but I may still update at some point"""
 

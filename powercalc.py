@@ -366,23 +366,39 @@ def sumAnyNBinom(p, anyN=1):
             tot[eventi] = np.prod(tmp)
     return tot.sum()
 
-def RRCI(a, b, c, d, alpha=0.05):
+def RRCI(a, b, c, d, alpha=0.05, RR0=1, method='katz'):
     """Compute relative-risk and confidence interval,
     given counts in each square of a 2 x 2 table.
 
-    Assumes normal distribution of log-RR.
+    Katz method and adj-log assume normal distribution of log-RR.
+
+            OUTCOME
+             +   -
+           ---------
+         + | a | b |
+    PRED   |-------|
+         - | c | d |
+           ---------
+
+    Fagerland MW, Lydersen S, Laake P. Recommended confidence intervals
+        for two independent binomial proportions. Stat Methods Med Res. 2011
+    
 
     Parameters
     ----------
     a,b,c,d : int
         Counts from a 2 x 2 table starting in upper-left and going clockwise.
         a = TP
-        b = FN
-        c = FP
+        b = FP
+        c = FN
         d = TN
 
     alpha : float
         Specifies the (1 - alpha)% confidence interval
+    RR0 : float
+        Null hypothesis for Wald test p-value
+    method : str
+        Currently support katz or adj-log which can handle 0s
 
     Returns
     -------
@@ -391,25 +407,56 @@ def RRCI(a, b, c, d, alpha=0.05):
     lb : float
         Lower-bound
     ub : float
-        Upper-bound"""
-    se = np.sqrt((1/a + 1/b) - (1/(a+c) + 1/(b+d)))
-    rr = (a / (a+c)) / (b / (b+d))
+        Upper-bound
+    pvalue : float
+        P-value by inverting the Wald CI"""
+    if method.lower() == 'katz':
+        """Standard normal approximation of RR CI"""
+        try:
+            rr = (a / (a+b)) / (c / (c+d))
+        except ZeroDivisionError:
+            if a+b == 0 or c+d==0:
+                rr = np.nan
+            elif c == 0:
+                rr = np.inf
+        
+        try:
+            se = np.sqrt((1/a + 1/c) - (1/(a+b) + 1/(c+d)))
+        except ZeroDivisionError:
+            se = np.inf
+    elif method == 'adj-log':
+        """Add 1/2 count to each square"""
+        rr = ((a+0.5) / (a + b + 1)) / ((c+0.5) / (c + d + 1))
+        se = np.sqrt((1/(a+0.5) + 1/(c+0.5)) - (1/(a + b + 1) + 1/(c + d + 1)))
+        
     delta = stats.norm.ppf(1 - alpha/2) * se
     ub = np.exp(np.log(rr) + delta)
     lb = np.exp(np.log(rr) - delta)
-    return rr, lb, ub
+
+    """Invert CI for H0: RR = 1"""
+    pvalue = 1 - stats.norm.cdf(np.abs(np.log(rr) - np.log(RR0))/se)
+
+    return rr, lb, ub, pvalue
 
 def sensitivityCI(a, b, c, d, alpha=0.05):
     """Compute sensitivity and confidence interval,
     given counts in each square of a 2 x 2 table.
+
+            OUTCOME
+             +   -
+           ---------
+         + | a | b |
+    PRED   |-------|
+         - | c | d |
+           ---------
 
     Parameters
     ----------
     a,b,c,d : int
         Counts from a 2 x 2 table starting in upper-left and going clockwise.
         a = TP
-        b = FN
-        c = FP
+        b = FP
+        c = FN
         d = TN
 
     alpha : float
@@ -425,21 +472,29 @@ def sensitivityCI(a, b, c, d, alpha=0.05):
         Upper-bound"""
     if np.isscalar(a):
         a = np.array([a])
-    sens = a / (a+b)
-    lb, ub = eventCI(x=a, N=a+b, alpha=alpha)
+    sens = a / (a+c)
+    lb, ub = eventCI(x=a, N=a+c, alpha=alpha)
     return sens, lb, ub
 
 def specificityCI(a, b, c, d, alpha=0.05):
     """Compute specificity and confidence interval,
     given counts in each square of a 2 x 2 table.
 
+            OUTCOME
+             +   -
+           ---------
+         + | a | b |
+    PRED   |-------|
+         - | c | d |
+           ---------
+
     Parameters
     ----------
     a,b,c,d : int
         Counts from a 2 x 2 table
         a = TP
-        b = FN
-        c = FP
+        b = FP
+        c = FN
         d = TN
 
     alpha : float
@@ -456,8 +511,8 @@ def specificityCI(a, b, c, d, alpha=0.05):
 
     if np.isscalar(d):
         d = np.array([d])
-    spec = d / (c+d)
-    lb, ub = eventCI(x=d, N=c+d, alpha=alpha)
+    spec = d / (b+d)
+    lb, ub = eventCI(x=d, N=b+d, alpha=alpha)
     return spec, lb, ub
 
 def computeRR(df, outcome, predictor, alpha=0.05):
