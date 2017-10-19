@@ -339,9 +339,9 @@ def _simpsons_index(vec, variant='D'):
     Returns
     -------
     index : float"""
+    vec = np.asarray(vec).astype(float)
 
-    tot = np.sum(vec).astype(float)
-    p = np.array(vec, dtype=float) / tot
+    p = vec / np.sum(vec)
 
     D = (p * p).sum()
     if variant == 'D':
