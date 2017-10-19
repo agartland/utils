@@ -383,7 +383,7 @@ def alignmentEntropy(align, statistic='absolute', removeGaps=False, k=1, logFunc
     L = len(align[align.index[0]])
     nKmers = L - k + 1
 
-    entropy = np.zeros(nKmers, dtype=float64)
+    entropy = np.zeros(nKmers, dtype=float)
     for aai in np.arange(nKmers):
         kmers = [grabKmer(seq, aai, k)[grabKmerFlag] for seq in align]
         """kmers that start with a gap or that are at the end and are of insufficent length, will be None"""
