@@ -79,7 +79,16 @@ def computeDMat(df, metric=None, minN=1, dfunc=None):
 def computeHCluster(dmat, method='complete'):
     """Compute dmat, clusters and dendrogram of df using
     the linkage method and distance metric given"""
-    clusters = sch.linkage(dmat, method=method)
+    if dmat.shape[0] == dmat.shape[1]:
+        if type(dmat) is pd.DataFrame:
+            #compressedDmat = dmat.values[np.triu_indices_from(dmat.values)].ravel()
+            compressedDmat = distance.squareform(dmat.values)
+        else:
+            #compressedDmat = dmat[np.triu_indices_from(dmat)].ravel()
+            compressedDmat = distance.squareform(dmat)
+    else:
+        raise
+    clusters = sch.linkage(compressedDmat, method=method)
     den = sch.dendrogram(clusters, color_threshold=np.inf, no_plot=True)
     return clusters, den
 
