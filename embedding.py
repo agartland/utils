@@ -170,7 +170,7 @@ def plotEmbedding(dmatDf,
     if xyDf is None:
         xyDf = embedDistanceMatrix(dmatDf, method=method, n_components=np.max(plotDims) + 1)
     
-    clusteredScatter(xyDf,
+    axh = clusteredScatter(xyDf,
                      labels=labels,
                      plotDims=plotDims,
                      plotElipse=plotElipse,
@@ -201,11 +201,11 @@ def plotEmbedding(dmatDf,
                 legTit = '%s | %s' % (labels.name, markerLabels.name)
             plt.legend(loc=0, title=legTit)
     if hasattr(xyDf, 'explained_variance_'):
-        plt.xlabel('KPCA %1.0f (%1.0f%% variance explained)' % (plotDims[0]+1, 100*xyDf.explained_variance_[plotDims[0]]))
-        plt.ylabel('KPCA %1.0f (%1.0f%% variance explained)' % (plotDims[1]+1, 100*xyDf.explained_variance_[plotDims[1]]))
+        axh.set_xlabel('KPCA %1.0f (%1.0f%% variance explained)' % (plotDims[0]+1, 100*xyDf.explained_variance_[plotDims[0]]))
+        axh.set_ylabel('KPCA %1.0f (%1.0f%% variance explained)' % (plotDims[1]+1, 100*xyDf.explained_variance_[plotDims[1]]))
     else:
-        plt.xlabel('KPCA %1.0f' % (plotDims[0]+1))
-        plt.ylabel('KPCA %1.0f' % (plotDims[1]+1))
+        axh.set_xlabel('KPCA %1.0f' % (plotDims[0]+1))
+        axh.set_ylabel('KPCA %1.0f' % (plotDims[1]+1))
     plt.show()
     return xyDf
 
@@ -342,4 +342,4 @@ def clusteredScatter(xyDf,
                 plot_point_cov(Xvar, ax=axh, color=colors[vi % len(colors)], alpha=0.2)
         axh.set_xticks(())
     axh.set_yticks(())
-    plt.show()
+    return axh
