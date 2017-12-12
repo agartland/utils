@@ -182,7 +182,7 @@ def plotEmbedding(dmatDf,
                      markers=markers,
                      continuousLabel=continuousLabel,
                      colors=colors)
-   
+    
     if plotLabels:
         annotationParams = dict(xytext=(0, 5), textcoords='offset points', size=txtSize)
         for coli, col in enumerate(dmatDf.columns):
@@ -196,7 +196,7 @@ def plotEmbedding(dmatDf,
             if labels is None:
                 legTit = markerLabels.name
             elif markerLabels is None:
-                legTit = abels.name
+                legTit = labels.name
             else:
                 legTit = '%s | %s' % (labels.name, markerLabels.name)
             plt.legend(loc=0, title=legTit)
@@ -206,7 +206,7 @@ def plotEmbedding(dmatDf,
     else:
         axh.set_xlabel('KPCA %1.0f' % (plotDims[0]+1))
         axh.set_ylabel('KPCA %1.0f' % (plotDims[1]+1))
-    plt.show()
+    # plt.show()
     return xyDf
 
 def clusteredScatter(xyDf,
@@ -336,7 +336,8 @@ def clusteredScatter(xyDf,
                             alpha=alpha,
                             c=[colors[vi % len(colors)], ] * ind.sum(),
                             label=labS,
-                            cmap=cmap)
+                            cmap=cmap,
+                            linewidths=0)
             if ind.sum() > 2 and plotElipse:
                 Xvar = xyDf[plotDims].loc[ind].values
                 plot_point_cov(Xvar, ax=axh, color=colors[vi % len(colors)], alpha=0.2)
