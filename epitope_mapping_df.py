@@ -8,6 +8,9 @@ import itertools
 import operator
 from functools import partial
 
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+
 """Rewrite of epitope_mapping.py that avoids the use of objects,
 thereby permitting easy writing/reading of epitope mapping
 results to/from files.
@@ -33,7 +36,11 @@ __all__ = [ 'hamming',
             'identicalRule',
             'overlapRule',
             'hlaRule',
-            'findpeptide']
+            'findpeptide',
+            'plotIsland',
+            'plotEpitopeMap',
+            'encodeVariants',
+            'decodeVariants']
 
 
 
@@ -196,7 +203,7 @@ def overlapRule(island, minOverlap=8, minSharedAA=6):
             nOverlap += 1
             if len(aas) == 1:
                 nMatching += 1
-                seq += list(aas)[0]
+                seq += aas.pop()
             else:
                 seq += 'X'
     if nOverlap >= minOverlap and nMatching >= minSharedAA:
@@ -205,7 +212,24 @@ def overlapRule(island, minOverlap=8, minSharedAA=6):
     else:
         return False, {}
 
-def hlaRule(island, hlaList, ba, topPct=0.1, nmer=[8, 9, 10]):
+def overlapEpitope(island, useX=True):
+    """Find the shared peptide for responses"""
+    sharedInds = sharedCoords(island)
+
+    seq = ''
+    for si in sharedInds:
+        aas = {respSeq[si - int(respStart)] for respSeq, respStart in zip(island.seq, island.start)}
+        if len(aas) == 1:
+            seq += aas.pop()
+        else:
+            if useX:
+                seq += 'X'
+            else:
+                seq += '[' + ''.join(aas) + ']'
+                
+    return dict(EpSeq=seq, EpStart=sharedInds[0], EpEnd=sharedInds[-1])
+
+def hlaRule(island, hlaList, ba, topPct=0.1, nmer=[8, 9, 10], useX=True):
     """Determine overlap region common amongst all responses in the island
     Predict HLA binding for all mers within the overlap region, for all response sequences (putative epitopes)
     For each mer (defined by start position and length),
@@ -249,7 +273,10 @@ def hlaRule(island, hlaList, ba, topPct=0.1, nmer=[8, 9, 10]):
             if len(aas) == 1:
                 seq += list(aas)[0]
             else:
-                seq += 'X'
+                if useX:
+                    seq += 'X'
+                else:
+                    seq += '[' + ''.join(aas) + ']'
         ep = dict(EpSeq=seq, EpStart=epitopeInds[0], EpEnd=epitopeInds[-1], hlas=[hla])
         return True, ep
     else:
@@ -300,31 +327,72 @@ def findpeptide(pep, seq):
     return startPos, endPos
 
 
-def plotIsland(ptid, island, ruleFunc=overlapRule, ruleKwargs={}, toHXB2=None):
-    subIslands, epitopes = findEpitopes(island, ruleFunc, **ruleKwargs)
-    #subIslands, epitopes = findEpitopes(island, overlapRule)
+def encodeVariants(peps):
+    """Encode a list of aligned peptides as a single string
+    indicating all variants within brackets.
 
+    Example
+    -------
+    peps = ['KMQKEYALL', 'KKQKEYALL','KMVKEYHAL']
+    print(encodeVariants(peps))
+    
+    'K[MK][QV]KEY[HA][LA]L'
+    """
+    assert np.all(np.array([len(s) for s in peps]))
+    vs = [list(set([p[i] for p in peps])) for i in range(len(peps[0]))]
+    out = ''
+    for v in vs:
+        if len(v) == 1:
+            out += v[0]
+        else:
+            out += '[' + ''.join(v) + ']'
+    return out
+
+def decodeVariants(s):
+    """Decode a variant string containing brackets,
+    into a list of all possible peptides. Note that
+    there are many more decoded variants possible than
+    may have been used to generate the variant string.
+    (i.e. it is a lossy compression)"""
+
+    vs = []
+    inGroup = False
+    i = 0
+    cur = ''
+    while i < len(s):
+        if not s[i] in '[]' and inGroup == False:
+            vs.append(s[i])
+        elif not s[i] in '[]':
+            cur += s[i]
+        elif s[i] == '[':
+            inGroup = True
+        elif s[i] == ']':
+            inGroup = False
+            vs.append(cur)
+            cur = ''
+        i += 1
+    out = [''.join(aas) for aas in itertools.product(*vs)]
+    return out
+
+def plotIsland(island):
     """Build an x-vector and AA vector"""
     sitex = []
     immunogens = []
-    for ep in epitopes:
-        sitex.extend(ep.coords)
-        for r in ep.parents:
-            sitex.extend(r.coords)
-            immunogens.append(r.peptideset)
+    for resp in island.seq:
+        sitex.extend(_coords(resp))
 
     sitex = np.array(sorted(set(sitex)))
     xx = np.arange(len(sitex))
     sitex2xx = {i:j for i, j in zip(sitex, xx)}
 
-    immunogens = set(immunogens)
-    colors = {p:col for p, col in zip(immunogens, palettable.colorbrewer.qualitative.Set1_3.mpl_colors)}
+    uEpIDs = np.unique(island.EpID)
+    colors = {i:c for i,c in zip(uEpIDs, sns.color_palette('Set1', n_colors=uEpIDs.shape[0]))}
 
     plt.clf()
     ss=[]
     y=1
-    for r in island:
-        col = colors[r.peptideset]
+    for r in island.iterrows():
+        col = colors[r.EpID]
 
         plt.plot([sitex2xx[r.start], sitex2xx[r.end]], [y, y], '-s', lw=2, mec='gray', color=col)
         for xoffset, aa in enumerate(r.seq):
@@ -355,27 +423,22 @@ def plotIsland(ptid, island, ruleFunc=overlapRule, ruleKwargs={}, toHXB2=None):
         y += 1
 
     y = 0
-    for e in epitopes:
-        xvec = [sitex2xx[e.start] - 0.3, sitex2xx[e.end] + 0.3]
-        plt.fill_between(xvec, [y, y], len(island), color='k', edgecolor='None', alpha=0.2)
-        for xoffset, aa in enumerate(e.seq):
-            plt.annotate(aa, xy=(sitex2xx[e.start] + xoffset, y + 0.1), ha='center', va='bottom', size='medium', weight='bold')
-        ss += [e.start, e.end]
+    for e in uEpIDs:
+        r = island.loc[island.EpID == e].iloc[0]
+        xvec = [sitex2xx[r.EpStart] - 0.3, sitex2xx[r.EpEnd] + 0.3]
+        plt.fill_between(xvec, [y, y], island.shape[0], color=color[e], edgecolor='None', alpha=0.2)
+        for xoffset, aa in enumerate(r.EpSeq):
+            plt.annotate(aa, xy=(sitex2xx[r.EpStart] + xoffset, y + 0.1), ha='center', va='bottom', size='medium', weight='bold')
+        ss += [r.EpStart, r.EpEnd]
         y -= 1
 
-    plt.title('PUB-ID: %s (%d epitopes)' % (ptid, len(epitopes)))
-
+    
     plt.yticks([])
     ss = np.unique(ss)
-    if not toHXB2 is None:
-        plt.xticks([sitex2xx[sx] for sx in ss], [toHXB2[aai] for aai in ss], size='x-large')
-        plt.xlabel('%s HXB2 coordinate' % r.protein.title(), fontsize='x-large')
-    else:
-        plt.xticks([sitex2xx[sx] for sx in ss], ss.astype(int), size='x-large')
-        plt.xlabel('%s coordinate' % r.protein.title(), fontsize='x-large')
+    plt.xlabel('%s coordinate' % r.protein.title(), fontsize='x-large')
+    plt.xticks([sitex2xx[sx] for sx in ss], ss.astype(int), size='x-large')
     plt.xlim((-1, len(xx)))
-    plt.ylim((-len(epitopes), len(island)+1))
+    plt.ylim((-len(uEpIDs), len(island)+1))
     
-    # plt.ylabel('Responses and epitopes',fontsize='x-large')
-    handles = [mpl.patches.Patch(facecolor=colors[p], edgecolor='k') for p in immunogens]
-    plt.legend(handles, immunogens, loc='best', title=None)
+    handles = [mpl.patches.Patch(facecolor=colors[e], edgecolor='k') for e in uEpIDs]
+    plt.legend(handles, uEpIDs, loc='best', title='Epitope')
