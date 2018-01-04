@@ -43,8 +43,6 @@ def partialcorr(x, y, adjust=[], method='pearson', minN = None):
     TODO:
         (1) Compute CIs
         (2) Make into its own testable module
-        (3) Include partial_corr gist
-        (4) Include function to compute whole partial correlation matrix
         (5) Add second method which takes correlation of residuals (should be equivalent, but is nice test)
 
     Parameters
@@ -99,13 +97,19 @@ def partialcorr(x, y, adjust=[], method='pearson', minN = None):
         for i, a in enumerate(adjust):
             m[:, i+2] = tmpDf[a.name]
     
-    if all(m[:, 0] == m[:, 1]):
+    if np.all(m[:, 0] == m[:, 1]):
         """Testing for perfect correlation avoids SingularMatrix exception"""
-        return 1, 0.0
-    
-    """Take the inverse of the covariance matrix including all variables
-    pc = -p_ij / sqrt(p_ii * p_ij)
-    where p is the inverse covariance matrix"""
+        return 1., 0.
+
+    zeroVar = np.var(m, axis=0) == 0.
+    if np.any(zeroVar[:2]):
+        """Test for zero variance in first two columns,
+        avoids SingularMatrix exception"""
+        return 0., 1.
+
+    if np.any(zeroVar):
+        """Discard any adjustment columns that have zero variance"""
+        m = m[:, np.nonzero(~zeroVar)[0]]
     
     try:
         icv = np.linalg.inv(np.cov(m, rowvar=0))

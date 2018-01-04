@@ -124,7 +124,20 @@ def _dimReduce(df, method='pca', n_components=2, labels=None, standardize=False,
         lda.fit(normed, labels.values)
         lda.explained_variance_ratio_ = np.abs(lda.explained_variance_ratio_) / np.abs(lda.explained_variance_ratio_).sum()
         xy = lda.transform(normed)
-        return xy, lda
+    elif method == 'pls':
+        if labels is None:
+            raise ValueError('labels needed to perform PLS')
+        if standardize:
+            normed = df.apply(lambda vec: (vec - vec.mean())/vec.std(), axis=0)
+        else:
+            normed = df.apply(lambda vec: vec - vec.mean(), axis=0)
+        
+        pls = PLSRegression(n_components=n_components)
+        pls.fit(normed, labels)
+        
+        pls.explained_variance_ratio_ = np.zeros(n_components)
+        xy = pls.x_scores_
+        return xy, pls
 
 def screeplot(df, method='pca', n_components=10, standardize=False, smatFunc=None):
     """Create stacked bar plot of compents and the fraction contributed by each feature"""
