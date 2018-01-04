@@ -31,7 +31,7 @@ epitope : pd.Series
 __all__ = [ 'hamming',
             'overlap',
             'sharedCoords',
-            'findResponseIslands',
+            'assignResponseIslands',
             'findEpitopes',
             'identicalRule',
             'overlapRule',
@@ -39,6 +39,7 @@ __all__ = [ 'hamming',
             'findpeptide',
             'plotIsland',
             'plotEpitopeMap',
+            'plotBreadth',
             'encodeVariants',
             'decodeVariants']
 
@@ -442,3 +443,84 @@ def plotIsland(island):
     
     handles = [mpl.patches.Patch(facecolor=colors[e], edgecolor='k') for e in uEpIDs]
     plt.legend(handles, uEpIDs, loc='best', title='Epitope')
+
+def plotEpitopeMap(rxDf, respDf):
+    nPTIDs = rxDf.ptid.unique().shape[0]
+    uArms = rxDf.Arm.unique()
+
+    tmp = respDf.groupby(['ptid', 'IslandID'])[['EpID']].agg(len).reset_index().groupby('ptid')[['IslandID']].agg(sum)
+    breadthDf = pd.merge(tmp, rxDf, left_on='ptid', right_on='ptid', how='right')
+    breadthDf.columns = ['ptid', 'Breadth', 'Arm']
+    breadthDf = breadthDf.fillna(0)
+    
+    armColors = sns.color_palette('Set1', n_colors=uArms.shape[0])[::-1]
+
+    lims = [respDf['start'].min(), respDf['end'].max()]
+
+    """Plot map of epitope responses by PTID"""
+    keepRegions = ['Signal peptide', 'V1 loop', 'V2 loop',
+                   'Loop D', 'V3 loop', 'V4 loop', 'V5 loop', 'gp41']
+    reg = pd.read_csv('../HIV_alignments/env_locations.csv')
+    reg = reg.loc[reg.region.isin(keepRegions)]
+    reg.loc[:, 'region'] = reg.region.str.replace(' loop', '').str.replace(' ', '\n')
+
+    np.random.seed(110820)
+    lasty = 0
+    yt = []
+    for a, color in zip(uArms, armColors):
+        """Sort PTIDs by breadth"""
+        sortedPtids = breadthDf.loc[breadthDf['Arm'] == a].sort_values(by='Breadth').ptid.tolist()
+        # sortedPtids = np.random.permutation(respDf.ptid.unique())
+        for y, ptid in enumerate(sortedPtids):
+            epDf = respDf.loc[respDf['ptid'] == ptid].drop_duplicates(subset=['ptid', 'IslandID', 'EpID'])
+            yt.append(y + lasty + 0.5)
+            yyvec = np.random.permutation(np.linspace(0, 1, posInd.sum()))
+            for yy, st, en in zip(yyvec, epDf['EpStart'], epDf['EpEnd']):
+                plt.plot([st, en], [y + yy + lasty, y + yy + lasty],
+                         '-',
+                         color=color,
+                         linewidth=3)
+        plt.plot([-5, -5], [lasty, lasty + y + 1], '-', color=color, linewidth=7)
+        lasty += y + 3
+
+    for i, (region, st, en) in reg.iterrows():
+        plt.plot([st, en], [lasty + 1, lasty + 1], 'k-', linewidth=6)
+        plt.annotate(region,
+                     xy=(st + (en-st)/2., lasty+1),
+                     xycoords='data',
+                     textcoords='offset points',
+                     xytext=(0, 10),
+                     ha='center',
+                     va='bottom',
+                     size='small',
+                     color='black')
+
+    plt.ylabel('Participants', fontsize=16)
+    plt.yticks(yt, ['' for i in range(nPTIDs)])
+    plt.ylim((-1, nPTIDs + 2 + 15))
+
+    plt.xlabel('HIV gp160 HXB2 Position')
+    xt = np.arange(0, lims[1], 50)
+    xt[0] += 1
+    plt.xticks(xt, xt.astype(int))
+    plt.xlim((-10, lims[1]))
+
+    handles = [mpl.patches.Patch(facecolor=c, edgecolor='k') for c in armColors[::-1]]
+    plt.legend(handles, uArms[::-1], loc='upper right', fontsize=14)
+
+def plotBreadth(rxDf, respDf, order=None, epitopes=True):
+    """Boxplot of response breadth at the peptide or epitope level"""
+
+    if epitopes:
+        tmp = respDf.groupby(['ptid', 'IslandID'])[['EpID']].agg(len).reset_index().groupby('ptid')[['IslandID']].agg(sum)
+    else:
+        tmp = respDf.groupby('ptid')[['seq']].agg(len).reset_index()
+    
+    breadthDf = pd.merge(tmp, rxDf, left_on='ptid', right_on='ptid', how='right')
+    breadthDf.columns = ['ptid', 'Breadth', 'Arm']
+    breadthDf = breadthDf.fillna(0)
+
+    sns.boxplot(x='Arm', y='Breadth', data=breadthDf, fliersize=0, palette='Set1', order=order)
+    sns.swarmplot(x='Arm', y='Breadth', data=breadthDf, linewidth=1, color='black', order=order)
+    plt.ylabel('Breadth\n(# of %s)' % 'epitopes' if epitopes else 'responses')
+    plt.xlabel('Treatment Group')
