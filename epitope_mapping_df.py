@@ -106,14 +106,35 @@ def findEpitopes(responses, sharedRule, **kwargs):
     """Given a list of responses find the minimum
     set of epitopes that "explain" all responses."""
 
+    if shareRule == overlapRule:
+        coords = {} # keeps track of unique coordinates: (st, en): i
+        keepInds = [] # indices we want to keep in the analysis for now
+        """Keeps track of redundant coords so we can correctly assign epitopes later"""
+        redundantD = {} # key: i, value: list of redundant i's
+        for i in range(responses.shape[0]):
+            st = responses.start.iloc[i]
+            en = responses.end.iloc[i]
+            if not (st, en) in coords:
+                coords[(st, en)] = i
+                keepInds.append(i)
+            else:
+                if coords[(st, en)] in redundantD:
+                    redundantD[coords[(st, en)]].append(i)
+                else:
+                    redundantD[coords[(st, en)]] = [i]
+
+        redResp = responses.iloc[keepInds]
+    else:
+        redResp = responses
+
     """Start with all possible sets of responses (i.e. combinations)"""
     sharedSets = []
-    for N in range(1, responses.shape[0] + 1):
-        for inds in itertools.combinations(list(range(responses.shape[0])), N):
+    for N in range(1, redResp.shape[0] + 1):
+        for inds in itertools.combinations(list(range(redResp.shape[0])), N):
             sharedSets.append(list(inds))
 
     """Remove any sets that don't have one unique shared response/epitope"""
-    sharedSets = [ss for ss in sharedSets if sharedRule(responses.iloc[ss], **kwargs)[0]]
+    sharedSets = [ss for ss in sharedSets if sharedRule(redResp.iloc[ss], **kwargs)[0]]
 
     """Remove any sets that are a subset of another set"""
     sharedSetsCopy = deepcopy(sharedSets)
@@ -150,14 +171,26 @@ def findEpitopes(responses, sharedRule, **kwargs):
                 break
 
     """Return epitope columns indexed like responses"""
-    epitopes = [None] * responses.shape[0]
+    epitopes = [None] * redResp.shape[0]
     for epitopei, inds in enumerate(sharedSets):
-        ep = sharedRule(responses.iloc[inds], **kwargs)[1]
+        ep = sharedRule(redResp.iloc[inds], **kwargs)[1]
         ep['EpID'] = 'E%d' % epitopei
         for i in inds:
             epitopes[i] = ep
-        
-    epitopesDf = pd.DataFrame(epitopes)
+
+    if sharedRule == overlapRule:
+        """Expand the reduced epitopes"""
+        expEpitopes = [None] * responses.shape[0]
+        for reducedi in range(len(epitopes)):
+            i = keepInds[reducedi]
+            expEpitopes[i] = epitopes[reducedi]
+            if i in redundantD:
+                for ii in redundantD[i]:
+                    expEpitopes[ii] = epitopes[reducedi]
+    else:
+        expEpitopes = epitopes
+            
+    epitopesDf = pd.DataFrame(expEpitopes)
     epitopesDf.index = responses.index
     return epitopesDf
 
