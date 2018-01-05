@@ -1,4 +1,4 @@
-
+import seaborn as sns
 import pandas as pd
 import numpy as np
 from copy import deepcopy
@@ -42,7 +42,8 @@ __all__ = [ 'hamming',
             'plotBreadth',
             'encodeVariants',
             'decodeVariants',
-            'sliceRespSeq']
+            'sliceRespSeq',
+            'computeBreadth']
 
 
 
@@ -51,7 +52,7 @@ def hamming(str1, str2):
     return sum([i for i in map(operator.__ne__, str1, str2)])
 
 def _coords(r):
-    return list(range(int(r.start), int(r.start) + r.L))
+    return list(range(int(r.start), int(r.start) + len(r.seq)))
 def _epcoords(r):
     return list(range(int(r.EpStart), int(r.EpStart) + len(r.EpSeq)))
 
@@ -116,7 +117,8 @@ def findEpitopes(responses, sharedRule, **kwargs):
         redundantD = {} # key: i, value: list of redundant i's
         for i in range(responses.shape[0]):
             st = responses.start.iloc[i]
-            en = responses.end.iloc[i]
+            en = responses.start.iloc[i] + len(responses.seq.iloc[i])
+            # en = responses.end.iloc[i]
             if not (st, en) in coords:
                 coords[(st, en)] = i
                 keepInds.append(i)
@@ -216,7 +218,9 @@ def identicalRule(island):
     s = set(island.seq)
     if len(s) == 1:
         """If there's just one response"""
-        ep = dict(EpSeq=island.iloc[0].seq, EpStart=island.iloc[0].start, EpEnd=island.iloc[0].end)
+        ep = dict(EpSeq=island.iloc[0].seq,
+                  EpStart=island.iloc[0].start,
+                  EpEnd=island.iloc[0].start + len(island.iloc[0].seq) - 1)
         return True, ep
     else:
         return False, {}
@@ -428,16 +432,21 @@ def plotIsland(island):
     xx = np.arange(len(sitex))
     sitex2xx = {i:j for i, j in zip(sitex, xx)}
 
-    uEpIDs = np.unique(island.EpID)
-    colors = {i:c for i,c in zip(uEpIDs, sns.color_palette('Set1', n_colors=uEpIDs.shape[0]))}
+    # figh = plt.gcf()
+    # figh.clf()
+    # axh = figh.add_axes([0.05, 0.05, 0.9, 0.9])
+    # axh.patch.set_facecolor('white')
 
     plt.clf()
+    uEpIDs = np.unique(island.EpID)
+    colors = {i:c for i,c in zip(uEpIDs, sns.color_palette('Set1', n_colors=uEpIDs.shape[0]))}
+    
     ss=[]
     y=1
     for i,r in island.iterrows():
         col = colors[r.EpID]
 
-        plt.plot([sitex2xx[r.start], sitex2xx[r.end]], [y, y], '-s', lw=2, mec='gray', color=col)
+        plt.plot([sitex2xx[r.start], sitex2xx[r.start + len(r.seq) - 1]], [y, y], '-s', lw=2, mec='gray', color=col)
         for xoffset, aa in enumerate(r.seq):
             plt.annotate(aa, xy=(sitex2xx[r.start] + xoffset, y - 0.1), ha='center', va='top', size='small')
         
@@ -462,11 +471,11 @@ def plotIsland(island):
                          xytext=(-1,0),textcoords='offset points',
                          ha='left',va='bottom',size='x-small')"""
 
-        ss += [r.start, r.end]
+        ss += [r.start, r.start + len(r.seq) - 1]
         y += 1
 
     y = 0
-    for e in uEpIDs:
+    for e in uEpIDs[::-1]:
         r = island.loc[island.EpID == e].iloc[0]
         xvec = [sitex2xx[r.EpStart] - 0.3, sitex2xx[r.EpEnd] + 0.3]
         plt.fill_between(xvec, [y, y], island.shape[0], color=colors[e], edgecolor='None', alpha=0.2)
@@ -488,9 +497,9 @@ def plotIsland(island):
 
 def computeBreadth(rxDf, epDf, epitopes=True):
     if epitopes:
-        tmp = respDf.groupby(['ptid', 'IslandID'])[['EpID']].agg(lambda v: np.unique(v).shape[0]).reset_index().groupby('ptid')[['EpID']].agg(sum).reset_index()
+        tmp = epDf.groupby(['ptid', 'IslandID'])[['EpID']].agg(lambda v: np.unique(v).shape[0]).reset_index().groupby('ptid')[['EpID']].agg(sum).reset_index()
     else:
-        tmp = respDf.groupby('ptid')[['seq']].agg(len).reset_index()
+        tmp = epDf.groupby('ptid')[['seq']].agg(len).reset_index()
     
     breadthDf = pd.merge(tmp, rxDf, left_on='ptid', right_on='ptid', how='right')
     breadthDf.columns = ['ptid', 'Breadth', 'Arm']
@@ -507,7 +516,7 @@ def plotEpitopeMap(rxDf, respDf, order=None):
 
     armColors = sns.color_palette('Set1', n_colors=uArms.shape[0])[::-1]
 
-    lims = [respDf['start'].min(), respDf['end'].max()]
+    lims = [respDf['start'].min(), (respDf['start'] + respDf['seq'].map(len)).max()]
 
     """Plot map of epitope responses by PTID"""
     keepRegions = ['Signal peptide', 'V1 loop', 'V2 loop',
