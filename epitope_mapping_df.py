@@ -41,7 +41,8 @@ __all__ = [ 'hamming',
             'plotEpitopeMap',
             'plotBreadth',
             'encodeVariants',
-            'decodeVariants']
+            'decodeVariants',
+            'sliceRespSeq']
 
 
 
@@ -51,6 +52,8 @@ def hamming(str1, str2):
 
 def _coords(r):
     return list(range(int(r.start), int(r.start) + r.L))
+def _epcoords(r):
+    return list(range(int(r.EpStart), int(r.EpStart) + len(r.EpSeq)))
 
 def overlap(response1, response2):
     """Any overlap between two responses?"""
@@ -106,7 +109,7 @@ def findEpitopes(responses, sharedRule, **kwargs):
     """Given a list of responses find the minimum
     set of epitopes that "explain" all responses."""
 
-    if shareRule == overlapRule:
+    if sharedRule == overlapRule:
         coords = {} # keeps track of unique coordinates: (st, en): i
         keepInds = [] # indices we want to keep in the analysis for now
         """Keeps track of redundant coords so we can correctly assign epitopes later"""
@@ -170,27 +173,27 @@ def findEpitopes(responses, sharedRule, **kwargs):
                 """Start for s1 again with updated set of responses"""
                 break
 
+    if sharedRule == overlapRule:
+        expSharedSets = []
+        for ss in sharedSets:
+            tmp = []
+            for reducedi in ss:
+                i = keepInds[reducedi]
+                tmp.append(i)
+                if i in redundantD:
+                    tmp.extend(redundantD[i])
+            expSharedSets.append(tmp)
+    else:
+        expSharedSets = sharedSets
     """Return epitope columns indexed like responses"""
-    epitopes = [None] * redResp.shape[0]
-    for epitopei, inds in enumerate(sharedSets):
-        ep = sharedRule(redResp.iloc[inds], **kwargs)[1]
+    epitopes = [None] * responses.shape[0]
+    for epitopei, inds in enumerate(expSharedSets):
+        ep = sharedRule(responses.iloc[inds], **kwargs)[1]
         ep['EpID'] = 'E%d' % epitopei
         for i in inds:
             epitopes[i] = ep
 
-    if sharedRule == overlapRule:
-        """Expand the reduced epitopes"""
-        expEpitopes = [None] * responses.shape[0]
-        for reducedi in range(len(epitopes)):
-            i = keepInds[reducedi]
-            expEpitopes[i] = epitopes[reducedi]
-            if i in redundantD:
-                for ii in redundantD[i]:
-                    expEpitopes[ii] = epitopes[reducedi]
-    else:
-        expEpitopes = epitopes
-            
-    epitopesDf = pd.DataFrame(expEpitopes)
+    epitopesDf = pd.DataFrame(epitopes)
     epitopesDf.index = responses.index
     return epitopesDf
 
@@ -360,6 +363,9 @@ def findpeptide(pep, seq):
             endPos += 1
     return startPos, endPos
 
+def sliceRespSeq(r):
+    """After the epitope has been identified, slice the response sequence to the appropriate size"""
+    return r['seq'][int(r['EpStart'] - r['start']):int(r['EpStart'] - r['start'] + len(r['EpSeq']))]
 
 def encodeVariants(peps):
     """Encode a list of aligned peptides as a single string
@@ -372,8 +378,10 @@ def encodeVariants(peps):
     
     'K[MK][QV]KEY[HA][LA]L'
     """
-    assert np.all(np.array([len(s) for s in peps]))
-    vs = [list(set([p[i] for p in peps])) for i in range(len(peps[0]))]
+    Ls = np.array([len(s) for s in peps])
+    assert np.unique(Ls).shape[0] == 1
+    L = Ls[0]
+    vs = [list(set([p[i] for p in peps])) for i in range(L)]
     out = ''
     for v in vs:
         if len(v) == 1:
@@ -412,8 +420,9 @@ def plotIsland(island):
     """Build an x-vector and AA vector"""
     sitex = []
     immunogens = []
-    for resp in island.seq:
+    for i,resp in island.iterrows():
         sitex.extend(_coords(resp))
+        sitex.extend(_epcoords(resp))
 
     sitex = np.array(sorted(set(sitex)))
     xx = np.arange(len(sitex))
@@ -425,7 +434,7 @@ def plotIsland(island):
     plt.clf()
     ss=[]
     y=1
-    for r in island.iterrows():
+    for i,r in island.iterrows():
         col = colors[r.EpID]
 
         plt.plot([sitex2xx[r.start], sitex2xx[r.end]], [y, y], '-s', lw=2, mec='gray', color=col)
@@ -460,7 +469,7 @@ def plotIsland(island):
     for e in uEpIDs:
         r = island.loc[island.EpID == e].iloc[0]
         xvec = [sitex2xx[r.EpStart] - 0.3, sitex2xx[r.EpEnd] + 0.3]
-        plt.fill_between(xvec, [y, y], island.shape[0], color=color[e], edgecolor='None', alpha=0.2)
+        plt.fill_between(xvec, [y, y], island.shape[0], color=colors[e], edgecolor='None', alpha=0.2)
         for xoffset, aa in enumerate(r.EpSeq):
             plt.annotate(aa, xy=(sitex2xx[r.EpStart] + xoffset, y + 0.1), ha='center', va='bottom', size='medium', weight='bold')
         ss += [r.EpStart, r.EpEnd]
@@ -477,15 +486,25 @@ def plotIsland(island):
     handles = [mpl.patches.Patch(facecolor=colors[e], edgecolor='k') for e in uEpIDs]
     plt.legend(handles, uEpIDs, loc='best', title='Epitope')
 
-def plotEpitopeMap(rxDf, respDf):
-    nPTIDs = rxDf.ptid.unique().shape[0]
-    uArms = rxDf.Arm.unique()
-
-    tmp = respDf.groupby(['ptid', 'IslandID'])[['EpID']].agg(len).reset_index().groupby('ptid')[['IslandID']].agg(sum)
+def computeBreadth(rxDf, epDf, epitopes=True):
+    if epitopes:
+        tmp = respDf.groupby(['ptid', 'IslandID'])[['EpID']].agg(lambda v: np.unique(v).shape[0]).reset_index().groupby('ptid')[['EpID']].agg(sum).reset_index()
+    else:
+        tmp = respDf.groupby('ptid')[['seq']].agg(len).reset_index()
+    
     breadthDf = pd.merge(tmp, rxDf, left_on='ptid', right_on='ptid', how='right')
     breadthDf.columns = ['ptid', 'Breadth', 'Arm']
     breadthDf = breadthDf.fillna(0)
-    
+    return breadthDf
+
+def plotEpitopeMap(rxDf, respDf, order=None):
+    nPTIDs = rxDf.ptid.unique().shape[0]
+    uArms = rxDf.Arm.unique()
+    if not order is None:
+        uArms = np.asarray(order)
+
+    breadthDf = computeBreadth(rxDf, respDf)
+
     armColors = sns.color_palette('Set1', n_colors=uArms.shape[0])[::-1]
 
     lims = [respDf['start'].min(), respDf['end'].max()]
@@ -497,6 +516,7 @@ def plotEpitopeMap(rxDf, respDf):
     reg = reg.loc[reg.region.isin(keepRegions)]
     reg.loc[:, 'region'] = reg.region.str.replace(' loop', '').str.replace(' ', '\n')
 
+    plt.clf()
     np.random.seed(110820)
     lasty = 0
     yt = []
@@ -507,7 +527,7 @@ def plotEpitopeMap(rxDf, respDf):
         for y, ptid in enumerate(sortedPtids):
             epDf = respDf.loc[respDf['ptid'] == ptid].drop_duplicates(subset=['ptid', 'IslandID', 'EpID'])
             yt.append(y + lasty + 0.5)
-            yyvec = np.random.permutation(np.linspace(0, 1, posInd.sum()))
+            yyvec = np.random.permutation(np.linspace(0, 1, epDf.shape[0]))
             for yy, st, en in zip(yyvec, epDf['EpStart'], epDf['EpEnd']):
                 plt.plot([st, en], [y + yy + lasty, y + yy + lasty],
                          '-',
@@ -525,7 +545,7 @@ def plotEpitopeMap(rxDf, respDf):
                      xytext=(0, 10),
                      ha='center',
                      va='bottom',
-                     size='small',
+                     size='medium',
                      color='black')
 
     plt.ylabel('Participants', fontsize=16)
@@ -539,20 +559,13 @@ def plotEpitopeMap(rxDf, respDf):
     plt.xlim((-10, lims[1]))
 
     handles = [mpl.patches.Patch(facecolor=c, edgecolor='k') for c in armColors[::-1]]
+    # plt.legend(handles, uArms[::-1], loc='upper left', bbox_to_anchor=[1,1], fontsize=14)
     plt.legend(handles, uArms[::-1], loc='upper right', fontsize=14)
 
 def plotBreadth(rxDf, respDf, order=None, epitopes=True):
     """Boxplot of response breadth at the peptide or epitope level"""
-
-    if epitopes:
-        tmp = respDf.groupby(['ptid', 'IslandID'])[['EpID']].agg(len).reset_index().groupby('ptid')[['IslandID']].agg(sum)
-    else:
-        tmp = respDf.groupby('ptid')[['seq']].agg(len).reset_index()
-    
-    breadthDf = pd.merge(tmp, rxDf, left_on='ptid', right_on='ptid', how='right')
-    breadthDf.columns = ['ptid', 'Breadth', 'Arm']
-    breadthDf = breadthDf.fillna(0)
-
+    plt.clf()
+    breadthDf = computeBreadth(rxDf, respDf, epitopes=epitopes)
     sns.boxplot(x='Arm', y='Breadth', data=breadthDf, fliersize=0, palette='Set1', order=order)
     sns.swarmplot(x='Arm', y='Breadth', data=breadthDf, linewidth=1, color='black', order=order)
     plt.ylabel('Breadth\n(# of %s)' % 'epitopes' if epitopes else 'responses')
