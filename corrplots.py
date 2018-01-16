@@ -378,8 +378,8 @@ def crosscorr(dfA, dfB, method='pearson', minN=0, adjMethod='fdr_bh', returnLong
         Number of non-nan value pairs in the calculation."""
     colA = dfA.columns
     colB = dfB.columns
-    dfA = dfA.rename_axis(lambda s: s + '_A', axis=1)
-    dfB = dfB.rename_axis(lambda s: s + '_B', axis=1)
+    dfA = dfA.rename(lambda s: s + '_A', axis=1)
+    dfB = dfB.rename(lambda s: s + '_B', axis=1)
 
     joinedDf = pd.merge(dfA, dfB, left_index=True, right_index=True)
 
