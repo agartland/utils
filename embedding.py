@@ -76,7 +76,8 @@ def embedDistanceMatrix(dmatDf, method='kpca', n_components=2, **kwargs):
     return xyDf
 
 def computePWDist(df, metric='pearson-signed', dfunc=None, minN=10, symetric=True):
-    """Compute pairwise distance matrix using correlation or arbitrary function.
+    """Compute pairwise distance matrix between features
+    using correlation or arbitrary function.
 
     Parameters
     ----------
@@ -87,7 +88,7 @@ def computePWDist(df, metric='pearson-signed', dfunc=None, minN=10, symetric=Tru
         or any other scipy distance
     dfunc : function(pd.Series, pd.Series)
         Function will override the metric string.
-        Called with two rows of df (e.g. df.iloc[:, i])
+        Called with two columns of df (e.g. df.iloc[:, i])
     minN : int
         Requires minimum number of non-NA rows to have a non-NA distance.
     symetric : bool
@@ -113,14 +114,14 @@ def computePWDist(df, metric='pearson-signed', dfunc=None, minN=10, symetric=Tru
             except:
                 raise NameError('metric name not recognized')
     else:
-        nrows = df.shape[0]
-        dmat = np.zeros((nrows, nrows))
-        for i in range(nrows):
-            for j in range(nrows):
+        ncols = df.shape[1]
+        dmat = np.zeros((ncols, ncols))
+        for i in range(ncols):
+            for j in range(ncols):
                 """Assume distance is symetric"""
                 if symetric and i <= j:
                     tmpdf = df.iloc[:, [i, j]]
-                    tmpdf = tmpdf.dropna()
+                    tmpdf = tmpdf.dropna(axis=0)
                     if tmpdf.shape[0] >= minN:
                         d = dfunc(df.iloc[:, i], df.iloc[:, j])
                     else:
@@ -129,14 +130,14 @@ def computePWDist(df, metric='pearson-signed', dfunc=None, minN=10, symetric=Tru
                     dmat[j, i] = d
                 else:
                     tmpdf = df.iloc[:, [i, j]]
-                    tmpdf = tmpdf.dropna()
+                    tmpdf = tmpdf.dropna(axis=0)
                     if tmpdf.shape[0] >= minN:
                         d = dfunc(df.iloc[:, i], df.iloc[:, j])
                     else:
                         d = np.nan
                     dmat[i, j] = d
 
-    return pd.DataFrame(dmat, columns=df.index, index=df.index)
+    return pd.DataFrame(dmat, columns=df.columns, index=df.columns)
 
 def plotEmbedding(dmatDf,
                   xyDf=None,
@@ -169,7 +170,7 @@ def plotEmbedding(dmatDf,
     if xyDf is None:
         xyDf = embedDistanceMatrix(dmatDf, method=method, n_components=np.max(plotDims) + 1)
     
-    clusteredScatter(xyDf,
+    axh = clusteredScatter(xyDf,
                      labels=labels,
                      plotDims=plotDims,
                      plotElipse=plotElipse,
@@ -181,7 +182,7 @@ def plotEmbedding(dmatDf,
                      markers=markers,
                      continuousLabel=continuousLabel,
                      colors=colors)
-   
+    
     if plotLabels:
         annotationParams = dict(xytext=(0, 5), textcoords='offset points', size=txtSize)
         for coli, col in enumerate(dmatDf.columns):
@@ -195,17 +196,17 @@ def plotEmbedding(dmatDf,
             if labels is None:
                 legTit = markerLabels.name
             elif markerLabels is None:
-                legTit = abels.name
+                legTit = labels.name
             else:
                 legTit = '%s | %s' % (labels.name, markerLabels.name)
             plt.legend(loc=0, title=legTit)
     if hasattr(xyDf, 'explained_variance_'):
-        plt.xlabel('KPCA %1.0f (%1.0f%% variance explained)' % (plotDims[0]+1, 100*xyDf.explained_variance_[plotDims[0]]))
-        plt.ylabel('KPCA %1.0f (%1.0f%% variance explained)' % (plotDims[1]+1, 100*xyDf.explained_variance_[plotDims[1]]))
+        axh.set_xlabel('KPCA %1.0f (%1.0f%% variance explained)' % (plotDims[0]+1, 100*xyDf.explained_variance_[plotDims[0]]))
+        axh.set_ylabel('KPCA %1.0f (%1.0f%% variance explained)' % (plotDims[1]+1, 100*xyDf.explained_variance_[plotDims[1]]))
     else:
-        plt.xlabel('KPCA %1.0f' % (plotDims[0]+1))
-        plt.ylabel('KPCA %1.0f' % (plotDims[1]+1))
-    plt.show()
+        axh.set_xlabel('KPCA %1.0f' % (plotDims[0]+1))
+        axh.set_ylabel('KPCA %1.0f' % (plotDims[1]+1))
+    # plt.show()
     return xyDf
 
 def clusteredScatter(xyDf,
@@ -335,10 +336,11 @@ def clusteredScatter(xyDf,
                             alpha=alpha,
                             c=[colors[vi % len(colors)], ] * ind.sum(),
                             label=labS,
-                            cmap=cmap)
+                            cmap=cmap,
+                            linewidths=0)
             if ind.sum() > 2 and plotElipse:
                 Xvar = xyDf[plotDims].loc[ind].values
                 plot_point_cov(Xvar, ax=axh, color=colors[vi % len(colors)], alpha=0.2)
         axh.set_xticks(())
     axh.set_yticks(())
-    plt.show()
+    return axh

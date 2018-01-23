@@ -11,7 +11,7 @@ The confidence interval computations is simply a wrapper around the scikits_boot
 
 
 import numpy as np
-from scikits_bootstrap import ci
+from scikits.bootstrap import ci
 from numpy.random import randint
 from functools import partial
 

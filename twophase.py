@@ -108,7 +108,8 @@ def joinIPWeights(twoDf, oneDf, matchCols, caseCol='infected'):
     
     """Optional check since the reweighted controls should equal  the target pop"""
     reweightedPop = twoDf.groupby(matchCols)['IPWeights'].agg(np.sum).xs(0, level=caseCol)
-    success = np.all(np.isclose(targetPop.xs(0, level=caseCol).values, reweightedPop.values))
+    tmp = pd.concat((targetPop.xs(0, level=caseCol), reweightedPop), axis=1)
+    success = np.all(np.isclose(tmp.iloc[:, 0].values, tmp.iloc[:, 1].values))
     if not success:
         print('Warning: reweighted controls do not match the target population!')
         print(reweightedPop)

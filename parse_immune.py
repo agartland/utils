@@ -49,7 +49,7 @@ def _parsePTID(v):
 
 def _parseIR(fn, uVars, mag, subset={}, printUnique=False, sep=','):
     raw = pd.read_csv(fn, dtype={'ptid':str, 'Ptid':str}, skipinitialspace=True, sep=sep)
-    raw = raw.rename_axis({'Ptid':'ptid'}, axis=1)
+    raw = raw.rename({'Ptid':'ptid'}, axis=1)
     raw.loc[:, 'ptid'] = raw.loc[:, 'ptid'].map(_parsePTID)
     allCols = raw.columns.tolist()
     if uVars is None:
@@ -119,14 +119,14 @@ def parseNAB(fn, uVars=['celltype', 'virusdilution', 'isolate'], mag='titer_num'
 def parseRx(rxFn, demFn=None):
     trtCols = ['ptid', 'arm', 'grp', 'protocol', 'rx_code', 'rx']
     tmp = pd.read_csv(rxFn)
-    tmp = tmp.rename_axis({'Ptid': 'ptid'}, axis=1)
+    tmp = tmp.rename({'Ptid': 'ptid'}, axis=1)
     tmp.loc[:, 'ptid'] = tmp.ptid.str.replace('-', '')
     trtDf = tmp[trtCols].set_index('ptid')
     
     if not  demFn is None:
         demCols = ['ptid', 'site', 'sex']
         demDf = pd.read_csv(demFn)
-        demDf = demDf.rename_axis({'Ptid': 'ptid'}, axis=1)
+        demDf = demDf.rename({'Ptid': 'ptid'}, axis=1)
         demDf.loc[:, 'ptid'] = demDf.ptid.str.replace('-', '')
         
         siteLists = dict(US = [121, 125, 126, 123, 127, 128, 129, 132, 133, 134, 167],

@@ -11,9 +11,7 @@ import subprocess
 import tempfile
 import os
 from aacolors import hydrophobicity, chemistry, taylor
-from pylab import *
-from corrplot import fdrAdjust
-from utilHelpers import mutual_information
+from adjustwithin import adjustnonnan
 from sympy import binomial
 import sys
 import numpy as np
@@ -82,21 +80,21 @@ AA2CODE.update({'-':21})
 CODE2AA = {i:aa for i, aa in enumerate(AALPHABET)}
 CODE2AA.update({21:'-'})
 
-def isvalidpeptide(mer,badaa=None):
+def isvalidpeptide(mer, badaa=None):
     """Test if the mer contains an BAD amino acids in global BADAA
     typically -*BX#Z"""
     if badaa is None:
-        badaa=BADAA
+        badaa = BADAA
     if not mer is None:
         return not re.search('[%s]' % badaa, mer)
     else:
         return False
-def cleanAlign(align,badaa=None):
+def cleanAlign(align, badaa=None):
     """Remove all invalid sequences (containing badaa) from
     the alignment
     badaa is '-*BX#Z' by default"""
     return align.loc[[isvalidpeptide(s, badaa) for s in align]]
-def cleanDf(df,badaa=None):
+def cleanDf(df, badaa=None):
     """Remove all invalid sequences (containing badaa) from
     the alignment
     badaa is '-*BX#Z' by default"""
@@ -104,14 +102,14 @@ def cleanDf(df,badaa=None):
 def removeBadAA(mer,badaa=None):
     """Remove badaa amino acids from the mer, default badaa is -*BX#Z"""
     if badaa is None:
-        badaa=BADAA
+        badaa = BADAA
     if not mer is None:
         return re.sub('[%s]' % badaa, '', mer)
     else:
         return mer
 def _seq2vec(seq):
     """Convert AA sequence into numpy vector of integers for fast comparison"""
-    vec = zeros(len(seq), dtype=int)
+    vec = np.zeros(len(seq), dtype=int)
     for aai, aa in enumerate(seq):
         vec[aai] = AA2CODE[aa]
     return vec
@@ -144,7 +142,7 @@ def padAlignment(align, applyPadding=True):
             L = L.max()
     return align
 
-def consensus(align, ignoreGaps = True):
+def consensus(align, ignoreGaps=True):
     """Return a consensus sequence from the sequences in seqs
     seqs can be a dict or a pd.Series of sequence strings
 
@@ -153,7 +151,7 @@ def consensus(align, ignoreGaps = True):
     L = len(align[align.index[0]])
 
     cons = ''
-    for aai in arange(L):
+    for aai in np.arange(L):
         counts = objhist([seq[aai] for seq in align])
         if ignoreGaps and len(counts)>1:
             droppedGaps = counts.pop('-', 0)
@@ -190,26 +188,25 @@ def peptideSetCoverage(peptides1,peptides2,mmTolerance=1):
     Call with unique(peptides2) if Q is the fraction of unique peptides or not if Q is fraction of representative population.
     Note: Can be used as a non-symetric distance between two peptide sets"""
 
-    oh1=objhist(peptides1)
-    coveredPeps={k:[] for k in set(oh1.keys())}
+    oh1 = objhist(peptides1)
+    coveredPeps = {k:[] for k in set(oh1.keys())}
     coveredPeps.update({'tot':[]})
-    cache={}
+    cache = {}
     for pep2 in peptides2:
-        anyCover=False
+        anyCover = False
         for pep1 in set(peptides1):
             try:
                 dist = cache[(pep1, pep2)]
             except KeyError:
                 dist = seq_distance(pep1, pep2, subst=binarySubst, normed=False)
                 cache.update({(pep1, pep2):dist,(pep2, pep1):dist})
-            if dist<=mmTolerance:
+            if dist <= mmTolerance:
                 coveredPeps[pep1].append(pep2)
-                anyCover=True
+                anyCover = True
         if anyCover:
             coveredPeps['tot'].append(pep2)
     coverage={k:len(v)/len(peptides2) for k, v in list(coveredPeps.items())}
     return coverage
-
 
 def fasta2seqs(fn):
     return [str(r.seq) for r in SeqIO.parse(open(fn, 'r'), 'fasta')]
@@ -218,7 +215,7 @@ def seqs2fasta(seqs, fn):
         for i, s in enumerate(seqs):
             fh.write('>seq%d\n' % i)
             fh.write('%s\n' % s)
-def fasta2df(fn,sep='.',columns=['clade', 'country', 'year', 'name', 'seqid'],index=None,uniqueIndex=True):
+def fasta2df(fn, sep='.', columns=['clade', 'country', 'year', 'name', 'seqid'], index=None, uniqueIndex=True):
     """Read in a fasta file and turn it  into a Pandas DataFrame
 
     Defaults parse the HIV LANL fasta alignments.
@@ -245,7 +242,7 @@ def fasta2df(fn,sep='.',columns=['clade', 'country', 'year', 'name', 'seqid'],in
             sDict['seq'].append(str(r.seq))
 
             info = r.description.split(sep)
-            for i in arange(len(columns)):
+            for i in np.arange(len(columns)):
                 if i < len(info):
                     sDict[columns[i]].append(info[i])
                 else:
@@ -253,7 +250,7 @@ def fasta2df(fn,sep='.',columns=['clade', 'country', 'year', 'name', 'seqid'],in
 
     seqDf = pd.DataFrame(sDict)
     if not index is None:
-        if seqDf.shape[0]==seqDf[index].unique().shape[0] or not uniqueIndex:
+        if seqDf.shape[0] == seqDf[index].unique().shape[0] or not uniqueIndex:
             """If the index is unique fine, otherwise make a unique index by appending _%d"""
             seqDf = seqDf.set_index(index)
         else:
@@ -262,17 +259,18 @@ def fasta2df(fn,sep='.',columns=['clade', 'country', 'year', 'name', 'seqid'],in
                 tmp[ind] = '%d_%s' % (i, tmp[ind])
             seqDf = seqDf.set_index(tmp)
     return seqDf
-def df2fasta(df,fn,sep='.',columns=None):
+
+def df2fasta(df, fn, sep='.', columns=None):
     """Writes the Df from fasta2df back to a FASTA file"""
     if columns is None:
-        columns=list(df.columns)
+        columns = list(df.columns)
     if 'seq' in columns:
         columns.remove('seq')
     with open(fn, 'w') as fh:
         for ind, row in df.iterrows():
-            label='>%s' % ind
+            label = '>%s' % ind
             for col in columns:
-                label+='%s%s' % (sep, row[col])
+                label += '%s%s' % (sep, row[col])
             fh.write('%s\n' % label)
             fh.write('%s\n' % row['seq'])
 
@@ -281,14 +279,15 @@ def align2fasta(align, fn, applyPadding = True):
     align = padAlignment(align, applyPadding)
 
     with open(fn, 'w') as fh:
-        for i in arange(align.shape[0]):
+        for i in np.arange(align.shape[0]):
             ind = align.index[i]
             fh.write('>%s\n' % ind)
             fh.write('%s\n' % align.iloc[i])
-def align2mers(align,fn=None,nmers=[9]):
+
+def align2mers(align, fn=None, nmers=[9]):
     """Compute all nmers in align and write to a mers file for prediction"""
-    align=padAlignment(align)
-    mers=[]
+    align = padAlignment(align)
+    mers = []
     for seq in align:
         mers.extend(getMers(re.sub('[%s]' % BADAA, '', seq), nmers))
     mers=set(mers)
@@ -298,7 +297,7 @@ def align2mers(align,fn=None,nmers=[9]):
                 fh.write('%s\n' % pep)
     else:
         return list(mers)
-def align2mers_tracked(align,nmers=[9],firstOnly=True):
+def align2mers_tracked(align, nmers=[9], firstOnly=True):
     """Return a df of all nmers in the alignment along with start position and seq index"""
     align = padAlignment(align)
     cols = ['peptide', 'starti', 'seqi', 'L', 'count']
@@ -346,7 +345,7 @@ def kmerSlice(align,starti,k,gapped=True):
         grabKmerFlag = 1
     return align.map(lambda s: grabKmer(s, starti, k)[grabKmerFlag])
 
-def alignmentEntropy(align, statistic = 'absolute', removeGaps = False, k = 1, logFunc = np.log):
+def alignmentEntropy(align, statistic='absolute', removeGaps=False, k=1, logFunc=np.log):
     """Calculates the entropy in bits of each site (or kmer) in a sequence alignment.
 
     Also can compute:
@@ -384,8 +383,8 @@ def alignmentEntropy(align, statistic = 'absolute', removeGaps = False, k = 1, l
     L = len(align[align.index[0]])
     nKmers = L - k + 1
 
-    entropy = zeros(nKmers, dtype=float64)
-    for aai in arange(nKmers):
+    entropy = np.zeros(nKmers, dtype=float)
+    for aai in np.arange(nKmers):
         kmers = [grabKmer(seq, aai, k)[grabKmerFlag] for seq in align]
         """kmers that start with a gap or that are at the end and are of insufficent length, will be None"""
         kmers = [mer for mer in kmers if not mer is None]
@@ -414,8 +413,8 @@ def generateAlignment(seqs):
         Aligned sequences.
     """
     """Create temporary file for MUSCLE"""
-    inFn=tempfile.mktemp(prefix='tmp_align', suffix='.fasta', dir=None)
-    outFn=tempfile.mktemp(prefix='tmp_align', suffix='.fasta', dir=None)
+    inFn = tempfile.mktemp(prefix='tmp_align', suffix='.fasta', dir=None)
+    outFn = tempfile.mktemp(prefix='tmp_align', suffix='.fasta', dir=None)
     
     
     """Creates an align object or pd.Series() with indexing to preserve order but does not appyl padding"""
@@ -447,7 +446,7 @@ def generateAlignment(seqs):
         print('Different number of output seqs!')
         badSeqs+=1
 
-    for i, s1, s2 in zip(arange(len(seqs)), seqs, outAlign):
+    for i, s1, s2 in zip(np.arange(len(seqs)), seqs, outAlign):
         if not s1.replace('-', '') == s2.replace('-', ''):
             print('%d: %s != %s' % (i, s1, s2))
             badSeqs+=1
@@ -472,25 +471,25 @@ def catAlignments(alignA, alignB):
     """
 
     """Create temporary files for MUSCLE to work on the two alignments"""
-    aFn=tempfile.mktemp(prefix='tmp_align', suffix='.fasta', dir=None)
-    bFn=tempfile.mktemp(prefix='tmp_align', suffix='.fasta', dir=None)
-    outFn=tempfile.mktemp(prefix='tmp_align', suffix='.fasta', dir=None)
+    aFn = tempfile.mktemp(prefix='tmp_align', suffix='.fasta', dir=None)
+    bFn = tempfile.mktemp(prefix='tmp_align', suffix='.fasta', dir=None)
+    outFn = tempfile.mktemp(prefix='tmp_align', suffix='.fasta', dir=None)
 
     
     """Make sure alignments have the same length and are Series objects"""
-    alignA=padAlignment(alignA)
-    alignB=padAlignment(alignB)
+    alignA = padAlignment(alignA)
+    alignB = padAlignment(alignB)
 
     """Put alignments in the tempfiles"""
     align2fasta(alignA, aFn)
     align2fasta(alignB, bFn)
 
-    muscleCommand=['muscle', '-profile', '-in1', aFn, '-in2', bFn, '-out', outFn]
-    result=subprocess.call(muscleCommand)
+    muscleCommand = ['muscle', '-profile', '-in1', aFn, '-in2', bFn, '-out', outFn]
+    result = subprocess.call(muscleCommand)
 
     """If MUSCLE was successful"""
     if not result:
-        outAlign=fasta2align(outFn)
+        outAlign = fasta2align(outFn)
     else:
         print("Error in MUSCLE!")
         raise Exception("MUSCLEError")
@@ -510,11 +509,11 @@ def catAlignments(alignA, alignB):
 
     return outAlign
 
-def mynorm(vec,mx=1,mn=0):
+def mynorm(vec, mx=1, mn=0):
     """Normazlize values of vec in-place to [mn, mx] interval"""
-    vec-=nanmin(vec)
-    vec=vec/nanmax(vec)
-    vec=vec*(mx-mn)+mn
+    vec -= np.nanmin(vec)
+    vec = vec/np.nanmax(vec)
+    vec = vec*(mx-mn)+mn
     return vec
 
 def aalogoheights(aahistObj, N=20):
@@ -556,16 +555,16 @@ def pairwiseDiversity(fullAlign,region=None,subst=None,bySite=True):
     if bySite is False then compute single PD based on whole-sequence distances
     Return the fraction of valid (non-gap) pairwise comparisons at each site that are AA matched"""
 
-    fullAlign=padAlignment(fullAlign)
-    align=sliceAlign(fullAlign, region)
-    L=len(align[align.index[0]])
+    fullAlign = padAlignment(fullAlign)
+    align = sliceAlign(fullAlign, region)
+    L = len(align[align.index[0]])
 
     if subst is None:
         _PD_hamming(align, None, subst, bySite, True)
     
     return _PD(align, None, subst, bySite, True)
 
-def pairwiseDiversityInterGroup(align1,align2,region=None,subst=None,bySite=True):
+def pairwiseDiversityInterGroup(align1, align2, region=None, subst=None, bySite=True):
     """Calculate pairwise diversity between two alignments
     By default it will use a "hamming" substitution matrix
     All gap comparisons are nan
@@ -573,9 +572,9 @@ def pairwiseDiversityInterGroup(align1,align2,region=None,subst=None,bySite=True
     Return the fraction of valid (non-gap) pairwise comparisons at each site that are AA matched"""
 
     """Does not perform "padding" so alignments must have same sequence lengths"""
-    align1=sliceAlign(align1, region)
-    align2=sliceAlign(align2, region)
-    L=len(align[align.index[0]])
+    align1 = sliceAlign(align1, region)
+    align2 = sliceAlign(align2, region)
+    L = len(align[align.index[0]])
 
     if subst is None:
         _PD_hamming(align1, align2, subst, bySite, False)
@@ -584,88 +583,91 @@ def pairwiseDiversityInterGroup(align1,align2,region=None,subst=None,bySite=True
 
 def _PD(alignA, alignB, subst, bySite, withinA):
     """Computation for pairwise diversity"""
-    L=len(alignA.iloc[0])
+    L = len(alignA.iloc[0])
 
     """Dist will be 1 where equal, 0 where not and nan if one is a gap"""
     if withinA:
-        dist=zeros((int(binomial(len(alignA), 2)), L))
+        dist = np.zeros((int(binomial(len(alignA), 2)), L))
         allPairs = itertools.combinations(alignA, 2)
     else:
-        dist=zeros((len(alignA)*len(alignB), L))
+        dist = np.zeros((len(alignA)*len(alignB), L))
         allPairs = itertools.product(alignA, alignB)
-    j=0
+    j = 0
     for seq1, seq2 in allPairs:
         """This line is the bottleneck. I should try some optimization here. This would help with all distance functions"""
-        dist[j,:]=array([i for i in map(lambda a, b: subst.get((a, b), subst.get((b, a))), seq1, seq2)])
-        j+=1
+        dist[j,:] = np.array([i for i in map(lambda a, b: subst.get((a, b), subst.get((b, a))), seq1, seq2)])
+        j += 1
     
     """Actually, pairwise diversity is a distance, not a similarity so identical AA should be counted as 0"""
-    dist=1-dist
+    dist = 1-dist
     if not bySite:
-        dist=nanmean(dist, axis=1)
-    return nanmean(dist, axis=0)
+        dist = np.nanmean(dist, axis=1)
+    return np.nanmean(dist, axis=0)
 
-def _PD_hamming(alignA,alignB,subst,bySite,withinA,ignoreGaps=True):
+def _PD_hamming(alignA, alignB, subst, bySite, withinA, ignoreGaps=True):
     """Computation for pairwise diversity using a vector optimized hamming distance.
     Optionally ignoreGaps treats gap comparisons as Nan"""
-    L=len(alignA.iloc[0])
+    L = len(alignA.iloc[0])
     gapCode = AA2CODE['-']
 
     """Convert alignments into integer arrays first to speed comparisons"""
-    matA = zeros((len(alignA), L))
+    matA = np.zeros((len(alignA), L))
     for seqi, s in enumerate(alignA):
         matA[seqi,:] = _seq2vec(s)
     if not withinA:
-        matB = zeros((len(alignB), L))
+        matB = np.zeros((len(alignB), L))
         for seqi, s in enumerate(alignB):
             matB[seqi,:] = _seq2vec(s)
 
     """Dist will be 1 where equal, 0 where not and nan if one is a gap"""
     if withinA:
-        dist=zeros((int(binomial(len(alignA), 2)), L))
-        allPairs = itertools.combinations(arange(len(alignA)), 2)
+        dist=np.zeros((int(binomial(len(alignA), 2)), L))
+        allPairs = itertools.combinations(np.arange(len(alignA)), 2)
         for j, (seqi1, seqi2) in enumerate(allPairs):
             dist[j,:] = matA[seqi1,:]!=matA[seqi2,:]
             if ignoreGaps:
                 gapInd = (matA[seqi1,:]==gapCode) | (matA[seqi2,:]==gapCode)
-                dist[j, gapInd] = nan
+                dist[j, gapInd] = np.nan
     else:
-        dist=zeros((len(alignA)*len(alignB), L))
-        allPairs = itertools.product(arange(len(alignA)), arange(len(alignB)))
+        dist=np.zeros((len(alignA)*len(alignB), L))
+        allPairs = itertools.product(np.arange(len(alignA)), np.arange(len(alignB)))
         for j, (seqiA, seqiB) in enumerate(allPairs):
             dist[j,:] = matA[seqiA,:]!=matB[seqiB,:]
             if ignoreGaps:
                 gapInd = (matA[seqiA,:]==gapCode) | (matB[seqiB,:]==gapCode)
-                dist[j, gapInd] = nan
+                dist[j, gapInd] = np.nan
 
     if not bySite:
-        dist=nanmean(dist, axis=1)
-    return nanmean(dist, axis=0)
+        dist=np.nanmean(dist, axis=1)
+    return np.nanmean(dist, axis=0)
 
-def pairwiseMutualInformation(align,nperms=1e4):
+def pairwiseMutualInformation(align, nperms=1e4):
     """Compute the pairwise mutual information of all sites in the alignment
     Return matrix of M and p-values"""
     L=len(align[align.index[0]])
-    columns=[align.map(lambda s: s[i]) for i in arange(L)]
-    M=nan*zeros((L, L))
-    p=nan*zeros((L, L))
-    Mstar=nan*zeros((L, L))
-    for xi, yi in itertools.combinations(arange(L), 2):
-        freqx=objhist(columns[xi])
-        freqy=objhist(columns[yi])
+    columns = [align.map(lambda s: s[i]) for i in np.arange(L)]
+    M = np.nan*np.zeros((L, L))
+    p = np.nan*np.zeros((L, L))
+    Mstar = np.nan*np.zeros((L, L))
+    for xi, yi in itertools.combinations(np.arange(L), 2):
+        freqx = objhist(columns[xi])
+        freqy = objhist(columns[yi])
 
-        tmpM, tmpMstar, tmpp, Hx, Hy, Hxy=mutual_information(columns[xi], columns[yi], logfunc=log2, nperms=nperms)
+        tmpM, tmpMstar, tmpp, Hx, Hy, Hxy= mutual_information(columns[xi],
+                                                              columns[yi],
+                                                              logfunc=np.log2,
+                                                              nperms=nperms)
        
         """We wouldn't need to test invariant sites or a site with itself"""
-        if len(freqx)==1 or len(freqy)==1:
-            tmpp=nan
-        elif xi==yi:
-            tmpp=nan
+        if len(freqx) == 1 or len(freqy) == 1:
+            tmpp = np.nan
+        elif xi == yi:
+            tmpp = np.np.nan
 
-        M[xi, yi]=tmpM
-        p[xi, yi]=tmpp
-        Mstar[xi, yi]=tmpMstar
-    q=fdrAdjust(p)
+        M[xi, yi] = tmpM
+        p[xi, yi] = tmpp
+        Mstar[xi, yi] = tmpMstar
+    q = adjustnonnan(p)
 
     return M, Mstar, p, q
 
@@ -721,7 +723,7 @@ def condenseGappyAlignment(a, thresh=0.9):
 
     a = padAlignment(a)
     smat = align2mat(a)
-    gapSiteInd = mean(smat == '-', axis=0) >= thresh
+    gapSiteInd = np.mean(smat == '-', axis=0) >= thresh
     keepSeqInd = np.all(smat[:, gapSiteInd] == '-', axis=1)
     print('Removing %d of %d sites and %d of %d sequences from the alignment.' % (gapSiteInd.sum(), smat.shape[1], (~keepSeqInd).sum(), smat.shape[0]))
 
@@ -734,6 +736,7 @@ def nx2sif(fn, g):
     with open(fn, 'w') as fh:
         for e in g.edges_iter():
             fh.write('%s pp %s\n' % (e[0], e[1]))
+
 def generateSequences(a,N=1,useFreqs=True):
     """Generate new sequences based on those in alignment a
     The AA at each position are chosen independently from the
@@ -746,7 +749,7 @@ def generateSequences(a,N=1,useFreqs=True):
 
     if useFreqs:
         smat = empty((N, L), dtype='S1')
-        for i in arange(L):
+        for i in np.arange(L):
             oh = objhist(sliceAlign(a, (i, i+1)))
             smat[:, i] = oh.generateRandomSequence(N, useFreqs=True)
     else:
@@ -756,7 +759,7 @@ def generateSequences(a,N=1,useFreqs=True):
         actualN = 0
         while actualN < N and counter < N*100:
             tmpmat = empty((chunkN, L), dtype='S1')
-            for i in arange(L):
+            for i in np.arange(L):
                 oh = objhist(sliceAlign(a, (i, i+1)))
                 tmpmat[:, i] = oh.generateRandomSequence(chunkN, useFreqs=False)
             if smat is None:
@@ -837,8 +840,8 @@ def kmerConsensus(align,k=9,verbose=False):
     """Get a 2D array of alignment [nSeqs x nSites]"""
     mat = align2mat(align)
 
-    full = [dict() for i in arange(L)]
-    for starti in arange(Nkmers):
+    full = [dict() for i in np.arange(L)]
+    for starti in np.arange(Nkmers):
         """Create a temporary alignment of the ith kmer"""
         tmpA = seqmat2align(mat[:, starti:starti+k])
         """Pick off the most common kmer at that start position"""
@@ -847,7 +850,7 @@ def kmerConsensus(align,k=9,verbose=False):
             print(' '*starti + top1)
             #print ' '*starti + objhist(tmpA).topN(n=2)[1][0]
         """Add each AA in the most frequent kmer to the consensus"""
-        for j, startj in enumerate(arange(starti, starti+k)):
+        for j, startj in enumerate(np.arange(starti, starti+k)):
             try:
                 full[startj][top1[j]] += 1
             except KeyError:
@@ -889,7 +892,7 @@ def tree2pwdist(tree):
     if isinstance(tree, type(Phylo.BaseTree.Tree())):
         N = len(tree.get_terminals())
         names = [node.name for node in tree.get_terminals()]
-        pwdist = zeros((N, N))
+        pwdist = np.zeros((N, N))
         for i, node1 in enumerate(tree.get_terminals()):
             for j, node2 in enumerate(tree.get_terminals()):
                 """Compute half of these and assume symmetry"""
@@ -903,7 +906,7 @@ def tree2pwdist(tree):
         taxon_set = [n.taxon for n in tree.leaf_nodes()]
         N = len(taxon_set)
         names = [taxa.label for taxa in taxon_set]
-        pwdist = zeros((N, N))
+        pwdist = np.zeros((N, N))
         for i, t1 in enumerate(taxon_set):
             for j, t2 in enumerate(taxon_set):
                 """Compute half of these and assume symmetry"""
@@ -1030,3 +1033,41 @@ def getStartPosMapper(seq, subst=None):
                                protein=True,
                                substitution_matrix=subst)
     return findPos
+
+def mutual_information(x, y, logfunc=np.log2, nperms=1e4):
+    """Calculates mutual information between the paired iterables x and y
+    Returns M(x,y), p-value, and entropy of x, y, and zip(x,y)
+    Methods are all described in Gilbert et al. (AIDS 2005)"""
+    def entropy(freqDict):
+        return -np.array([p*logFunc(p) for p in freqDict.values()]).sum()
+    freqx = objhist(x)
+    freqy = objhist(y)
+   
+    Hx = freqx.entropy()
+    Hy = freqy.entropy()
+    Hxy = objhist(zip(x,y)).entropy()
+    M = Hx + Hy - Hxy
+    Mstar = 2*M / (Hx+Hy)
+
+    if len(freqx)==1 or len(freqy)==1:
+        p = 1
+    elif np.all([xi==yi for xi,yi in zip(x,y)]):
+        p = 0
+    else:
+        Mperms = np.array([Hx + Hy - objhist(zip(permutation(x),y)).entropy() for i in np.arange(nperms)])
+        p = (Mperms >= M).sum() / nperms
+
+    return M, Mstar, p, Hx, Hy, Hxy
+
+def kl(p, q):
+    """Kullback-Leibler divergence D(P || Q) for discrete distributions
+
+    Parameters
+    ----------
+    p, q : array-like, dtype=float, shape=n
+        Discrete probability distributions.
+    """
+    p = np.asarray(p, dtype=float)
+    q = np.asarray(q, dtype=float)
+
+    return np.where(p != 0, p * np.log(p / q), 0).sum()

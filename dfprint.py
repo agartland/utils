@@ -68,8 +68,8 @@ def toPDF(df,
         for func in [partial(repChar, c1='_', c2='-'),
                      partial(repChar, c1='%', c2='PCT')]:
             df = df.applymap(func)
-            df = df.rename_axis(func, axis=0)
-            df = df.rename_axis(func, axis=1)
+            df = df.rename(func, axis=0)
+            df = df.rename(func, axis=1)
 
     texFn = outFn[:-3] + 'tex'
     header = ['\\documentclass[10pt]{article}',
