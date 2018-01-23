@@ -168,7 +168,7 @@ def printTPS(resDf):
         v = resDf.loc[i, 'Value']
         se = resDf.loc[i, 'Mod.SE']
         pvalue = resDf.loc[i, 'Mod.p']
-        print('%s coef = %1.2f [%1.2f, %1.2f]; p = %1.3f' % (var, v, v-se*1.96, v+se*1.96, pvalue))
+        print('%s OR = %1.2f [%1.2f, %1.2f]; p = %1.3f' % (var, np.exp(v), np.exp(v-se*1.96), np.exp(v+se*1.96), pvalue))
 
 def printLogistic(resDf):
     for i in resDf.index:
@@ -176,5 +176,5 @@ def printLogistic(resDf):
         v = resDf.loc[i, 'Estimate']
         se = resDf.loc[i, 'Std..Error']
         pvalue = resDf.loc[i, 'Pr...z..']
-        print('%s coef = %1.2f [%1.2f, %1.2f]; p = %1.3f' % (var, v, v-se*1.96, v+se*1.96, pvalue))
+        print('%s OR = %1.2f [%1.2f, %1.2f]; p = %1.3f' % (var, np.exp(v), np.exp(v-se*1.96), np.exp(v+se*1.96), pvalue))
 
