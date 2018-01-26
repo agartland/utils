@@ -13,38 +13,9 @@ __all__ = ['ICSDist',
            'pwICSDist',
            'prepICSData',
            'googleMCF',
-           'nxMCF',
-           'computeMarginals']
+           'nxMCF']
 
 """Formulating polyfunctionality distance as a min cost flow problem"""
-
-def computeMarginals(df, indexCols, magCol='mag'):
-    """Compress df cytokine subsets to a single subset for each cytokine.
-
-    Parameters
-    ----------
-    df : pd.DataFrame no index
-        Raw or background subtracted ICS data
-    indexCols : list
-        Columns that make each sample unique
-    magCol : str
-        Typically "mag" or "bg"
-
-    Returns
-    -------
-    df : pd.DataFrame
-        Rows for each of the samples that were indexed,
-        and for each cytokine"""
-
-    cytokines = df.cytokine.iloc[0].replace('-', '+').split('+')[:-1]
-    out = []
-    for cy in cytokines:
-        marg = compressSubsets(df, indexCols=indexCols, subset=[cy], magCol=magCol)
-        marg = marg.loc[marg.cytokine == cy + '+']
-        out.append(marg)
-    out = pd.concat(out, axis=0)
-    out.loc[:, magCol] = out
-    return out
 
 def ICSDist(freq1Df, freq2Df):
     mcfData = prepICSData(freq1Df, freq2Df, factor=1000)
@@ -55,8 +26,8 @@ def ICSDist(freq1Df, freq2Df):
         cost, flow = googleMCF(**mcfData, verbose=False, withConstraints=False)
     return cost/1000
 
-def pwICSDist(cdf, indexCols=['ptid', 'visitday', 'tcellsub', 'antigen']):
-    d = {ptid:tmpdf.set_index('cytokine')['mag'] for ptid, tmpdf in cdf.groupby('ptid')}
+def pwICSDist(cdf, magCol='mag_bg', indexCols=['ptid', 'visitday', 'tcellsub', 'antigen']):
+    d = {ptid:tmpdf.set_index('cytokine')[magCol] for ptid, tmpdf in cdf.groupby('ptid')}
     s = pd.Series(d)
     pwdist = computePWDist(s, s, ICSDist, symetric=True)
     return pwdist

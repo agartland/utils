@@ -341,6 +341,6 @@ def clusteredScatter(xyDf,
             if ind.sum() > 2 and plotElipse:
                 Xvar = xyDf[plotDims].loc[ind].values
                 plot_point_cov(Xvar, ax=axh, color=colors[vi % len(colors)], alpha=0.2)
-        axh.set_xticks(())
+    axh.set_xticks(())
     axh.set_yticks(())
     return axh
