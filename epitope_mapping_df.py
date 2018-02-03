@@ -52,9 +52,11 @@ def hamming(str1, str2):
     return sum([i for i in map(operator.__ne__, str1, str2)])
 
 def _coords(r):
-    return list(range(int(r.start), int(r.start) + len(r.seq)))
+    # return list(range(int(r.start), int(r.start) + len(r.seq)))
+    return list(range(int(r.start), int(r.end) + 1))
 def _epcoords(r):
-    return list(range(int(r.EpStart), int(r.EpStart) + len(r.EpSeq)))
+    # return list(range(int(r.EpStart), int(r.EpStart) + len(r.EpSeq)))
+    return list(range(int(r.EpStart), int(r.EpEnd) + 1))
 
 def overlap(response1, response2):
     """Any overlap between two responses?"""
@@ -106,19 +108,20 @@ def assignResponseIslands(responses):
     out.index = responses.index
     return out
 
-def findEpitopes(responses, sharedRule, **kwargs):
+def findEpitopes(responses, sharedRule, reduceResponses=True, **kwargs):
     """Given a list of responses find the minimum
     set of epitopes that "explain" all responses."""
 
-    if sharedRule == overlapRule:
+    if reduceResponses:
+        """Reduce responses to those with unique start and end positions"""
         coords = {} # keeps track of unique coordinates: (st, en): i
         keepInds = [] # indices we want to keep in the analysis for now
         """Keeps track of redundant coords so we can correctly assign epitopes later"""
         redundantD = {} # key: i, value: list of redundant i's
         for i in range(responses.shape[0]):
             st = responses.start.iloc[i]
-            en = responses.start.iloc[i] + len(responses.seq.iloc[i])
-            # en = responses.end.iloc[i]
+            # en = responses.start.iloc[i] + len(responses.seq.iloc[i])
+            en = responses.end.iloc[i]
             if not (st, en) in coords:
                 coords[(st, en)] = i
                 keepInds.append(i)
@@ -175,7 +178,7 @@ def findEpitopes(responses, sharedRule, **kwargs):
                 """Start for s1 again with updated set of responses"""
                 break
 
-    if sharedRule == overlapRule:
+    if reduceResponses:
         expSharedSets = []
         for ss in sharedSets:
             tmp = []
@@ -446,7 +449,7 @@ def plotIsland(island):
     for i,r in island.iterrows():
         col = colors[r.EpID]
 
-        plt.plot([sitex2xx[r.start], sitex2xx[r.start + len(r.seq) - 1]], [y, y], '-s', lw=2, mec='gray', color=col)
+        plt.plot([sitex2xx[r.start], sitex2xx[r.end]], [y, y], '-s', lw=2, mec='gray', color=col)
         for xoffset, aa in enumerate(r.seq):
             plt.annotate(aa, xy=(sitex2xx[r.start] + xoffset, y - 0.1), ha='center', va='top', size='small')
         
@@ -471,7 +474,7 @@ def plotIsland(island):
                          xytext=(-1,0),textcoords='offset points',
                          ha='left',va='bottom',size='x-small')"""
 
-        ss += [r.start, r.start + len(r.seq) - 1]
+        ss += [r.start, r.end]
         y += 1
 
     y = 0
@@ -516,7 +519,8 @@ def plotEpitopeMap(rxDf, respDf, order=None):
 
     armColors = sns.color_palette('Set1', n_colors=uArms.shape[0])[::-1]
 
-    lims = [respDf['start'].min(), (respDf['start'] + respDf['seq'].map(len)).max()]
+    #lims = [respDf['start'].min(), (respDf['start'] + respDf['seq'].map(len)).max()]
+    lims = [respDf['start'].min(), respDf['end'].max()]
 
     """Plot map of epitope responses by PTID"""
     keepRegions = ['Signal peptide', 'V1 loop', 'V2 loop',
