@@ -675,7 +675,7 @@ def seqmat2align(smat,index=None):
     """Convert from an array of dtype=S1 to alignment"""
     if index is None:
         index = np.arange(smat.shape[0])
-    return pd.Series([''.join(smat[seqi,:]) for seqi in np.arange(smat.shape[0])], name='seq', index=index)
+    return pd.Series([''.join(smat[seqi,:].astype(str)) for seqi in np.arange(smat.shape[0])], name='seq', index=index)
 
 def align2mat(align, k=1, gapped=True):
     """Convert an alignment into a 2d numpy array of kmers [nSeqs x nSites/nKmers]
@@ -723,8 +723,8 @@ def condenseGappyAlignment(a, thresh=0.9):
 
     a = padAlignment(a)
     smat = align2mat(a)
-    gapSiteInd = np.mean(smat == '-', axis=0) >= thresh
-    keepSeqInd = np.all(smat[:, gapSiteInd] == '-', axis=1)
+    gapSiteInd = np.mean(smat == b'-', axis=0) >= thresh
+    keepSeqInd = np.all(smat[:, gapSiteInd] == b'-', axis=1)
     print('Removing %d of %d sites and %d of %d sequences from the alignment.' % (gapSiteInd.sum(), smat.shape[1], (~keepSeqInd).sum(), smat.shape[0]))
 
     smat = smat[keepSeqInd,:]

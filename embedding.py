@@ -155,7 +155,9 @@ def plotEmbedding(dmatDf,
                   plotLegend=True,
                   colors=None,
                   markerLabels=None,
-                  continuousLabel=False):
+                  continuousLabel=False,
+                  linewidths=0,
+                  edgecolors='gray'):
     """Two-dimensional plot of embedded distance matrix, colored by labels"""
     
     if labels is None:
@@ -181,7 +183,9 @@ def plotEmbedding(dmatDf,
                      markerLabels=markerLabels,
                      markers=markers,
                      continuousLabel=continuousLabel,
-                     colors=colors)
+                     colors=colors,
+                     linewidths=linewidths,
+                     edgecolors=edgecolors)
     
     if plotLabels:
         annotationParams = dict(xytext=(0, 5), textcoords='offset points', size=txtSize)
@@ -201,11 +205,11 @@ def plotEmbedding(dmatDf,
                 legTit = '%s | %s' % (labels.name, markerLabels.name)
             plt.legend(loc=0, title=legTit)
     if hasattr(xyDf, 'explained_variance_'):
-        axh.set_xlabel('KPCA %1.0f (%1.0f%% variance explained)' % (plotDims[0]+1, 100*xyDf.explained_variance_[plotDims[0]]))
-        axh.set_ylabel('KPCA %1.0f (%1.0f%% variance explained)' % (plotDims[1]+1, 100*xyDf.explained_variance_[plotDims[1]]))
+        axh.set_xlabel('%s %1.0f (%1.0f%% variance explained)' % (method.upper(), plotDims[0]+1, 100*xyDf.explained_variance_[plotDims[0]]))
+        axh.set_ylabel('%s %1.0f (%1.0f%% variance explained)' % (method.upper(), plotDims[1]+1, 100*xyDf.explained_variance_[plotDims[1]]))
     else:
-        axh.set_xlabel('KPCA %1.0f' % (plotDims[0]+1))
-        axh.set_ylabel('KPCA %1.0f' % (plotDims[1]+1))
+        axh.set_xlabel('%s %1.0f' % (method.upper(), plotDims[0]+1))
+        axh.set_ylabel('%s %1.0f' % (method.upper(), plotDims[1]+1))
     # plt.show()
     return xyDf
 
@@ -220,7 +224,9 @@ def clusteredScatter(xyDf,
                      markerLabels=None,
                      markers=None,
                      colors=None,
-                     continuousLabel=False):
+                     continuousLabel=False,
+                     linewidths=0,
+                     edgecolors='gray'):
     """Produce a scatter plot with axes, shaded by values in labels and with specified markers
 
     Parameters
@@ -293,12 +299,14 @@ def clusteredScatter(xyDf,
     elif isinstance(markers, pd.Series):
         markers = markers[uMLabels].values
 
-    figh = plt.gcf()
+    '''figh = plt.gcf()
     plt.clf()
     axh = figh.add_axes([0.05, 0.05, 0.9, 0.9])
+    '''
+    axh = plt.gca()
     axh.patch.set_facecolor('white')
     # axh.axis('off')
-    figh.patch.set_facecolor('white')
+    # figh.patch.set_facecolor('white')
 
     if continuousLabel:
         for mi, m in enumerate(uMLabels):
@@ -315,7 +323,9 @@ def clusteredScatter(xyDf,
                         alpha=alpha,
                         c=labels.loc[ind],
                         label=labS,
-                        cmap=cmap)
+                        cmap=cmap,
+                        linewidths=linewidths,
+                        edgecolors=edgecolors)
     else:
         for vi, v in enumerate(uLabels):
             for mi, m in enumerate(uMLabels):
@@ -337,10 +347,11 @@ def clusteredScatter(xyDf,
                             c=[colors[vi % len(colors)], ] * ind.sum(),
                             label=labS,
                             cmap=cmap,
-                            linewidths=0)
+                            linewidths=linewidths,
+                            edgecolors=edgecolors)
             if ind.sum() > 2 and plotElipse:
                 Xvar = xyDf[plotDims].loc[ind].values
                 plot_point_cov(Xvar, ax=axh, color=colors[vi % len(colors)], alpha=0.2)
-        axh.set_xticks(())
+    axh.set_xticks(())
     axh.set_yticks(())
     return axh
