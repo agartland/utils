@@ -240,7 +240,7 @@ def overlapRule(island, minOverlap=8, minSharedAA=6):
     nMatching = 0
     seq = ''
     for si in sharedInds:
-        aas = {respSeq[si - int(respStart)] for respSeq, respStart in zip(island.seq, island.start)}
+        aas = {respSeq[si - int(respStart)] for respSeq, respStart in zip(island.seq, island.start) if (si - int(respStart)) < len(respSeq)}
         if '-' in aas:
             seq += '-'
         else:
@@ -450,6 +450,12 @@ def plotIsland(island):
         col = colors[r.EpID]
 
         plt.plot([sitex2xx[r.start], sitex2xx[r.end]], [y, y], '-s', lw=2, mec='gray', color=col)
+        if 'LANL start' in r and not r['LANL start'] is None:
+            plt.annotate('LANL {}'.format(r['LANL HLA']),
+                         xy=(sitex2xx[r.start], y),
+                         xytext=(5, 5),
+                         textcoords='offset points',
+                         ha='left', va='bottom', size='x-small')
         for xoffset, aa in enumerate(r.seq):
             plt.annotate(aa, xy=(sitex2xx[r.start] + xoffset, y - 0.1), ha='center', va='top', size='small')
         
