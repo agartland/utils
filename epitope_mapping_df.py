@@ -52,6 +52,9 @@ def hamming(str1, str2):
     return sum([i for i in map(operator.__ne__, str1, str2)])
 
 def _coords(r, plot=False):
+    """Return coordinates of the response peptide
+    Plot option returns coordinates based on start and length of peptide,
+    as opposed to end coordinate which is subject to indsertions/deletions"""
     if plot:
         return list(range(int(r.start), int(r.start) + len(r.seq)))
     else:
@@ -376,6 +379,7 @@ def findpeptide(pep, seq):
 
 def sliceRespSeq(r):
     """After the epitope has been identified, slice the response sequence to the appropriate size"""
+    #return r['seq'][int(r['EpStart'] - r['start']):int(r['EpStart'] - r['start'] + len(r['EpSeq']))]
     return r['seq'][int(r['EpStart'] - r['start']):int(r['EpStart'] - r['start'] + len(r['EpSeq']))]
 
 def encodeVariants(peps):
@@ -455,7 +459,7 @@ def plotIsland(island):
 
         plt.plot([sitex2xx[r.start], sitex2xx[r.start + len(r.Sequence) - 1]], [y, y], '-s', lw=2, mec='gray', color=col)
         if 'LANL start' in r and not r['LANL start'] is None:
-            plt.annotate('LANL {}'.format(r['LANL HLA']),
+            plt.annotate('LANL {} {}'.format(r['LANL HLA'], r['LANL Epitope']),
                          xy=(sitex2xx[r.start], y),
                          xytext=(5, 5),
                          textcoords='offset points',
