@@ -51,12 +51,19 @@ def hamming(str1, str2):
     """Hamming distance between two strings"""
     return sum([i for i in map(operator.__ne__, str1, str2)])
 
-def _coords(r):
-    # return list(range(int(r.start), int(r.start) + len(r.seq)))
-    return list(range(int(r.start), int(r.end) + 1))
-def _epcoords(r):
-    # return list(range(int(r.EpStart), int(r.EpStart) + len(r.EpSeq)))
-    return list(range(int(r.EpStart), int(r.EpEnd) + 1))
+def _coords(r, plot=False):
+    """Return coordinates of the response peptide
+    Plot option returns coordinates based on start and length of peptide,
+    as opposed to end coordinate which is subject to indsertions/deletions"""
+    if plot:
+        return list(range(int(r.start), int(r.start) + len(r.seq)))
+    else:
+        return list(range(int(r.start), int(r.end) + 1))
+def _epcoords(r, plot=False):
+    if plot:
+        return list(range(int(r.EpStart), int(r.EpStart) + len(r.EpSeq)))
+    else:
+        return list(range(int(r.EpStart), int(r.EpEnd) + 1))
 
 def overlap(response1, response2):
     """Any overlap between two responses?"""
@@ -372,6 +379,7 @@ def findpeptide(pep, seq):
 
 def sliceRespSeq(r):
     """After the epitope has been identified, slice the response sequence to the appropriate size"""
+    #return r['seq'][int(r['EpStart'] - r['start']):int(r['EpStart'] - r['start'] + len(r['EpSeq']))]
     return r['seq'][int(r['EpStart'] - r['start']):int(r['EpStart'] - r['start'] + len(r['EpSeq']))]
 
 def encodeVariants(peps):
@@ -428,8 +436,8 @@ def plotIsland(island):
     sitex = []
     immunogens = []
     for i,resp in island.iterrows():
-        sitex.extend(_coords(resp))
-        sitex.extend(_epcoords(resp))
+        sitex.extend(_coords(resp, plot=True))
+        sitex.extend(_epcoords(resp, plot=True))
 
     sitex = np.array(sorted(set(sitex)))
     xx = np.arange(len(sitex))
@@ -449,9 +457,9 @@ def plotIsland(island):
     for i,r in island.iterrows():
         col = colors[r.EpID]
 
-        plt.plot([sitex2xx[r.start], sitex2xx[r.end]], [y, y], '-s', lw=2, mec='gray', color=col)
+        plt.plot([sitex2xx[r.start], sitex2xx[r.start + len(r.Sequence) - 1]], [y, y], '-s', lw=2, mec='gray', color=col)
         if 'LANL start' in r and not r['LANL start'] is None:
-            plt.annotate('LANL {}'.format(r['LANL HLA']),
+            plt.annotate('LANL {} {}'.format(r['LANL HLA'], r['LANL Epitope']),
                          xy=(sitex2xx[r.start], y),
                          xytext=(5, 5),
                          textcoords='offset points',
@@ -480,7 +488,7 @@ def plotIsland(island):
                          xytext=(-1,0),textcoords='offset points',
                          ha='left',va='bottom',size='x-small')"""
 
-        ss += [r.start, r.end]
+        ss += [r.start, r.start + len(r.Sequence) - 1]
         y += 1
 
     y = 0
