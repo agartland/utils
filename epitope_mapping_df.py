@@ -51,10 +51,20 @@ def hamming(str1, str2):
     """Hamming distance between two strings"""
     return sum([i for i in map(operator.__ne__, str1, str2)])
 
-def _coords(r):
-    return list(range(int(r.start), int(r.start) + len(r.seq)))
-def _epcoords(r):
-    return list(range(int(r.EpStart), int(r.EpStart) + len(r.EpSeq)))
+def _coords(r, plot=False):
+    """Return coordinates of the response peptide
+    Plot option returns coordinates based on start and length of peptide,
+    as opposed to end coordinate which is subject to indsertions/deletions
+    Use end like a stop in range(start, stop)"""
+    if plot:
+        return list(range(int(r.start), int(r.start) + len(r.seq)))
+    else:
+        return list(range(int(r.start), int(r.end)))
+def _epcoords(r, plot=False):
+    if plot:
+        return list(range(int(r.EpStart), int(r.EpStart) + len(r.EpSeq)))
+    else:
+        return list(range(int(r.EpStart), int(r.EpEnd)))
 
 def overlap(response1, response2):
     """Any overlap between two responses?"""
@@ -106,19 +116,20 @@ def assignResponseIslands(responses):
     out.index = responses.index
     return out
 
-def findEpitopes(responses, sharedRule, **kwargs):
+def findEpitopes(responses, sharedRule, reduceResponses=True, **kwargs):
     """Given a list of responses find the minimum
     set of epitopes that "explain" all responses."""
 
-    if sharedRule == overlapRule:
+    if reduceResponses:
+        """Reduce responses to those with unique start and end positions"""
         coords = {} # keeps track of unique coordinates: (st, en): i
         keepInds = [] # indices we want to keep in the analysis for now
         """Keeps track of redundant coords so we can correctly assign epitopes later"""
         redundantD = {} # key: i, value: list of redundant i's
         for i in range(responses.shape[0]):
             st = responses.start.iloc[i]
-            en = responses.start.iloc[i] + len(responses.seq.iloc[i])
-            # en = responses.end.iloc[i]
+            # en = responses.start.iloc[i] + len(responses.seq.iloc[i])
+            en = responses.end.iloc[i]
             if not (st, en) in coords:
                 coords[(st, en)] = i
                 keepInds.append(i)
@@ -175,7 +186,7 @@ def findEpitopes(responses, sharedRule, **kwargs):
                 """Start for s1 again with updated set of responses"""
                 break
 
-    if sharedRule == overlapRule:
+    if reduceResponses:
         expSharedSets = []
         for ss in sharedSets:
             tmp = []
@@ -220,7 +231,7 @@ def identicalRule(island):
         """If there's just one response"""
         ep = dict(EpSeq=island.iloc[0].seq,
                   EpStart=island.iloc[0].start,
-                  EpEnd=island.iloc[0].start + len(island.iloc[0].seq) - 1)
+                  EpEnd=island.iloc[0].start + len(island.iloc[0].seq))
         return True, ep
     else:
         return False, {}
@@ -237,7 +248,7 @@ def overlapRule(island, minOverlap=8, minSharedAA=6):
     nMatching = 0
     seq = ''
     for si in sharedInds:
-        aas = {respSeq[si - int(respStart)] for respSeq, respStart in zip(island.seq, island.start)}
+        aas = {respSeq[si - int(respStart)] for respSeq, respStart in zip(island.seq, island.start) if (si - int(respStart)) < len(respSeq)}
         if '-' in aas:
             seq += '-'
         else:
@@ -248,7 +259,7 @@ def overlapRule(island, minOverlap=8, minSharedAA=6):
             else:
                 seq += 'X'
     if nOverlap >= minOverlap and nMatching >= minSharedAA:
-        ep = dict(EpSeq=seq, EpStart=sharedInds[0], EpEnd=sharedInds[-1])
+        ep = dict(EpSeq=seq, EpStart=sharedInds[0], EpEnd=sharedInds[-1]+1)
         return True, ep
     else:
         return False, {}
@@ -259,7 +270,7 @@ def overlapEpitope(island, useX=True):
 
     seq = ''
     for si in sharedInds:
-        aas = {respSeq[si - int(respStart)] for respSeq, respStart in zip(island.seq, island.start)}
+        aas = {respSeq[si - int(respStart)] for respSeq, respStart in zip(island.seq, island.start) if (si - int(respStart)) < len(respSeq)}
         if len(aas) == 1:
             seq += aas.pop()
         else:
@@ -268,7 +279,7 @@ def overlapEpitope(island, useX=True):
             else:
                 seq += '[' + ''.join(aas) + ']'
                 
-    return dict(EpSeq=seq, EpStart=sharedInds[0], EpEnd=sharedInds[-1])
+    return dict(EpSeq=seq, EpStart=sharedInds[0], EpEnd=sharedInds[-1]+1)
 
 def hlaRule(island, hlaList, ba, topPct=0.1, nmer=[8, 9, 10], useX=True):
     """Determine overlap region common amongst all responses in the island
@@ -318,12 +329,12 @@ def hlaRule(island, hlaList, ba, topPct=0.1, nmer=[8, 9, 10], useX=True):
                     seq += 'X'
                 else:
                     seq += '[' + ''.join(aas) + ']'
-        ep = dict(EpSeq=seq, EpStart=epitopeInds[0], EpEnd=epitopeInds[-1], hlas=[hla])
+        ep = dict(EpSeq=seq, EpStart=epitopeInds[0], EpEnd=epitopeInds[-1]+1, hlas=[hla])
         return True, ep
     else:
         return False, {}
 
-def findpeptide(pep, seq):
+def findpeptide(pep, seq, returnGapped=False):
     """Find pep in seq ignoring gaps but returning a start position that counts gaps
     pep must match seq exactly (otherwise you should be using pairwise alignment)
 
@@ -335,27 +346,28 @@ def findpeptide(pep, seq):
         Peptide to be found in seq.
     seq : str
         Sequence to be searched.
-    returnEnd : bool
-        Flag to return the end position such that:
         
     Returns
     -------
     startPos : int
         Start position (zero-indexed) of pep in seq or -1 if not found
     endPos : int
-        Start position (zero-indexed) of pep in seq or -1 if not found"""
+        Stop + 1 position (zero-indexed) of pep in seq or -1 if not found
+        Use as stop in range(statr, stop) or slicing [start:stop]"""
 
     ng = seq.replace('-', '')
     ngInd = ng.find(pep)
     ngCount = 0
     pos = 0
-    """Count the number of gaps prior to the non-gapped position. Add them to it to get the gapped position"""
+    """Count the number of gaps prior to the non-gapped position.
+    Add them to it to get the gapped position"""
     while ngCount < ngInd or seq[pos] == '-':
         if not seq[pos] == '-':
             ngCount += 1
         pos += 1
     startPos = ngInd + (pos - ngCount)
 
+    pepOut = ''
     if startPos == -1:
         endPos = -1
     else:
@@ -364,12 +376,24 @@ def findpeptide(pep, seq):
         while count < len(pep):
             if not seq[endPos] == '-':
                 count += 1
+                pepOut += seq[endPos]
+            else:
+                pepOut += '-'
             endPos += 1
-    return startPos, endPos
+    if returnGapped:
+        return startPos, endPos, pepOut
+    else:
+        return startPos, endPos
 
 def sliceRespSeq(r):
     """After the epitope has been identified, slice the response sequence to the appropriate size"""
-    return r['seq'][int(r['EpStart'] - r['start']):int(r['EpStart'] - r['start'] + len(r['EpSeq']))]
+    start, stop = int(r['EpStart'] - r['start']), int(r['EpStart'] - r['start'] + len(r['EpSeq']))
+    if 'align seq' in r:
+        out = r['align seq'][start:stop]
+    else:
+        out = r['seq'][start:stop]
+    return out
+
 
 def encodeVariants(peps):
     """Encode a list of aligned peptides as a single string
@@ -425,8 +449,8 @@ def plotIsland(island):
     sitex = []
     immunogens = []
     for i,resp in island.iterrows():
-        sitex.extend(_coords(resp))
-        sitex.extend(_epcoords(resp))
+        sitex.extend(_coords(resp, plot=False))
+        sitex.extend(_epcoords(resp, plot=False))
 
     sitex = np.array(sorted(set(sitex)))
     xx = np.arange(len(sitex))
@@ -446,7 +470,18 @@ def plotIsland(island):
     for i,r in island.iterrows():
         col = colors[r.EpID]
 
-        plt.plot([sitex2xx[r.start], sitex2xx[r.start + len(r.seq) - 1]], [y, y], '-s', lw=2, mec='gray', color=col)
+        plt.plot([sitex2xx[r.start], sitex2xx[r.end - 1]], [y, y], '-s', lw=2, mec='gray', color=col)
+        if 'LANL start' in r and not pd.isnull(r['LANL start']):
+            if pd.isnull(r['LANL HLA']):
+                s = 'LANL {}'.format(r['LANL Epitope'])
+            else:
+                s = 'LANL {} {}'.format(r['LANL HLA'], r['LANL Epitope'])
+
+            plt.annotate(s,
+                         xy=(sitex2xx[r.start], y),
+                         xytext=(5, 5),
+                         textcoords='offset points',
+                         ha='left', va='bottom', size='x-small')
         for xoffset, aa in enumerate(r.seq):
             plt.annotate(aa, xy=(sitex2xx[r.start] + xoffset, y - 0.1), ha='center', va='top', size='small')
         
@@ -471,17 +506,17 @@ def plotIsland(island):
                          xytext=(-1,0),textcoords='offset points',
                          ha='left',va='bottom',size='x-small')"""
 
-        ss += [r.start, r.start + len(r.seq) - 1]
+        ss += [r.start, r.end - 1]
         y += 1
 
     y = 0
     for e in uEpIDs[::-1]:
         r = island.loc[island.EpID == e].iloc[0]
-        xvec = [sitex2xx[r.EpStart] - 0.3, sitex2xx[r.EpEnd] + 0.3]
+        xvec = [sitex2xx[r.EpStart] - 0.3, sitex2xx[r.EpEnd - 1] + 0.3]
         plt.fill_between(xvec, [y, y], island.shape[0], color=colors[e], edgecolor='None', alpha=0.2)
         for xoffset, aa in enumerate(r.EpSeq):
             plt.annotate(aa, xy=(sitex2xx[r.EpStart] + xoffset, y + 0.1), ha='center', va='bottom', size='medium', weight='bold')
-        ss += [r.EpStart, r.EpEnd]
+        ss += [r.EpStart, r.EpEnd - 1]
         y -= 1
 
     
@@ -516,7 +551,8 @@ def plotEpitopeMap(rxDf, respDf, order=None):
 
     armColors = sns.color_palette('Set1', n_colors=uArms.shape[0])[::-1]
 
-    lims = [respDf['start'].min(), (respDf['start'] + respDf['seq'].map(len)).max()]
+    #lims = [respDf['start'].min(), (respDf['start'] + respDf['seq'].map(len)).max()]
+    lims = [respDf['start'].min(), respDf['end'].max()]
 
     """Plot map of epitope responses by PTID"""
     keepRegions = ['Signal peptide', 'V1 loop', 'V2 loop',

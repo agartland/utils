@@ -23,7 +23,7 @@ def align2skbio(align):
     return skbio.TabularMSA([Sequence(s, metadata=dict(id=str(i))) for i, s in align.items()])
 
 def skbio2align(seqColl):
-    return pd.Series({s.metadata['id']:''.join(s.values) for s in seqColl})
+    return pd.Series({s.metadata['id']:''.join([c.decode('utf-8') for c in s.values]) for s in seqColl})
 
 def align2fasta(align, fn):
     with open(fn, 'w') as fh:

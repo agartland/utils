@@ -84,6 +84,7 @@ def needleall(seqsA, seqsB=None, gop=5, gep=2):
         with open(outFn, 'r') as fh:
             s = fh.read()
         resDf = _parseEMBOSSmarkx10(s)
+        #print(str(s))
     else:
         print("Error in EMBOSS needleall!")
         raise Exception("EMBOSSError")
@@ -93,9 +94,11 @@ def needleall(seqsA, seqsB=None, gop=5, gep=2):
     if not seqsB is None:
         os.remove(inBFn)
     os.remove(outFn)
-        
-    """Check that all scores are there"""
-    if not seqsB is None:
+    
+    resDf.loc[:, 'SeqA'] = resDf['AlgnSeqA'].str.replace('-','')
+    resDf.loc[:, 'SeqB'] = resDf['AlgnSeqB'].str.replace('-','')
+    """Check that all scores are there: they may not be so just return"""
+    '''if not seqsB is None:
         newShape = (alignB.shape[0], alignA.shape[0])
         index = alignB.values
         columns = alignA.values
@@ -107,8 +110,10 @@ def needleall(seqsA, seqsB=None, gop=5, gep=2):
     pwsim = pd.DataFrame(resDf['Score'].values.reshape(newShape),
                          index=index,
                          columns=columns)
-
-    return pwsim, resDf
+    '''
+    #pwsim = pd.DataFrame(np.nan * np.zeros((len(index), len(columns))), index=index, columns=columns)
+    #pwsim.iloc[resDf.NameA, resDf.NameB] = resDf.Score
+    return resDf
 
 def _parseEMBOSSmarkx10(s):
     allSeqs = np.array(re.findall(r'^([\w-]+)', s, flags=re.MULTILINE))
