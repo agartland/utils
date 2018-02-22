@@ -4,7 +4,8 @@ __all__ = ['unique_rows',
             'argrank',
             'mnmx',
             'mnmxi',
-            'argsort_rows']
+            'argsort_rows',
+            'untangle']
 
 def unique_rows(a, return_index=False, return_inverse=False, return_counts=False):
     """Performs np.unique on whole rows of matrix a using a "view".
@@ -28,6 +29,40 @@ def unique_rows(a, return_index=False, return_inverse=False, return_counts=False
         return out[0]
     else:
         return tuple(out)
+
+def untangle(y_orig, y_tangled, rtol=0.001):
+    """Assuming two vectors contain the same elements (to a
+    relative tolerance), but in different order, find the
+    indices into y_tangled that "untangle" it so that it matches
+    the original data.
+
+    Parameters
+    ----------
+    y_orig : np.ndarray
+    y_tangled : np.ndarray
+
+    Returns
+    -------
+    untanglei : np.ndarray
+        Indices into y_tangled such that: y_orig == y_tangled[untanglei]"""
+
+    yo = np.array(y_orig)
+    y = np.array(y_tangled)
+    assert len(yo) == len(y)
+    
+    yo_sorti = np.argsort(yo)
+    y_sorti = np.argsort(y)
+    
+    yo_sorted = yo[yo_sorti]
+    y_sorted = y[y_sorti]
+    assert np.allclose(yo_sorted, y_sorted, rtol=rtol)
+
+    yo_unsorti = np.argsort(yo_sorti)
+    
+    untanglei = y_sorti[yo_unsorti]
+    newy = y[untanglei]
+    # assert newy == yo
+    return untanglei
 
 def argrank(vec):
     """Return the rank (0 based) of the elements in vec"""
