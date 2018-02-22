@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from copy import deepcopy
 import argparse
+import multiprocessing
 
 import itertools
 import operator
@@ -43,7 +44,8 @@ __all__ = [ 'hamming',
             'encodeVariants',
             'decodeVariants',
             'sliceRespSeq',
-            'computeBreadth']
+            'computeBreadth',
+            'groupby_parallel']
 
 
 
@@ -530,14 +532,15 @@ def plotIsland(island):
     handles = [mpl.patches.Patch(facecolor=colors[e], edgecolor='k') for e in uEpIDs]
     plt.legend(handles, uEpIDs, loc='best', title='Epitope')
 
-def computeBreadth(rxDf, epDf, epitopes=True):
+def computeBreadth(rxDf, epDf, epIDCol='EpID', epitopes=True):
+    """Requires unique EpIDs within a ptid (not by island as before)"""
     if epitopes:
-        tmp = epDf.groupby(['ptid', 'IslandID'])[['EpID']].agg(lambda v: np.unique(v).shape[0]).reset_index().groupby('ptid')[['EpID']].agg(sum).reset_index()
+        tmp = epDf.groupby('ptid')[[epIDCol]].agg(lambda v: np.unique(v.dropna()).shape[0]).reset_index()
     else:
-        tmp = epDf.groupby('ptid')[['seq']].agg(len).reset_index()
+        tmp = epDf.groupby('ptid')[['Seq']].agg(len).reset_index()
     
     breadthDf = pd.merge(tmp, rxDf, left_on='ptid', right_on='ptid', how='right')
-    breadthDf.columns = ['ptid', 'Breadth', 'Arm']
+    breadthDf.columns = ['ptid', 'Breadth ({})'.format(epIDCol), 'Arm']
     breadthDf = breadthDf.fillna(0)
     return breadthDf
 
@@ -615,3 +618,53 @@ def plotBreadth(rxDf, respDf, order=None, epitopes=True):
     sns.swarmplot(x='Arm', y='Breadth', data=breadthDf, linewidth=1, color='black', order=order)
     plt.ylabel('Breadth\n(# of %s)' % 'epitopes' if epitopes else 'responses')
     plt.xlabel('Treatment Group')
+
+def AlgnFreeOverlapRule(island, overlapD, minOverlap=7, minSharedAA=5, maxMismatches=3):
+    """PROBLEM: Is working partly because it is still dependent on using the shared coords
+    Using shared coords greatly reduces complexity of the problem. Will try to go back and
+    get correct coords for each peptide
+
+    If all responses share an overlap by at least minOverlap and 
+    at least minSharedAA amino acid residues are matched in all responses
+    then the responses are considered 'shared'"""
+    oParams = dict(overlapD=overlapD,
+                   minOverlap=minOverlap,
+                   minSharedAA=minSharedAA,
+                   maxMismatches=maxMismatches)
+
+    """Find the shared peptide for responses"""
+    sharedInds = sharedCoords(island)
+
+    nOverlap = 0
+    nMatching = 0
+    seq = ''
+    for si in sharedInds:
+        aas = {respSeq[si - int(respStart)] for respSeq, respStart in zip(island.seq, island.start)}
+        if '-' in aas:
+            seq += '-'
+        else:
+            nOverlap += 1
+            if len(aas) == 1:
+                nMatching += 1
+                seq += aas.pop()
+            else:
+                seq += 'X'
+    allOverlap = np.all([isoverlapping(a, b, **oParams) for a,b in itertools.product(island.seq, island.seq)])
+
+    if allOverlap:
+    # if nOverlap >= minOverlap and nMatching >= minSharedAA:
+        ep = dict(EpSeq=seq, EpStart=sharedInds[0], EpEnd=sharedInds[-1])
+        return True, ep
+    else:
+        return False, {}
+
+def groupby_parallel(gb, func, ncpus=4):
+    """Performs a Pandas groupby operation in parallel.
+    Example
+    -------
+    ep = groupby_parallel(posDf.groupby(['ptid', 'IslandID'], .apply(findEpitopes, overlapRule, minSharedAA=5, minOverlap=7))"""
+    with multiprocessing.Pool(ncpus) as pool:
+        queue = multiprocessing.Manager().Queue()
+        result = pool.starmap_async(func, [(name, group) for name, group in gb])
+        got = result.get()
+    return pd.concat(got)
