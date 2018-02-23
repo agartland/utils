@@ -2,11 +2,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 from numpy.random import permutation, seed
 import pandas as pd
-#import seaborn as sns
+import seaborn as sns
+
+from vectools import untangle
 
 __all__ = ['scatterdots',
            'myboxplot',
-           'manyboxplots']
+           'manyboxplots',
+           'swarmbox']
 
 def scatterdots(data, x, axh=None, width=0.8, returnx=False, rseed=820, **kwargs):
     """Dots plotted with random x-coordinates and y-coordinates from data array.
@@ -189,3 +192,48 @@ def manyboxplots(df, cols=None, axh=None, colLabels=None,annotation='N',horizont
     plt.xlim((-1, x+1))
     plt.xticks(np.arange(x+1))
     xlabelsL = axh.set_xticklabels(colLabels, fontsize = 'large', rotation = xRot, fontname = 'Consolas')
+
+def swarmbox(x, y, hue, data, palette=None, order=None, hue_order=None, connect=False, connect_on=[]):
+    """Based on seaborn boxplots and swarmplots.
+    Adds the option to connect dots by joining on an identifier columns"""
+    if palette is None:
+        palette = sns.color_palette('Set2',  n_colors=data[hue].unique().shape[0])
+    if hue_order is None:
+        hue_order = sorted(data[hue].unique())
+    if order is None:
+        order = sorted(data[x].unique())
+        
+    params = dict(data=data, x=x, y=y, hue=hue, palette=palette, order=order, hue_order=hue_order)
+    sns.boxplot(**params, fliersize=0, linewidth=1.5)
+    swarm = sns.swarmplot(**params, linewidth=0.5, edgecolor='black', dodge=True)
+    if connect:
+        for i in range(len(hue_order) - 1):
+            """Loop over pairs of hues (i.e. grouped boxes)"""
+            curHues = hue_order[i:i+2]
+            """Pull out just the swarm collections that are needed"""
+            zipper = [order] + [swarm.collections[i::len(hue_order)], swarm.collections[i+1::len(hue_order)]]
+            for curx, cA, cB in zip(*zipper):
+                """Loop over the x positions (i.e. outer groups)"""
+                indA = (data[x] == curx) & (data[hue] == curHues[0])
+                indB = (data[x] == curx) & (data[hue] == curHues[1])
+                
+                """Locate the data and match it up with the points plotted for each hue"""
+                tmpA = data[[x, hue, y] + connect_on].loc[indA].dropna()
+                tmpB = data[[x, hue, y] + connect_on].loc[indB].dropna()
+                plottedA = cA.get_offsets() # shaped (n_elements x 2)
+                plottedB = cB.get_offsets()
+                
+                """Merge the data from each hue, including the new detangled x coords,
+                based on what was plotted"""
+                tmpA.loc[:, '_untangi'] = untangle(tmpA[y].values, plottedA[:, 1])
+                tmpB.loc[:, '_untangi'] = untangle(tmpB[y].values, plottedB[:, 1])
+                tmpA.loc[:, '_newx'] = plottedA[:, 0][tmpA['_untangi'].values]
+                tmpB.loc[:, '_newx'] = plottedB[:, 0][tmpB['_untangi'].values]
+                """Using 'inner' drops the data points that are in one hue grouping and not the other"""
+                tmp = pd.merge(tmpA, tmpB, left_on=connect_on, right_on=connect_on, suffixes=('_A', '_B'), how='inner')
+                """Plot them one by one"""
+                for rind, r in tmp.iterrows():
+                    plt.plot(r[['_newx_A', '_newx_B']],
+                             r[[y + '_A', y + '_B']],
+                             '-', color='gray', linewidth=0.5)
+    plt.legend([plt.Circle(1, color=c) for c in palette], hue_order, title=hue, loc='upper left')

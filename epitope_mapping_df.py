@@ -4,6 +4,7 @@ import numpy as np
 from copy import deepcopy
 import argparse
 import multiprocessing
+import skbio
 
 import itertools
 import operator
@@ -45,7 +46,8 @@ __all__ = [ 'hamming',
             'decodeVariants',
             'sliceRespSeq',
             'computeBreadth',
-            'groupby_parallel']
+            'groupby_parallel',
+            'realignPeptides']
 
 
 
@@ -473,12 +475,18 @@ def plotIsland(island):
         col = colors[r.EpID]
 
         plt.plot([sitex2xx[r.start], sitex2xx[r.end - 1]], [y, y], '-s', lw=2, mec='gray', color=col)
+        ann = []
+        if 'PeptideSet' in r:
+            ann.append(r['PeptideSet'])
         if 'LANL start' in r and not pd.isnull(r['LANL start']):
             if pd.isnull(r['LANL HLA']):
                 s = 'LANL {}'.format(r['LANL Epitope'])
             else:
                 s = 'LANL {} {}'.format(r['LANL HLA'], r['LANL Epitope'])
+            ann.append(s)
 
+        if len(ann) > 0:
+            s = ' | '.join(ann)
             plt.annotate(s,
                          xy=(sitex2xx[r.start], y),
                          xytext=(5, 5),
@@ -668,3 +676,115 @@ def groupby_parallel(gb, func, ncpus=4):
         result = pool.starmap_async(func, [(name, group) for name, group in gb])
         got = result.get()
     return pd.concat(got)
+
+def realignPeptides(peptides, alignFn, minL=4):
+    """Use an alignment to assign peptide locations in alignment coordinates.
+    Algorithm first tries to find the whole peptide reporting all sequence IDs
+    that match in the alignment. With successive attempts it tries to match kmers
+    decreasing lengths with a minimum of minL.
+
+    Parameters
+    ----------
+    peptides : iterator
+        Collection of peptides (e.g. list or pd.Series)
+    alignFn : str
+        Filename of a FASTA formatted multiple sequence alignment
+    minL : None int
+        Value of None requires exact matches be found in the alignment
+        or a minimum of minL AAs must match
+
+    Returns
+    -------
+    resDf : pd.DataFrame shape (len(peptides), 6)
+        Columns are: align start, align end, align seq, firstN, lastN, align seqs"""
+
+    seqs = skbio.read(alignFn, format='fasta')
+    seqs = {s.metadata['id']:str(s) for s in seqs}
+    def _findOne(pep, pos=None, L=None):
+        origPep = pep
+        if pos is None:
+            pos = 0
+        if L is None:
+            L = len(pep)
+        pep = pep[pos:pos + L]
+
+        names = []
+        startPos, endPos = -1, -1
+        gapped = ''
+        for name, s in seqs.items():
+            st, en, g = findpeptide(pep, s, returnGapped=True)
+            if st >= 0:
+                names.append(name)
+                startPos, endPos = st, en 
+                gapped = g
+
+                core = gapped
+                afterCore = origPep[pos + L:]
+                beforeCore = origPep[:pos]
+
+                endAdd = len(origPep) - (pos + L)
+                add = 0
+                afteri = 0
+                while add < endAdd:
+                    if not s[endPos] == '-':
+                        add += 1
+                        core = core + afterCore[afteri]
+                        afteri += 1
+                    else:
+                        core = core + '-'
+                    endPos += 1
+
+                add = 0
+                beforei = 0
+                while add < pos:
+                    if not s[startPos-1] == '-':
+                        add += 1
+                        core = beforeCore[pos - beforei - 1] + core
+                        beforei += 1
+                    else:
+                        core = '-' + core
+                    startPos -= 1
+                """For L < len(origPep) this is filling AAs from the alignment"""
+                matched = s[startPos:endPos]
+                """while core fills from the original peptide sequence"""
+
+        if startPos == -1:
+            pep = ''
+            firstN = None
+            lastN = None
+            matched = ''      
+            core = ''
+        out = pd.Series({'align start':startPos,
+                         'align end':endPos,
+                         'align subseq':gapped,
+                         'align seq':matched,
+                         'realign seq':core,
+                         'matched subseq':pep,
+                         'seq':origPep,
+                         'subpos':pos,
+                         'subL':L,
+                         'L':len(origPep),
+                         'align seqs':'|'.join(names)})
+        return out
+
+    resL = []
+    for pep in peptides:
+        out = _findOne(pep)
+        if not minL is None:
+            for k in range(len(pep), minL, -1):
+                for pos in range(len(pep)-k+1):
+                    if out['align start'] < 0:
+                        out = _findOne(pep, pos=pos, L=k)
+                    else:
+                        break
+                if out['align start'] > 0:
+                    break
+        resL.append(out)
+    
+    outDf = pd.DataFrame(resL)
+    if type(peptides) == pd.DataFrame or type(peptides) == pd.Series:
+        outDf.index = peptides.index
+    colsOrder = ['seq', 'align seq', 'realign seq', 'align subseq',
+                 'matched subseq', 'align start', 'align end',
+                 'L', 'subL', 'subpos', 'align seqs']
+    return outDf[colsOrder]
