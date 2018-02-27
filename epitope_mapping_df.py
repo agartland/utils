@@ -47,13 +47,19 @@ __all__ = [ 'hamming',
             'sliceRespSeq',
             'computeBreadth',
             'groupby_parallel',
-            'realignPeptides']
+            'realignPeptides',
+            'coord_overlap']
 
 
 
 def hamming(str1, str2):
     """Hamming distance between two strings"""
     return sum([i for i in map(operator.__ne__, str1, str2)])
+
+def coord_overlap(start1, end1, start2, end2):
+    coords1 = list(range(int(start1), int(end1)))
+    coords2 = list(range(int(start2), int(end2)))
+    return [i for i in coords1 if i in coords2]
 
 def _coords(r, plot=False):
     """Return coordinates of the response peptide
