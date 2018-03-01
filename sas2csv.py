@@ -17,7 +17,10 @@ def convert(path):
                 raw = sas7bdat.SAS7BDAT(f)
                 raw.convert_file(fout)
             except:
-                traceback.print_last()
+                try:
+                    traceback.print_last()
+                except:
+                    print('Exception trying to print exception: %s' % f)
 
 if __name__ == '__main__':
     convert(sys.argv[1])    
