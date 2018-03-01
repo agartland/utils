@@ -113,6 +113,7 @@ def needleall(seqsA, seqsB=None, gop=5, gep=2):
     '''
     #pwsim = pd.DataFrame(np.nan * np.zeros((len(index), len(columns))), index=index, columns=columns)
     #pwsim.iloc[resDf.NameA, resDf.NameB] = resDf.Score
+    # pwsim = resDf.set_index(['SeqA', 'SeqB'])[['Score']].unstack('SeqB')
     return resDf
 
 def _parseEMBOSSmarkx10(s):

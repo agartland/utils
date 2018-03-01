@@ -153,7 +153,7 @@ def applyResponseCriteria(df, subset=['IFNg', 'IL2'], ANY=1, indexCols=None, mag
     symLookup = {True:'+', False:'-'}
 
     
-    base = '/'.join(subset) + ' ({}/{})'.format(ANY, len(subset))
+    base = '/'.join([subset2label(ss) for ss in subset]) + ' ({} of {})'.format(ANY, len(subset))
     pos = base
     neg = base + '-'
     convertLookup = {}
@@ -271,19 +271,36 @@ def vec2subset(vec, cytokines=['IFNg', 'IL2', 'TNFa', 'IL4']):
     return s
 
 def subset2label(s, excludeNeg=False):
-    lookup = {'154': r'CD$154$',
-              '2':r' IL$2$',
-              '4':r' IL$4$',
-              '17':r'IL$17$',
-              'IFNg':r'IFN$\gamma$',
-              'TNFa':r'TNF$\alpha$'}
+    def _convertGreek(s):
+        
+        conv = {'a':r'$\alpha$',
+                'b': r'$\beta$',
+                'g': r'$\gamma$'}
+        return s[:-1] + conv.get(s[-1], s[-1])
+        return s
+    lookup = {'154': 'CD154',
+              'Th2': 'IL4/IL13+',
+              'DR': 'HLA-DR',
+              'GzA+Perf+':'Granzyme A+\nPerforin+',
+              '2':'IL2',
+              '4':'IL4',
+              '17':'IL17',
+              '22':'IL22',
+              'IFNg':'IFNg',
+              'TNFa':'TNFa'}
+
     vec = re.findall(r'\w*[\+-]', s)
-    out = ''
-    for cyt in vec:
-        if not excludeNeg or cyt[-1] == '+':
-            cy = lookup.get(cyt[:-1], cyt[:-1])
-            out += '{:<5s}{}\n'.format(cy, cyt[-1])
-    out = out[:-1]
+    if len(vec) == 0:
+        out = _convertGreek(lookup.get(s, s))
+    else:
+        out = ''
+        for cyt in vec:
+            if not excludeNeg or cyt[-1] == '+':
+                cy = lookup.get(cyt[:-1], cyt[:-1])
+                # print(len(cy), '"{:>5s}"'.format(cy))
+                tmp = _convertGreek('{:>5s}'.format(cy)) + '{}\n'.format(cyt[-1])
+                out += tmp
+        out = out[:-1]
     return out
 
 def itersubsets(cytokines):

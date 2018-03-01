@@ -1,7 +1,12 @@
 import itertools
-from ortools.graph import pywrapgraph
 import numpy as np
 import pandas as pd
+
+try:
+    from ortools.graph import pywrapgraph
+else:
+    print('Could not import ortools')
+
 import networkx as nx
 
 from kernel_regression import computePWDist

@@ -8,10 +8,9 @@ import platform
 import numpy as np
 
 if platform.system() == 'Windows':
-    import _subprocess  # @bug with python 2.7 ?
     startupinfo = subprocess.STARTUPINFO()
-    startupinfo.dwFlags |= _subprocess.STARTF_USESHOWWINDOW
-    startupinfo.wShowWindow = _subprocess.SW_HIDE
+    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    startupinfo.wShowWindow = subprocess.SW_HIDE
 else:
     startupinfo = None
 
