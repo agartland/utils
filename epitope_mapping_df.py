@@ -41,11 +41,9 @@ __all__ = [ 'hamming',
             'findpeptide',
             'plotIsland',
             'plotEpitopeMap',
-            'plotBreadth',
             'encodeVariants',
             'decodeVariants',
             'sliceRespSeq',
-            'computeBreadth',
             'groupby_parallel',
             'realignPeptides',
             'coord_overlap']
@@ -546,18 +544,6 @@ def plotIsland(island):
     handles = [mpl.patches.Patch(facecolor=colors[e], edgecolor='k') for e in uEpIDs]
     plt.legend(handles, uEpIDs, loc='best', title='Epitope')
 
-def computeBreadth(rxDf, epDf, epIDCol='EpID', epitopes=True):
-    """Requires unique EpIDs within a ptid (not by island as before)"""
-    if epitopes:
-        tmp = epDf.groupby('ptid')[[epIDCol]].agg(lambda v: np.unique(v.dropna()).shape[0]).reset_index()
-    else:
-        tmp = epDf.groupby('ptid')[['Seq']].agg(len).reset_index()
-    
-    breadthDf = pd.merge(tmp, rxDf, left_on='ptid', right_on='ptid', how='right')
-    breadthDf.columns = ['ptid', 'Breadth ({})'.format(epIDCol), 'Arm']
-    breadthDf = breadthDf.fillna(0)
-    return breadthDf
-
 def plotEpitopeMap(rxDf, respDf, order=None):
     nPTIDs = rxDf.ptid.unique().shape[0]
     uArms = rxDf.Arm.unique()
@@ -623,15 +609,6 @@ def plotEpitopeMap(rxDf, respDf, order=None):
     handles = [mpl.patches.Patch(facecolor=c, edgecolor='k') for c in armColors[::-1]]
     # plt.legend(handles, uArms[::-1], loc='upper left', bbox_to_anchor=[1,1], fontsize=14)
     plt.legend(handles, uArms[::-1], loc='upper right', fontsize=14)
-
-def plotBreadth(rxDf, respDf, order=None, epitopes=True):
-    """Boxplot of response breadth at the peptide or epitope level"""
-    plt.clf()
-    breadthDf = computeBreadth(rxDf, respDf, epitopes=epitopes)
-    sns.boxplot(x='Arm', y='Breadth', data=breadthDf, fliersize=0, palette='Set1', order=order)
-    sns.swarmplot(x='Arm', y='Breadth', data=breadthDf, linewidth=1, color='black', order=order)
-    plt.ylabel('Breadth\n(# of %s)' % 'epitopes' if epitopes else 'responses')
-    plt.xlabel('Treatment Group')
 
 def AlgnFreeOverlapRule(island, overlapD, minOverlap=7, minSharedAA=5, maxMismatches=3):
     """PROBLEM: Is working partly because it is still dependent on using the shared coords
