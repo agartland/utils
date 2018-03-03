@@ -40,7 +40,6 @@ __all__ = [ 'hamming',
             'hlaRule',
             'findpeptide',
             'plotIsland',
-            'plotEpitopeMap',
             'encodeVariants',
             'decodeVariants',
             'sliceRespSeq',
@@ -482,6 +481,10 @@ def plotIsland(island):
         ann = []
         if 'PeptideSet' in r:
             ann.append(r['PeptideSet'])
+        if 'align seqs' in r:
+            ann.append(r['align seqs'])
+        if 'SFC/M' in r:
+            ann.append('{:1.0f} SFC/M'.format(r['SFC/M']))
         if 'LANL start' in r and not pd.isnull(r['LANL start']):
             if pd.isnull(r['LANL HLA']):
                 s = 'LANL {}'.format(r['LANL Epitope'])
@@ -544,7 +547,7 @@ def plotIsland(island):
     handles = [mpl.patches.Patch(facecolor=colors[e], edgecolor='k') for e in uEpIDs]
     plt.legend(handles, uEpIDs, loc='best', title='Epitope')
 
-def plotEpitopeMap(rxDf, respDf, order=None):
+def _plotEpitopeMap(rxDf, respDf, order=None):
     nPTIDs = rxDf.ptid.unique().shape[0]
     uArms = rxDf.Arm.unique()
     if not order is None:
