@@ -350,7 +350,7 @@ def pwpartialcorr(df, rowVars=None, colVars=None, adjust=[], method='pearson', m
     N = pd.DataFrame(N.astype(int), index=rowVars, columns=colVars)
     return rho, pvalue, qvalue, N
 
-def crosscorr(dfA, dfB, method='pearson', minN=0, adjMethod='fdr_bh', returnLong=False):
+def crosscorr(dfA, dfB, method='spearman', minN=0, adjMethod='fdr_bh', returnLong=False):
     """Pairwise correlations between A and B after a join,
     when there are potential column name overlaps.
 

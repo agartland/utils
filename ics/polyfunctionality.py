@@ -4,7 +4,7 @@ import pandas as pd
 
 try:
     from ortools.graph import pywrapgraph
-else:
+except:
     print('Could not import ortools')
 
 import networkx as nx
