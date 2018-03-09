@@ -236,4 +236,4 @@ def swarmbox(x, y, hue, data, palette=None, order=None, hue_order=None, connect=
                     plt.plot(r[['_newx_A', '_newx_B']],
                              r[[y + '_A', y + '_B']],
                              '-', color='gray', linewidth=0.5)
-    plt.legend([plt.Circle(1, color=c) for c in palette], hue_order, title=hue, loc='upper left')
+    plt.legend([plt.Circle(1, color=c) for c in palette], hue_order, title=hue, loc='best')
