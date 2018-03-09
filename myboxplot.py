@@ -191,14 +191,14 @@ def manyboxplots(df, cols=None, axh=None, colLabels=None,annotation='N',horizont
         
     plt.xlim((-1, x+1))
     plt.xticks(np.arange(x+1))
-    xlabelsL = axh.set_xticklabels(colLabels, fontsize = 'large', rotation = xRot, fontname = 'Consolas')
+    xlabelsL = axh.set_xticklabels(colLabels, fontsize='large', rotation=xRot, fontname='Consolas')
 
-def swarmbox(x, y, hue, data, palette=None, order=None, hue_order=None, connect=False, connect_on=[]):
+def swarmbox(x, y, data, hue=None, palette=None, order=None, hue_order=None, connect=False, connect_on=[], legend_loc=0, legend_bbox=None):
     """Based on seaborn boxplots and swarmplots.
     Adds the option to connect dots by joining on an identifier columns"""
-    if palette is None:
+    if palette is None and not hue is None:
         palette = sns.color_palette('Set2',  n_colors=data[hue].unique().shape[0])
-    if hue_order is None:
+    if hue_order is None and not hue is None:
         hue_order = sorted(data[hue].unique())
     if order is None:
         order = sorted(data[x].unique())
@@ -206,7 +206,7 @@ def swarmbox(x, y, hue, data, palette=None, order=None, hue_order=None, connect=
     params = dict(data=data, x=x, y=y, hue=hue, palette=palette, order=order, hue_order=hue_order)
     sns.boxplot(**params, fliersize=0, linewidth=1.5)
     swarm = sns.swarmplot(**params, linewidth=0.5, edgecolor='black', dodge=True)
-    if connect:
+    if connect and not hue is None:
         for i in range(len(hue_order) - 1):
             """Loop over pairs of hues (i.e. grouped boxes)"""
             curHues = hue_order[i:i+2]
@@ -236,4 +236,5 @@ def swarmbox(x, y, hue, data, palette=None, order=None, hue_order=None, connect=
                     plt.plot(r[['_newx_A', '_newx_B']],
                              r[[y + '_A', y + '_B']],
                              '-', color='gray', linewidth=0.5)
-    plt.legend([plt.Circle(1, color=c) for c in palette], hue_order, title=hue, loc='best')
+    if not hue is None:
+        plt.legend([plt.Circle(1, color=c) for c in palette], hue_order, title=hue, loc=legend_loc, bbox_to_anchor=legend_bbox)
