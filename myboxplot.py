@@ -236,5 +236,7 @@ def swarmbox(x, y, data, hue=None, palette=None, order=None, hue_order=None, con
                     plt.plot(r[['_newx_A', '_newx_B']],
                              r[[y + '_A', y + '_B']],
                              '-', color='gray', linewidth=0.5)
-    if not hue is None:
+    if not hue is None and not legend_loc is None:
         plt.legend([plt.Circle(1, color=c) for c in palette], hue_order, title=hue, loc=legend_loc, bbox_to_anchor=legend_bbox)
+    if legend_loc is None:
+        plt.gca().legend_.remove()
