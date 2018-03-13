@@ -193,7 +193,7 @@ def manyboxplots(df, cols=None, axh=None, colLabels=None,annotation='N',horizont
     plt.xticks(np.arange(x+1))
     xlabelsL = axh.set_xticklabels(colLabels, fontsize='large', rotation=xRot, fontname='Consolas')
 
-def swarmbox(x, y, data, hue=None, palette=None, order=None, hue_order=None, connect=False, connect_on=[], legend_loc=0, legend_bbox=None):
+def swarmbox(x, y, data, hue=None, palette=None, order=None, hue_order=None, connect=False, connect_on=[], legend_loc=0, legend_bbox=None, swarm_alpha=1, swarm_size=5):
     """Based on seaborn boxplots and swarmplots.
     Adds the option to connect dots by joining on an identifier columns"""
     if palette is None and not hue is None:
@@ -205,7 +205,7 @@ def swarmbox(x, y, data, hue=None, palette=None, order=None, hue_order=None, con
         
     params = dict(data=data, x=x, y=y, hue=hue, palette=palette, order=order, hue_order=hue_order)
     sns.boxplot(**params, fliersize=0, linewidth=1.5)
-    swarm = sns.swarmplot(**params, linewidth=0.5, edgecolor='black', dodge=True)
+    swarm = sns.swarmplot(**params, linewidth=0.5, edgecolor='black', dodge=True, alpha=swarm_alpha, size=swarm_size)
     if connect and not hue is None:
         for i in range(len(hue_order) - 1):
             """Loop over pairs of hues (i.e. grouped boxes)"""
