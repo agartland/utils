@@ -193,7 +193,7 @@ def manyboxplots(df, cols=None, axh=None, colLabels=None,annotation='N',horizont
     plt.xticks(np.arange(x+1))
     xlabelsL = axh.set_xticklabels(colLabels, fontsize='large', rotation=xRot, fontname='Consolas')
 
-def swarmbox(x, y, data, hue=None, palette=None, order=None, hue_order=None, connect=False, connect_on=[], legend_loc=0, legend_bbox=None, swarm_alpha=1, swarm_size=5):
+def swarmbox(x, y, data, hue=None, palette=None, order=None, hue_order=None, connect=False, connect_on=[], legend_loc=0, legend_bbox=None, swarm_alpha=1, swarm_size=5, box_alpha=1, box_edgecolor='k'):
     """Based on seaborn boxplots and swarmplots.
     Adds the option to connect dots by joining on an identifier columns"""
     if palette is None and not hue is None:
@@ -203,9 +203,25 @@ def swarmbox(x, y, data, hue=None, palette=None, order=None, hue_order=None, con
     if order is None:
         order = sorted(data[x].unique())
         
-    params = dict(data=data, x=x, y=y, hue=hue, palette=palette, order=order, hue_order=hue_order)
-    sns.boxplot(**params, fliersize=0, linewidth=1.5)
-    swarm = sns.swarmplot(**params, linewidth=0.5, edgecolor='black', dodge=True, alpha=swarm_alpha, size=swarm_size)
+    params = dict(data=data, x=x, y=y, hue=hue, order=order, hue_order=hue_order)
+    box_axh = sns.boxplot(**params,
+                            fliersize=0,
+                            linewidth=1.5,
+                            palette=palette)
+    for patch in box_axh.artists:
+        patch.set_edgecolor((0, 0, 0, 1))
+        r, g, b, a = patch.get_facecolor()
+        patch.set_facecolor((r, g, b, box_alpha))
+    for line in box_axh.lines:
+        line.set_color(box_edgecolor)
+
+    swarm = sns.swarmplot(**params,
+                            linewidth=0.5,
+                            edgecolor='black',
+                            dodge=True,
+                            alpha=swarm_alpha,
+                            size=swarm_size,
+                            palette=palette)
     if connect and not hue is None:
         for i in range(len(hue_order) - 1):
             """Loop over pairs of hues (i.e. grouped boxes)"""
@@ -237,6 +253,6 @@ def swarmbox(x, y, data, hue=None, palette=None, order=None, hue_order=None, con
                              r[[y + '_A', y + '_B']],
                              '-', color='gray', linewidth=0.5)
     if not hue is None and not legend_loc is None:
-        plt.legend([plt.Circle(1, color=c) for c in palette], hue_order, title=hue, loc=legend_loc, bbox_to_anchor=legend_bbox)
+        plt.legend([plt.Circle(1, color=c, alpha=1) for c in palette], hue_order, title=hue, loc=legend_loc, bbox_to_anchor=legend_bbox)
     if legend_loc is None:
         plt.gca().legend_.remove()
