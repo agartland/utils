@@ -6,7 +6,7 @@ import itertools
 import statsmodels.api as sm
 import sklearn
 import sklearn.ensemble
-from sklearn.model_selection import StratifiedKFold, cross_val_score, LeaveOneOut, GridSearchCV
+from sklearn.model_selection import StratifiedKFold, cross_val_score, LeaveOneOut, LeavePOut, GridSearchCV
 import sklearn.linear_model
 
 sns.set(style='darkgrid', palette='muted', font_scale=1.5)
@@ -146,7 +146,7 @@ def plotLogisticL1Vars(lo):
     plt.xlabel('% times selected in 10-fold CV')
     plt.legend(loc=0, title='Final model?')
 
-def logisticL1NestedCV(df, outcomeVar, predVars, nFolds=10, Cs=10, n_jobs=1):
+def logisticL1NestedCV(df, outcomeVar, predVars, nFolds=10, LPO=None, Cs=10, n_jobs=1):
     """Apply logistic regression with L1-regularization (LASSO) to df.
     Uses nested cross-validation framework with inner folds to optimize C
     and outer test folds to evaluate performance.
@@ -159,7 +159,9 @@ def logisticL1NestedCV(df, outcomeVar, predVars, nFolds=10, Cs=10, n_jobs=1):
     predVars : ndarray or list
         Predictor variables in the model.
     nFolds : int
-        N-fold cross-validation
+        N-fold stratified cross-validation
+    LPO : int or None
+        Use Leave-P-Out cross-validation instead of StratifiedNFoldCV
     Cs : int or list
         Each of the values in Cs describes the inverse of regularization strength.
         If Cs is as an int, then a grid of Cs values are chosen in a logarithmic
@@ -192,8 +194,13 @@ def logisticL1NestedCV(df, outcomeVar, predVars, nFolds=10, Cs=10, n_jobs=1):
     tmp = df[[outcomeVar] + predVars].dropna()
     X,y = tmp[predVars].astype(float), tmp[outcomeVar].astype(float)
 
-    innerCV = StratifiedKFold(n_splits=nFolds, shuffle=True)
-    outerCV = StratifiedKFold(n_splits=nFolds, shuffle=True)
+    if LPO is None:
+        innerCV = StratifiedKFold(n_splits=nFolds, shuffle=True)
+        outerCV = StratifiedKFold(n_splits=nFolds, shuffle=True)
+    else:
+        innerCV = LeavePOut(LPO)
+        outerCV = StratifiedKFold(LPO)
+
     
     scorerFunc = sklearn.metrics.make_scorer(sklearn.metrics.log_loss,
                                              greater_is_better=False,
@@ -284,7 +291,7 @@ def logisticL1NestedCV(df, outcomeVar, predVars, nFolds=10, Cs=10, n_jobs=1):
     outD.update(rocRes[['Sensitivity', 'Specificity']].to_dict())
     return outD
 
-def nestedCVClassifier(df, outcomeVar, predVars, model, params={}, nFolds=10, scorer='log_loss', n_jobs=1):
+def nestedCVClassifier(df, outcomeVar, predVars, model, params={}, nFolds=10, LPO=None, scorer='log_loss', n_jobs=1):
     """Apply model to df in nested cross-validation framework
     with inner folds to optimize hyperparameters.
     and outer test folds to evaluate performance.
@@ -298,7 +305,9 @@ def nestedCVClassifier(df, outcomeVar, predVars, model, params={}, nFolds=10, sc
         Predictor variables in the model.
     model : sklearn model
     nFolds : int
-        N-fold cross-validation
+        N-fold stratified cross-validation
+    LPO : int or None
+        Use Leave-P-Out cross-validation instead of StratifiedNFoldCV
     params : dict
         Keys of model hyperparameters withe values to try in
         a grid search.
@@ -330,8 +339,12 @@ def nestedCVClassifier(df, outcomeVar, predVars, model, params={}, nFolds=10, sc
     tmp = df[[outcomeVar] + predVars].dropna()
     X,y = tmp[predVars].astype(float), tmp[outcomeVar].astype(float)
 
-    innerCV = StratifiedKFold(n_splits=nFolds, shuffle=True)
-    outerCV = StratifiedKFold(n_splits=nFolds, shuffle=True)
+    if LPO is None:
+        innerCV = StratifiedKFold(n_splits=nFolds, shuffle=True)
+        outerCV = StratifiedKFold(n_splits=nFolds, shuffle=True)
+    else:
+        innerCV = LeavePOut(LPO)
+        outerCV = StratifiedKFold(LPO)
     
     if scorer == 'log_loss':
         scorerFunc = sklearn.metrics.make_scorer(sklearn.metrics.log_loss,
