@@ -83,6 +83,12 @@ def partialcorr(x, y, adjust=[], method='pearson', minN = None):
     if not minN is None and tmpDf.shape[0] < minN:
         return np.nan, 1.
     
+    if len(adjust) == 0:
+        if method == 'pearson':
+            pc, pvalue = stats.pearsonr(tmpDf[x.name].values, tmpDf[y.name].values)
+        else:
+            pc, pvalue = stats.spearmanr(tmpDf[x.name].values, tmpDf[y.name].values)
+
     m = np.zeros((tmpDf.shape[0], 2+len(adjust)))
     
     if method == 'spearman':
