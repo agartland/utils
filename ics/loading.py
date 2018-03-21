@@ -125,7 +125,7 @@ def parseRaw(fn):
     df = pdf['mag'].reset_index().join(ndf['bg'], on=ctrlCols)
     return df
 
-def applyResponseCriteria(df, subset=['IFNg', 'IL2'], ANY=1, indexCols=None, magCol='cytnum'):
+def applyResponseCriteria(df, subset=['IFNg', 'IL2'], ANY=1, indexCols=None, magCols=['cytnum']):
     """Compress cytokine subsets into binary subsets (ie positive/negative)
     based on criteria such as ANY 1 of IFNg or IL2 (ie IFNg and/or IL2)
 
@@ -137,6 +137,8 @@ def applyResponseCriteria(df, subset=['IFNg', 'IL2'], ANY=1, indexCols=None, mag
         Cytokines considered for positivity.
     ANY : int
         Number of cytokines from subset required to be positive.
+    magCols : list
+        Columns that will be summed in the summary.
 
     Returns
     -------
@@ -144,7 +146,7 @@ def applyResponseCriteria(df, subset=['IFNg', 'IL2'], ANY=1, indexCols=None, mag
         A stacked dataset that has fewer unique cytokine subsets after marginalizing over cytokines not in subset."""
     
     """First compress to the relevant cytokines"""
-    cdf = compressSubsets(df, subset=subset, indexCols=indexCols, groups=None, magCol=magCol)
+    cdf = compressSubsets(df, subset=subset, indexCols=indexCols, groups=None, magCols=magCols)
 
     cytokineSubsets = cdf.cytokine.unique()
     cytokines = cytokineSubsets[0].replace('-', '+').split('+')[:-1]
@@ -169,11 +171,11 @@ def applyResponseCriteria(df, subset=['IFNg', 'IL2'], ANY=1, indexCols=None, mag
     """Only keep the positive subset"""
     cdf = cdf.loc[cdf['cytokine'] == pos]
     """Groupby unique columns and agg-sum across cytokine subsets, then reset index"""
-    cdf = cdf[indexCols + [magCol, 'cytokine']].groupby(indexCols + ['cytokine']).agg(np.sum)
+    cdf = cdf[indexCols + magCols + ['cytokine']].groupby(indexCols + ['cytokine']).agg(np.sum)
     cdf = cdf.reset_index()
     return cdf
 
-def compressSubsets(df, subset=['IFNg', '2', 'TNFa'], indexCols=None, groups=None, magCol='cytnum'):
+def compressSubsets(df, subset=['IFNg', '2', 'TNFa'], indexCols=None, groups=None, magCols=['cytnum']):
     """Combine cell subsets into a smaller number of subsets before performing the analysis.
     Data will be summed-over cytokines not included in the subset list.
 
@@ -188,6 +190,8 @@ def compressSubsets(df, subset=['IFNg', '2', 'TNFa'], indexCols=None, groups=Non
     groups : dict of lists
         Alternatively, use groups of cytokine subsets to compress (e.g. ANY 1 marker)
         New column names will be the keys in groups.
+    magCols : list
+        Columns that will be summed over in the compression.
 
     Returns
     -------
@@ -228,7 +232,7 @@ def compressSubsets(df, subset=['IFNg', '2', 'TNFa'], indexCols=None, groups=Non
     aggDf = df.copy()
     aggDf['cytokine'] = aggDf.cytokine.map(convertLookup.get)
     """Groupby unique columns and agg-sum across cytokine subsets, then reset index"""
-    aggDf = aggDf[indexCols + [magCol, 'cytokine']].groupby(indexCols + ['cytokine']).agg(sum)
+    aggDf = aggDf[indexCols + magCols + ['cytokine']].groupby(indexCols + ['cytokine']).agg(sum)
     aggDf = aggDf.reset_index()
     return aggDf
 
