@@ -410,20 +410,29 @@ def RRCI(a, b, c, d, alpha=0.05, RR0=1, method='katz'):
         Upper-bound
     pvalue : float
         P-value by inverting the Wald CI"""
+    if np.all([np.isscalar(x) for x in [a, b, c, d]]):
+        back2scalar = True
+        a = np.asarray(a).reshape((1,))
+        b = np.asarray(b).reshape((1,))
+        c = np.asarray(c).reshape((1,))
+        d = np.asarray(d).reshape((1,))
+    elif np.any([np.isscalar(x) for x in [a, b, c, d]]):
+        raise ValueError('Cannot currently handle mix of scalars and vectors.')
+    else:
+        a = np.asarray(a)
+        b = np.asarray(b)
+        c = np.asarray(c)
+        d = np.asarray(d)
+        back2scalar = False
+
     if method.lower() == 'katz':
         """Standard normal approximation of RR CI"""
-        try:
-            rr = (a / (a+b)) / (c / (c+d))
-        except ZeroDivisionError:
-            if a+b == 0 or c+d==0:
-                rr = np.nan
-            elif c == 0:
-                rr = np.inf
-        
-        try:
-            se = np.sqrt((1/a + 1/c) - (1/(a+b) + 1/(c+d)))
-        except ZeroDivisionError:
-            se = np.inf
+        rr = (a / (a+b)) / (c / (c+d))
+        rr[c == 0] = np.inf
+       
+        se = np.sqrt((1/a + 1/c) - (1/(a+b) + 1/(c+d)))
+        se[np.isnan(se)] = np.inf
+
     elif method == 'adj-log':
         """Add 1/2 count to each square"""
         rr = ((a+0.5) / (a + b + 1)) / ((c+0.5) / (c + d + 1))
@@ -435,6 +444,12 @@ def RRCI(a, b, c, d, alpha=0.05, RR0=1, method='katz'):
 
     """Invert CI for H0: RR = 1"""
     pvalue = 1 - stats.norm.cdf(np.abs(np.log(rr) - np.log(RR0))/se)
+
+    if back2scalar and len(rr) == 1:
+        rr = rr[0]
+        lb = lb[0]
+        ub = ub[0]
+        pvalue = pvalue[0]
 
     return rr, lb, ub, pvalue
 
@@ -470,10 +485,25 @@ def sensitivityCI(a, b, c, d, alpha=0.05):
         Lower-bound
     ub : float
         Upper-bound"""
-    if np.isscalar(a):
-        a = np.array([a])
+    if np.all([np.isscalar(x) for x in [a, c]]):
+        back2scalar = True
+        a = np.asarray(a).reshape((1,))
+        c = np.asarray(c).reshape((1,))
+    elif np.any([np.isscalar(x) for x in [a,c]]):
+        raise ValueError('Cannot currently handle mix of scalars and vectors.')
+    else:
+        a = np.asarray(a)
+        c = np.asarray(c)
+        back2scalar = False
+
     sens = a / (a+c)
     lb, ub = eventCI(x=a, N=a+c, alpha=alpha)
+
+    if back2scalar and len(sens) == 1:
+        sens = sens[0]
+        lb = lb[0]
+        ub = ub[0]
+
     return sens, lb, ub
 
 def specificityCI(a, b, c, d, alpha=0.05):
@@ -508,11 +538,25 @@ def specificityCI(a, b, c, d, alpha=0.05):
         Lower-bound
     ub : float
         Upper-bound"""
+    if np.all([np.isscalar(x) for x in [b, d]]):
+        back2scalar = True
+        b = np.asarray(b).reshape((1,))
+        d = np.asarray(d).reshape((1,))
+    elif np.any([np.isscalar(x) for x in [b, d]]):
+        raise ValueError('Cannot currently handle mix of scalars and vectors.')
+    else:
+        b = np.asarray(b)
+        d = np.asarray(d)
+        back2scalar = False
 
-    if np.isscalar(d):
-        d = np.array([d])
     spec = d / (b+d)
     lb, ub = eventCI(x=d, N=b+d, alpha=alpha)
+
+    if back2scalar and len(spec) == 1:
+        spec = spec[0]
+        lb = lb[0]
+        ub = ub[0]
+
     return spec, lb, ub
 
 def computeRR(df, outcome, predictor, alpha=0.05):

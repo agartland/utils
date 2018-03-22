@@ -20,6 +20,7 @@ __all__ = ['plotROC', 'plotROCObj',
            'nestedCVClassifier',
            'computeROC',
            'computeCVROC',
+           'captureStandardization',
            'smLogisticRegression',
            'rocStats',
            'plotNestedCVParams',
@@ -199,13 +200,13 @@ def logisticL1NestedCV(df, outcomeVar, predVars, nFolds=10, LPO=None, Cs=10, n_j
         outerCV = StratifiedKFold(n_splits=nFolds, shuffle=True)
     else:
         innerCV = LeavePOut(LPO)
-        outerCV = StratifiedKFold(LPO)
+        outerCV = LeavePOut(LPO)
 
-    
     scorerFunc = sklearn.metrics.make_scorer(sklearn.metrics.log_loss,
                                              greater_is_better=False,
                                              needs_proba=True,
-                                             needs_threshold=False)
+                                             needs_threshold=False,
+                                             labels=[0, 1])
     
     fpr = np.linspace(0, 1, 100)
     tpr = np.nan * np.zeros((fpr.shape[0], nFolds))
@@ -344,13 +345,14 @@ def nestedCVClassifier(df, outcomeVar, predVars, model, params={}, nFolds=10, LP
         outerCV = StratifiedKFold(n_splits=nFolds, shuffle=True)
     else:
         innerCV = LeavePOut(LPO)
-        outerCV = StratifiedKFold(LPO)
-    
+        outerCV = LeavePOut(LPO)
+
     if scorer == 'log_loss':
         scorerFunc = sklearn.metrics.make_scorer(sklearn.metrics.log_loss,
                                                  greater_is_better=False,
                                                  needs_proba=True,
-                                                 needs_threshold=False)
+                                                 needs_threshold=False,
+                                                 labels=[0, 1])
     elif scorer == 'accuracy':
         scorerFunc = sklearn.metrics.make_scorer(sklearn.metrics.accuracy_score,
                                                  greater_is_better=True,
@@ -422,6 +424,24 @@ def nestedCVClassifier(df, outcomeVar, predVars, model, params={}, nFolds=10, LP
             'params':params}                  
     outD.update(rocRes[['Sensitivity', 'Specificity']].to_dict())
     return outD
+
+def captureStandardization(df, columns=None):
+    """A function factory that creates a function for standardizing all columns
+    in df with each columns mean and standard deviation."""
+    if columns is None:
+        columns = df.columns
+    stdParams = {}
+    for c in columns:
+        mu = df[c].mean()
+        sigma2 = df[c].std()
+        stdParams[c] = (mu, sigma2)
+    
+    def stdFunc(df):
+        df = df.copy()
+        for c in columns:
+            df.loc[:, c] = (df[c] - stdParams[c][0]) / stdParams[c][1]
+        return df
+    return stdFunc
 
 def plotNestedCVScores(lo):
     scores = _reshape(lo, 'mean_test_score').mean(axis=0)
