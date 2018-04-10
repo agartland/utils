@@ -14,8 +14,9 @@ def toPNG(df, outFn, dpi=200, **kwargs):
     toPDF(df, pdfFn, **kwargs)
     cmd = ['convert',# '-interaction=nonstopmode',
            '-density %d' % dpi,
+           '-alpha remove', 
            pdfFn,
-           outFn]
+           'PNG32:%s' % outFn]
     #print ' '.join(cmd)
     if 'hideConsole' in kwargs and kwargs['hideConsole']:
         try:
@@ -66,7 +67,7 @@ def toPDF(df,
             return s.replace(c1, c2)
     if not df.empty:
         for func in [partial(repChar, c1='_', c2='-'),
-                     partial(repChar, c1='%', c2='PCT')]:
+                     partial(repChar, c1='%', c2='\\%')]:
             df = df.applymap(func)
             df = df.rename(func, axis=0)
             df = df.rename(func, axis=1)
@@ -86,7 +87,9 @@ def toPDF(df,
               '\\rhead{%s}' % time.ctime(),
               '\\chead{%s}' % titStr,
               '\\rfoot{Page \\thepage}',
+              '\\renewcommand{\\familydefault}{\\sfdefault}'
               '\\begin{document}']
+              #'\\section*{%s}' % titStr]
     
     footer = ['\\end{document}']
 
