@@ -193,7 +193,7 @@ def manyboxplots(df, cols=None, axh=None, colLabels=None,annotation='N',horizont
     plt.xticks(np.arange(x+1))
     xlabelsL = axh.set_xticklabels(colLabels, fontsize='large', rotation=xRot, fontname='Consolas')
 
-def swarmbox(x, y, data, hue=None, palette=None, order=None, hue_order=None, connect=False, connect_on=[], legend_loc=0, legend_bbox=None, swarm_alpha=1, swarm_size=5, box_alpha=1, box_edgecolor='k'):
+def swarmbox(x, y, data, hue=None, palette=None, order=None, hue_order=None, connect=False, connect_on=[], legend_loc=0, legend_bbox=None, swarm_alpha=1, swarm_size=5, box_alpha=1, box_edgecolor='k', box_facewhite=False):
     """Based on seaborn boxplots and swarmplots.
     Adds the option to connect dots by joining on an identifier columns"""
     if palette is None and not hue is None:
@@ -211,7 +211,10 @@ def swarmbox(x, y, data, hue=None, palette=None, order=None, hue_order=None, con
     for patch in box_axh.artists:
         patch.set_edgecolor((0, 0, 0, 1))
         r, g, b, a = patch.get_facecolor()
-        patch.set_facecolor((r, g, b, box_alpha))
+        if box_facewhite:
+            patch.set_facecolor((1, 1, 1, 1))
+        else:
+            patch.set_facecolor((r, g, b, box_alpha))
     for line in box_axh.lines:
         line.set_color(box_edgecolor)
 
