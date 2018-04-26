@@ -81,13 +81,16 @@ def partialcorr(x, y, adjust=[], method='pearson', minN = None):
     tmpDf = tmpDf.dropna(axis=0, how='any')
 
     if not minN is None and tmpDf.shape[0] < minN:
+        """Do not compute a correlation if n < minN"""
         return np.nan, 1.
     
     if len(adjust) == 0:
+        """Ensures that when adjust = [], this is just a call to scipy correlation statistic"""
         if method == 'pearson':
             pc, pvalue = stats.pearsonr(tmpDf[x.name].values, tmpDf[y.name].values)
         else:
             pc, pvalue = stats.spearmanr(tmpDf[x.name].values, tmpDf[y.name].values)
+        return pc, pvalue
 
     m = np.zeros((tmpDf.shape[0], 2+len(adjust)))
     
@@ -389,7 +392,9 @@ def crosscorr(dfA, dfB, method='spearman', minN=0, adjMethod='fdr_bh', returnLon
 
     joinedDf = pd.merge(dfA, dfB, left_index=True, right_index=True)
 
-    rho, pvalue, qvalue, N = pwpartialcorr(joinedDf, rowVars=dfA.columns, colVars=dfB.columns, method=method, minN=minN, adjMethod=adjMethod)
+    rho, pvalue, qvalue, N = pwpartialcorr(joinedDf,
+                                           rowVars=dfA.columns, colVars=dfB.columns,
+                                           method=method, minN=minN, adjMethod=adjMethod)
 
     rho.index = colA
     rho.columns = colB
