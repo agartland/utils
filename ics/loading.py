@@ -125,7 +125,7 @@ def parseRaw(fn):
     df = pdf['mag'].reset_index().join(ndf['bg'], on=ctrlCols)
     return df
 
-def applyResponseCriteria(df, subset=['IFNg', 'IL2'], ANY=1, indexCols=None, magCols=['cytnum']):
+def applyResponseCriteria(df, subset=['IFNg', 'IL2'], ANY=1, indexCols=None, magCols=['cytnum'], nsubCols=['nsub']):
     """Compress cytokine subsets into binary subsets (ie positive/negative)
     based on criteria such as ANY 1 of IFNg or IL2 (ie IFNg and/or IL2)
 
@@ -139,6 +139,9 @@ def applyResponseCriteria(df, subset=['IFNg', 'IL2'], ANY=1, indexCols=None, mag
         Number of cytokines from subset required to be positive.
     magCols : list
         Columns that will be summed in the summary.
+    nsubCols : list
+        Columns that will be median'ed over in the compression.
+        (they should all be identical though, since nsub is same for all cytokine subsets)
 
     Returns
     -------
@@ -146,7 +149,7 @@ def applyResponseCriteria(df, subset=['IFNg', 'IL2'], ANY=1, indexCols=None, mag
         A stacked dataset that has fewer unique cytokine subsets after marginalizing over cytokines not in subset."""
     
     """First compress to the relevant cytokines"""
-    cdf = compressSubsets(df, subset=subset, indexCols=indexCols, groups=None, magCols=magCols)
+    cdf = compressSubsets(df, subset=subset, indexCols=indexCols, groups=None, magCols=magCols, nsubCols=nsubCols)
 
     cytokineSubsets = cdf.cytokine.unique()
     cytokines = cytokineSubsets[0].replace('-', '+').split('+')[:-1]
@@ -171,11 +174,16 @@ def applyResponseCriteria(df, subset=['IFNg', 'IL2'], ANY=1, indexCols=None, mag
     """Only keep the positive subset"""
     cdf = cdf.loc[cdf['cytokine'] == pos]
     """Groupby unique columns and agg-sum across cytokine subsets, then reset index"""
-    cdf = cdf[indexCols + magCols + ['cytokine']].groupby(indexCols + ['cytokine']).agg(np.sum)
-    cdf = cdf.reset_index()
-    return cdf
+    out = cdf[indexCols + magCols + ['cytokine']].groupby(indexCols + ['cytokine']).agg(np.sum)
 
-def compressSubsets(df, subset=['IFNg', '2', 'TNFa'], indexCols=None, groups=None, magCols=['cytnum']):
+    if not nsubCols is None:
+        nsubDf = cdf[indexCols + nsubCols + ['cytokine']].groupby(indexCols + ['cytokine']).agg(np.median)
+        out = out.join(nsubDf)
+   
+    out = out.reset_index()
+    return out
+
+def compressSubsets(df, subset=['IFNg', '2', 'TNFa'], indexCols=None, groups=None, magCols=['cytnum'], nsubCols=['nsub']):
     """Combine cell subsets into a smaller number of subsets before performing the analysis.
     Data will be summed-over cytokines not included in the subset list.
 
@@ -192,6 +200,9 @@ def compressSubsets(df, subset=['IFNg', '2', 'TNFa'], indexCols=None, groups=Non
         New column names will be the keys in groups.
     magCols : list
         Columns that will be summed over in the compression.
+    nsubCols : list
+        Columns that will be median'ed over in the compression.
+        (they should all be identical though, since nsub is same for all cytokine subsets)
 
     Returns
     -------
@@ -229,10 +240,13 @@ def compressSubsets(df, subset=['IFNg', '2', 'TNFa'], indexCols=None, groups=Non
         print("Need to specify cytokine subsets!")
         return df
 
-    aggDf = df.copy()
-    aggDf['cytokine'] = aggDf.cytokine.map(convertLookup.get)
+    preDf = df.copy()
+    preDf['cytokine'] = preDf.cytokine.map(convertLookup.get)
     """Groupby unique columns and agg-sum across cytokine subsets, then reset index"""
-    aggDf = aggDf[indexCols + magCols + ['cytokine']].groupby(indexCols + ['cytokine']).agg(sum)
+    aggDf = preDf[indexCols + magCols + ['cytokine']].groupby(indexCols + ['cytokine']).agg(np.sum)
+    if not nsubCols is None:
+        nsubDf = preDf[indexCols + nsubCols + ['cytokine']].groupby(indexCols + ['cytokine']).agg(np.median)
+        aggDf = aggDf.join(nsubDf)
     aggDf = aggDf.reset_index()
     return aggDf
 
@@ -291,7 +305,9 @@ def subset2label(s, excludeNeg=False):
               '17':'IL17',
               '22':'IL22',
               'IFNg':'IFNg',
-              'TNFa':'TNFa'}
+              'TNFa':'TNFa',
+              'TN':'TNFa',
+              'IF':'IFNg'}
 
     vec = re.findall(r'\w*[\+-]', s)
     if len(vec) == 0:
