@@ -1,4 +1,4 @@
-
+import itertools
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -158,12 +158,14 @@ def screeplot(df, method='pca', n_components=10, standardize=False, smatFunc=Non
         bottom = 0
         for dimi, col in zip(list(range(df.shape[1])), itertools.cycle(palettable.colorbrewer.qualitative.Set3_12.mpl_colors)):
             height = pca.components_[compi, dimi]**2 / (pca.components_[compi,:]**2).sum()
-            axh2.bar(left=compi, bottom=bottom, height=height, align='center', color=col)
+            if height > 0.01:
+                axh2.bar(left=compi, bottom=bottom, height=height, align='center', color=col)
             if height > 0.1:
                 note = df.columns[dimi].replace(' ', '\n')
                 note += '(+)' if pca.components_[compi, dimi] >= 0 else '(-)'
                 axh2.annotate(note, xy=(compi, bottom+height/2), ha='center', va='center', size='small')
-            bottom += height
+            if height > 0.01:
+                bottom += height
     plt.xticks(list(range(n_components)), ['PC%d' % (i+1) for i in range(n_components)], rotation=90)
     plt.ylim([0, 1])
     plt.ylabel('Fraction of\ncomponent variance')

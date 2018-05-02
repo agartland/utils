@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from lifelines.estimation import KaplanMeierFitter, NelsonAalenFitter
+from lifelines import KaplanMeierFitter, NelsonAalenFitter
 from lifelines.statistics import logrank_test
 from lifelines import CoxPHFitter
 from myfisher import *
