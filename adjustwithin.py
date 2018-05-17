@@ -75,8 +75,8 @@ def adjustwithin(df, pCol, withinCols, method='holm'):
 
     Returns
     -------
-    adjDf : pd.DataFrame
-        Same shape as df, but with adjusted pvalues/adjpvalues."""
+    adjSeries : pd.Series
+        Same shape[0] as df containing adjusted pvalues/adjpvalues."""
 
     def _transformFunc(ser, method):
         nonNan = ~ser.isnull()
@@ -92,8 +92,7 @@ def adjustwithin(df, pCol, withinCols, method='holm'):
         gby = df[[pCol] + withinCols].groupby(withinCols)
 
         adjDf = gby.transform(partial(_transformFunc, method=method))
-        adjDf = df.drop(pCol, axis=1).join(adjDf)
+        # adjDf = df.drop(pCol, axis=1).join(adjDf)
     else:
-        adjDf = df.copy()
-        adjDf.loc[:, pCol] = adjustnonnan(adjDf.loc[:, pCol], method=method)
+        adjDf = pd.Series(adjustnonnan(df.loc[:, pCol], method=method), index=df.index, name='adjusted-pvalue')
     return adjDf

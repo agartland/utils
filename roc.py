@@ -23,6 +23,7 @@ __all__ = ['plotROC', 'plotROCObj',
            'captureStandardization',
            'smLogisticRegression',
            'rocStats',
+           'compute2x2',
            'plotNestedCVParams',
            'plotNestedCVScores']
 
@@ -700,6 +701,34 @@ class smLogisticRegression(object):
         pred = self.res.predict(exog)
         return pred
 
+def compute2x2(obs, pred):
+    """Compute stats for a 2x2 table derived from
+    observed and predicted data vectors
+
+    Parameters
+    ----------
+    obs,pred : np.ndarray or pd.Series of shape (n,)
+
+    Returns
+    -------
+    a : int
+        True positives
+    b : int
+        False positives
+    c : int
+        False negatives
+    d : True negatives"""
+
+
+    assert obs.shape[0] == pred.shape[0]
+
+    a = (obs.astype(bool) & pred.astype(bool)).sum() # TP
+    c = (obs.astype(bool) & (~pred.astype(bool))).sum() # FN
+    b = ((~obs.astype(bool)) & pred.astype(bool)).sum() # FP
+    d = ((~obs.astype(bool)) & (~pred.astype(bool))).sum() # TN 
+    return a, b, c, d
+
+
 def rocStats(obs, pred, returnSeries=True):
     """Compute stats for a 2x2 table derived from
     observed and predicted data vectors
@@ -732,6 +761,7 @@ def rocStats(obs, pred, returnSeries=True):
 
     assert obs.shape[0] == pred.shape[0]
 
+    """Note a,b,c,d here are different than typical"""
     n = obs.shape[0]
     a = (obs.astype(bool) & pred.astype(bool)).sum() # TP
     b = (obs.astype(bool) & (~pred.astype(bool))).sum() # FN
@@ -797,10 +827,10 @@ def rocStats2x2(a, b, c, d):
         Marginal prevalence of the predictor."""
 
     n = a + b + c + d
-    a = a / n
-    b = b / n
-    c = c / n
-    d = d / n
+    #a = a / n
+    #b = b / n
+    #c = c / n
+    #d = d / n
 
     sens = a / (a+c)
     spec = d / (b+d)
@@ -810,15 +840,15 @@ def rocStats2x2(a, b, c, d):
     acc = (a + d)/n
     rr = (a / (a+b)) / (c / (c+d))
     OR = (a/c) / (b/d)
-    prevOut = a + c
-    prevPred = a + b
+    prevOut = (a + c) / n
+    prevPred = (a + b) / n
 
-    vec = [sens, spec, ppv, npv, nnt, acc, rr, OR, prevOut, prevPred, a, b, c, d]
+    vec = [sens, spec, ppv, npv, nnt, acc, rr, OR, prevOut, prevPred, a, b, c, d, n]
     labels = ['Sensitivity', 'Specificity',
                 'PPV', 'NPV', 'NNT',
                 'ACC', 'RR', 'OR',
                 'prevOut', 'prevPred',
-                'A', 'B', 'C', 'D']
+                'A', 'B', 'C', 'D', 'N']
     if np.isscalar(a):
         out = pd.Series(vec, name='ROC', index=labels)
     else:
