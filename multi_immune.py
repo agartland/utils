@@ -121,21 +121,33 @@ def plotHeatmap(df, row_labels=None, col_labels=None, titleStr=None, vRange=None
     fig.clf()
 
     if row_labels is None and col_labels is None:
-        heatmapAX = fig.add_subplot(GridSpec(1, 1, left=0.05, bottom=0.05, right=0.78, top=0.85)[0, 0])
+        heatmapAX = fig.add_subplot(GridSpec(1, 1, left=0.05, bottom=0.05, right=0.78, top=0.90)[0, 0])
         scale_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.87, bottom=0.05, right=0.93, top=0.85)[0, 0])
+        outAX = {'heatmap':heatmapAX,
+                'scale':scale_cbAX}
     elif col_labels is None:
-        row_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.05, bottom=0.05, right=0.09, top=0.85)[0, 0])
-        heatmapAX = fig.add_subplot(GridSpec(1, 1, left=0.1, bottom=0.05, right=0.78, top=0.85)[0, 0])
-        scale_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.87, bottom=0.05, right=0.93, top=0.85)[0, 0])
+        row_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.05, bottom=0.05, right=0.09, top=0.90)[0, 0])
+        heatmapAX = fig.add_subplot(GridSpec(1, 1, left=0.1, bottom=0.05, right=0.78, top=0.90)[0, 0])
+        scale_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.87, bottom=0.05, right=0.93, top=0.90)[0, 0])
+        outAX = {'heatmap':heatmapAX,
+                 'scale':scale_cbAX,
+                 'rowCB':row_cbAX}
     elif row_labels is None:
         col_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.05, bottom=0.05, right=0.78, top=0.09)[0, 0])
-        heatmapAX = fig.add_subplot(GridSpec(1, 1, left=0.05, bottom=0.1, right=0.78, top=0.85)[0, 0])
-        scale_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.87, bottom=0.05, right=0.93, top=0.85)[0, 0])
+        heatmapAX = fig.add_subplot(GridSpec(1, 1, left=0.05, bottom=0.1, right=0.78, top=0.90)[0, 0])
+        scale_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.87, bottom=0.05, right=0.93, top=0.90)[0, 0])
+        outAX = {'heatmap':heatmapAX,
+                 'scale':scale_cbAX,
+                 'colCB':col_cbAX}
     else:
-        row_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.05, bottom=0.05, right=0.09, top=0.85)[0, 0])
+        row_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.05, bottom=0.05, right=0.09, top=0.90)[0, 0])
         col_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.1, bottom=0.05, right=0.09, top=0.09)[0, 0])
-        heatmapAX = fig.add_subplot(GridSpec(1, 1, left=0.1, bottom=0.1, right=0.78, top=0.85)[0, 0])
-        scale_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.87, bottom=0.05, right=0.93, top=0.85)[0, 0])
+        heatmapAX = fig.add_subplot(GridSpec(1, 1, left=0.1, bottom=0.1, right=0.78, top=0.90)[0, 0])
+        scale_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.87, bottom=0.05, right=0.93, top=0.90)[0, 0])
+        outAX = {'heatmap':heatmapAX,
+                 'scale':scale_cbAX,
+                 'colCB':col_cbAX,
+                 'rowCB':row_cbAX}
 
     my_norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
 
@@ -193,7 +205,7 @@ def plotHeatmap(df, row_labels=None, col_labels=None, titleStr=None, vRange=None
     if not titleStr is None:
         heatmapAX.set_xlabel(titleStr, size='x-large')
     plt.show()
-    return heatmapAX
+    return outAX
 
 def plotHierClust(dmatDf, Z, labels=None, titleStr=None, vRange=None, tickSz='small', cmap=None, cmapLabel='', plotLegend=False, plotColorbar=True):
     """Display a hierarchical clustering result."""
