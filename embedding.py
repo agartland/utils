@@ -72,7 +72,7 @@ def embedDistanceMatrix(dmatDf, method='kpca', n_components=2, **kwargs):
     if method == 'kpca':
         """Not sure how negative eigenvalues should be handled here, but they are usually
         small so it shouldn't make a big difference"""
-        xyDf.explained_variance_ = pcaObj.lambdas_[:n_components]/pcaObj.lambdas_[pcaObj.lambdas_>0].sum()
+        setattr(xyDf, 'explained_variance_', pcaObj.lambdas_[:n_components]/pcaObj.lambdas_[pcaObj.lambdas_>0].sum())
     return xyDf
 
 def computePWDist(df, metric='pearson-signed', dfunc=None, minN=10, symetric=True):

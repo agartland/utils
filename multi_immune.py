@@ -103,7 +103,7 @@ def _clean_axis(ax):
     ax.grid(False)
     ax.set_facecolor('white')
 
-def plotHeatmap(df, labels=None, titleStr=None, vRange=None, tickSz='small', cmap=None, cmapLabel='', annotation=False, xtickRot=90):
+def plotHeatmap(df, row_labels=None, col_labels=None, titleStr=None, vRange=None, tickSz='small', cmap=None, cmapLabel='', annotation=False, xtickRot=90, xtickLabels=False, ytickLabels=False):
     """Display a heatmap with labels."""
     if vRange is None:
         vmin = np.min(np.ravel(df.values))
@@ -120,20 +120,33 @@ def plotHeatmap(df, labels=None, titleStr=None, vRange=None, tickSz='small', cma
     fig = plt.gcf()
     fig.clf()
 
-    if labels is None:
+    if row_labels is None and col_labels is None:
         heatmapAX = fig.add_subplot(GridSpec(1, 1, left=0.05, bottom=0.05, right=0.78, top=0.85)[0, 0])
         scale_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.87, bottom=0.05, right=0.93, top=0.85)[0, 0])
-    else:
-        cbAX = fig.add_subplot(GridSpec(1, 1, left=0.05, bottom=0.05, right=0.09, top=0.85)[0, 0])
+    elif col_labels is None:
+        row_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.05, bottom=0.05, right=0.09, top=0.85)[0, 0])
         heatmapAX = fig.add_subplot(GridSpec(1, 1, left=0.1, bottom=0.05, right=0.78, top=0.85)[0, 0])
+        scale_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.87, bottom=0.05, right=0.93, top=0.85)[0, 0])
+    elif row_labels is None:
+        col_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.05, bottom=0.05, right=0.78, top=0.09)[0, 0])
+        heatmapAX = fig.add_subplot(GridSpec(1, 1, left=0.05, bottom=0.1, right=0.78, top=0.85)[0, 0])
+        scale_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.87, bottom=0.05, right=0.93, top=0.85)[0, 0])
+    else:
+        row_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.05, bottom=0.05, right=0.09, top=0.85)[0, 0])
+        col_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.1, bottom=0.05, right=0.09, top=0.09)[0, 0])
+        heatmapAX = fig.add_subplot(GridSpec(1, 1, left=0.1, bottom=0.1, right=0.78, top=0.85)[0, 0])
         scale_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.87, bottom=0.05, right=0.93, top=0.85)[0, 0])
 
     my_norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
 
-    if not labels is None:
-        cbSE = _colors2labels(labels)
-        axi = cbAX.imshow(cbSE.values, interpolation='nearest', aspect='auto', origin='lower')
-        _clean_axis(cbAX)
+    if not row_labels is None:
+        row_cbSE = np.concatenate(_colors2labels(row_labels).values).reshape((roww_labels.shape[0], 1, 3))
+        axi = row_cbAX.imshow(row_cbSE, interpolation='nearest', aspect='auto', origin='lower')
+        _clean_axis(row_cbAX)
+    if not col_labels is None:
+        col_cbSE = np.concatenate(_colors2labels(col_labels).values).reshape((1, col_labels.shape[0], 3))
+        axi = col_cbAX.imshow(col_cbSE, interpolation='nearest', aspect='auto', origin='lower')
+        _clean_axis(col_cbAX)
 
     """Heatmap plot"""
     axi = heatmapAX.imshow(df.values, interpolation='nearest', aspect='auto', origin='lower', norm=my_norm, cmap=cmap)
@@ -149,18 +162,25 @@ def plotHeatmap(df, labels=None, titleStr=None, vRange=None, tickSz='small', cma
         heatmapAX.set_yticks(())
         heatmapAX.set_xticks(())
     else:
-        heatmapAX.set_yticks(np.arange(df.shape[0]))
-        heatmapAX.yaxis.set_ticks_position('right')
-        heatmapAX.set_yticklabels(df.index, fontsize=tickSz, fontname='Consolas')
+        if ytickLabels:
+            heatmapAX.set_yticks(np.arange(df.shape[0]))
+            heatmapAX.yaxis.set_ticks_position('right')
+            heatmapAX.set_yticklabels(df.index, fontsize=tickSz, fontname='Consolas')
+            for l in heatmapAX.get_yticklines():
+                l.set_markersize(0)
+        else:
+            heatmapAX.set_yticks(())
 
-        """Column tick labels"""
-        heatmapAX.set_xticks(np.arange(df.shape[1]))
-        heatmapAX.xaxis.set_ticks_position('top')
-        xlabelsL = heatmapAX.set_xticklabels(df.columns, fontsize=tickSz, rotation=xtickRot, fontname='Consolas')
 
-        """Remove the tick lines"""
-        for l in heatmapAX.get_xticklines() + heatmapAX.get_yticklines(): 
-            l.set_markersize(0)
+        if xtickLabels:
+            """Column tick labels"""
+            heatmapAX.set_xticks(np.arange(df.shape[1]))
+            heatmapAX.xaxis.set_ticks_position('top')
+            xlabelsL = heatmapAX.set_xticklabels(df.columns, fontsize=tickSz, rotation=xtickRot, fontname='Consolas')
+            for l in heatmapAX.get_xticklines():
+                l.set_markersize(0)
+        else:
+            heatmapAX.set_xticks(())
 
     """Add a colorbar"""
     cb = fig.colorbar(axi, scale_cbAX) # note that we could pass the norm explicitly with norm=my_norm
@@ -173,6 +193,7 @@ def plotHeatmap(df, labels=None, titleStr=None, vRange=None, tickSz='small', cma
     if not titleStr is None:
         heatmapAX.set_xlabel(titleStr, size='x-large')
     plt.show()
+    return heatmapAX
 
 def plotHierClust(dmatDf, Z, labels=None, titleStr=None, vRange=None, tickSz='small', cmap=None, cmapLabel='', plotLegend=False, plotColorbar=True):
     """Display a hierarchical clustering result."""
