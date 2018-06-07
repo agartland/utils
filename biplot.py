@@ -226,8 +226,8 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
     xy, pca = _dimReduce(df, method=method, n_components=n_components, standardize=standardize, smatFunc=smatFunc, labels=labels, ldaShrinkage=ldaShrinkage)
 
     colors = palettable.colorbrewer.get_map('Set1', 'qualitative', min(12, max(3, len(uLabels)))).mpl_colors
-    plt.clf()
     figh = plt.gcf()
+    figh.clf()
     axh = figh.add_axes([0.1, 0.1, 0.8, 0.8], aspect='equal')
     axh.axis('on')
     figh.set_facecolor('white')
@@ -258,7 +258,7 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
     mxy = np.max(np.abs(xy[:, plotDims[1]]))
     scalar = min(mxx, mxy) * 0.8
     
-    if method in ['lda', 'pca'] and False:
+    if method in ['lda', 'pca']:
         """Project a unit vector for each feature, into the new space"""    
         arrowxy = pca.transform(np.diag(np.ones(df.shape[1])))
         mxarr = np.max(np.abs(arrowxy))
