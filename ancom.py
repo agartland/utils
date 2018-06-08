@@ -33,6 +33,27 @@ def _sumTStat(mat, boolInd, axis=0):
 def _maxTStat(mat, boolInd, axis=0):
     return np.abs(_tStat(mat, boolInd)).max()
 
+def _rhoStat(mat, x, axis=0):
+    assert mat.shape[axis] == x.shape[axis]
+    if axis == 0:
+        r = [
+            stats.spearmanr(x, mat[:, i], axis=axis).correlation
+            for i in range(mat.shape[axis])
+        ]
+    else:
+        r = [
+            stats.spearmanr(x, mat[i, :], axis=axis).correlation
+            for i in range(mat.shape[axis])
+        ]
+    r = np.array(r)
+    assert r.shape[0] == mat.shape[axis], r.shape[0]
+    return r
+def _sumRhoStat(mat, x):
+    return (_rhoStat(mat, x)**2).sum()
+def _maxRhoStat(mat, x):
+    return (_rhoStat(mat, x)**2).max()
+
+
 def loadAbundance(filename, compositionNorm=True, truncate=True):
     """Load OTU counts file (phylum, genus or species level)
     with OTUs along the rows and samples along the columns.
@@ -163,6 +184,116 @@ def otuLogRatios(otuDf):
     cols = [(otuDf.columns[ratioIndices[r][0]], otuDf.columns[ratioIndices[r][1]]) for r in range(nRatios)]
     logRatio = pd.DataFrame(logRatio, index=otuDf.index, columns=cols)
     return logRatio
+
+
+def globalMedianRatioPermTest(otuDf, labels, statfunc=_sumTStat, nperms=999, seed=110820):
+    """Calculates log ratios against the median for each sample and performs global
+    permutation tests to determine if there is a significant correlation
+    over all log-median-ratios, with respect to the label variable of interest.
+
+    Parameters
+    ----------
+    otuDf : pd.DataFrame [samples x OTUs]
+        Contains relative abundance [0-1] for all samples (rows) and OTUs (colums)
+    labels: pd.Series (float)
+        Contains binary variable indicating membership into one of two categories
+        (e.g. treatment conditions). Must share index with otuDf.
+    statfunc : function
+        Takes a np.ndarray [n x k] and float index [n] as parameters and
+        returns a float summarizing over k.
+    nperms : int
+        Number of iterations for the permutation test.
+    seed :int
+        Seed for random permutation generation.
+    
+    Returns:
+    --------
+    pvalue : float
+        Global p-value for a significant association of OTU log-median-ratios
+        with label, based on the summary statistic.
+    obs : float
+        Statistic summarizing the label difference."""
+
+    nSamples, nOTUs = otuDf.shape
+
+    labelFloat = labels.values.astype(float)
+
+    # Calculate the log median ratio
+    # The median excludes zero values for each sample
+    logMedianRatio = otuDf.apply(lambda r: r / r.loc[r > 0].median(), axis=1)
+
+    np.random.seed(seed)
+    obs = statfunc(logMedianRatio.values, labelFloat)
+    samples = np.array([
+        statfunc(logMedianRatio.values, labelFloat[np.random.permutation(nSamples)])
+        for permi in range(nperms)
+    ])
+
+    """Since test is based on the abs statistic it is inherently two-sided"""
+    pvalue = ((np.abs(samples) >= np.abs(obs)).sum() + 1) / (nperms + 1)
+
+    return pvalue, obs
+
+
+def MedianRatioPermTest(otuDf, labels, statfunc=_dmeanStat, nperms=999, adjMethod='fdr_bh', seed=110820):
+    """Calculates log median ratio for all OTUs and performs
+    permutation tests to determine if there is a significant correlation
+    in OTU ratios with respect to the label variable of interest.
+
+    Parameters
+    ----------
+    otuDf : pd.DataFrame [samples x OTUs]
+        Contains relative abundance [0-1] for all samples (rows) and OTUs (colums)
+    labels: pd.Series (float)
+        Contains binary variable indicating membership into one of two categories
+        (e.g. treatment conditions). Must share index with otuDf.
+    statfunc : function
+        Takes a np.array [n x k] and float index [n] as parameters and
+        returns a 1-D array of the statistic [k].
+    nperms : int
+        Number of iterations for the permutation test.
+    adjMethod : string
+        Passed to sm.stats.multipletests for p-value multiplicity adjustment.
+        If value is None then no adjustment is made.
+    seed :int
+        Seed for random permutation generation.
+    
+    Returns:
+    --------
+    qvalues : pd.Series [index: OTU]
+        Q/P-values for each OTU computed.
+    observed : pd.Series [index: OTU]
+        Log-ratio statistic summarizing across samples."""
+
+    nSamples, nOTUs = otuDf.shape
+
+    labelFloat = labels.values.astype(float)
+
+    # Calculate the log median ratio
+    # The median excludes zero values for each sample
+    logMedianRatio = otuDf.apply(lambda r: r / r.loc[r > 0].median(), axis=1)
+
+    obs = statfunc(logMedianRatio.values, labelFloat)
+    np.random.seed(seed)
+    samples = np.zeros((nperms, nOTUs))
+    for permi in range(nperms):
+        samples[permi, :] = statfunc(
+            logMedianRatio.values,
+            labelFloat[np.random.permutation(nSamples)]
+        )
+
+    pvalues = ((np.abs(samples) >= np.abs(obs[None, :])).sum(
+        axis=0) + 1) / (nperms + 1)
+
+    if adjMethod is None or adjMethod.lower() == 'none':
+        qvalues = pvalues
+    else:
+        qvalues = _pvalueAdjust(pvalues, method=adjMethod)
+
+    qvalues = pd.Series(qvalues, index=otuDf.columns)
+    observed = pd.Series(obs, index=otuDf.columns)
+
+    return qvalues, observed
 
 def globalLRPermTest(otuDf, labels, statfunc=_sumTStat, nperms=999, seed=110820):
     """Calculates pairwise log ratios between all OTUs and performs global
