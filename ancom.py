@@ -34,19 +34,19 @@ def _maxTStat(mat, boolInd, axis=0):
     return np.abs(_tStat(mat, boolInd)).max()
 
 def _rhoStat(mat, x, axis=0):
-    assert mat.shape[axis] == x.shape[axis]
+    assert mat.shape[axis] == x.shape[0]
     if axis == 0:
         r = [
-            stats.spearmanr(x, mat[:, i], axis=axis).correlation
-            for i in range(mat.shape[axis])
+            stats.spearmanr(x, mat[:, i]).correlation
+            for i in range(mat.shape[1 - axis])
         ]
     else:
         r = [
-            stats.spearmanr(x, mat[i, :], axis=axis).correlation
-            for i in range(mat.shape[axis])
+            stats.spearmanr(x, mat[i, :]).correlation
+            for i in range(mat.shape[1 - axis])
         ]
     r = np.array(r)
-    assert r.shape[0] == mat.shape[axis], r.shape[0]
+    assert r.shape[0] == mat.shape[1 - axis], (r.shape[0], mat.shape[1 - axis])
     return r
 def _sumRhoStat(mat, x):
     return (_rhoStat(mat, x)**2).sum()
@@ -273,7 +273,9 @@ def MedianRatioPermTest(otuDf, labels, statfunc=_dmeanStat, nperms=999, adjMetho
     # The median excludes zero values for each sample
     logMedianRatio = otuDf.apply(lambda r: r / r.loc[r > 0].median(), axis=1)
 
+    assert logMedianRatio.shape[0] == labelFloat.shape[0]
     obs = statfunc(logMedianRatio.values, labelFloat)
+    assert obs.shape[0] == logMedianRatio.shape[1], (obs.shape[0], logMedianRatio.shape[1])
     np.random.seed(seed)
     samples = np.zeros((nperms, nOTUs))
     for permi in range(nperms):
