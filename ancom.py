@@ -6,6 +6,7 @@ from scipy import stats
 from itertools import product
 from mytstats import tstatistic
 from skbio.stats import composition
+from skbio.stats.composition import clr, multiplicative_replacement
 
 __all__ = ['otuLogRatios',
            'ancom',
@@ -186,8 +187,8 @@ def otuLogRatios(otuDf):
     return logRatio
 
 
-def globalMedianRatioPermTest(otuDf, labels, statfunc=_sumTStat, nperms=999, seed=110820):
-    """Calculates log ratios against the median for each sample and performs global
+def globalCLRPermTest(otuDf, labels, statfunc=_sumRhoStat, nperms=999, seed=110820):
+    """Calculates centered-log-ratios (CLR) for each sample and performs global
     permutation tests to determine if there is a significant correlation
     over all log-median-ratios, with respect to the label variable of interest.
 
@@ -218,14 +219,19 @@ def globalMedianRatioPermTest(otuDf, labels, statfunc=_sumTStat, nperms=999, see
 
     labelFloat = labels.values.astype(float)
 
-    # Calculate the log median ratio
-    # The median excludes zero values for each sample
-    logMedianRatio = otuDf.apply(lambda r: r / r.loc[r > 0].median(), axis=1)
+    # Make proportions
+    otuDf = otuDf / otuDf.sum()
+    # Apply multiplicative replacement for zero values
+    otuMR = multiplicative_replacement(otuDf.values)
+    # Calculate the CLR
+    otuCLR = clr(otuMR)
+    # Make into a DataFrame
+    otuCLR = pd.DataFrame(otuCLR, index=otuDf.index, columns=otuDf.columns)
 
     np.random.seed(seed)
-    obs = statfunc(logMedianRatio.values, labelFloat)
+    obs = statfunc(otuCLR.values, labelFloat)
     samples = np.array([
-        statfunc(logMedianRatio.values, labelFloat[np.random.permutation(nSamples)])
+        statfunc(otuCLR.values, labelFloat[np.random.permutation(nSamples)])
         for permi in range(nperms)
     ])
 
@@ -235,8 +241,8 @@ def globalMedianRatioPermTest(otuDf, labels, statfunc=_sumTStat, nperms=999, see
     return pvalue, obs
 
 
-def MedianRatioPermTest(otuDf, labels, statfunc=_dmeanStat, nperms=999, adjMethod='fdr_bh', seed=110820):
-    """Calculates log median ratio for all OTUs and performs
+def CLRPermTest(otuDf, labels, statfunc=_rhoStat, nperms=999, adjMethod='fdr_bh', seed=110820):
+    """Calculates centered-log-ratio (CLR) for all OTUs and performs
     permutation tests to determine if there is a significant correlation
     in OTU ratios with respect to the label variable of interest.
 
@@ -269,18 +275,23 @@ def MedianRatioPermTest(otuDf, labels, statfunc=_dmeanStat, nperms=999, adjMetho
 
     labelFloat = labels.values.astype(float)
 
-    # Calculate the log median ratio
-    # The median excludes zero values for each sample
-    logMedianRatio = otuDf.apply(lambda r: r / r.loc[r > 0].median(), axis=1)
+    # Make proportions
+    otuDf = otuDf / otuDf.sum()
+    # Apply multiplicative replacement for zero values
+    otuMR = multiplicative_replacement(otuDf.values)
+    # Calculate the CLR
+    otuCLR = clr(otuMR)
+    # Make into a DataFrame
+    otuCLR = pd.DataFrame(otuCLR, index=otuDf.index, columns=otuDf.columns)
 
-    assert logMedianRatio.shape[0] == labelFloat.shape[0]
-    obs = statfunc(logMedianRatio.values, labelFloat)
-    assert obs.shape[0] == logMedianRatio.shape[1], (obs.shape[0], logMedianRatio.shape[1])
+    obs = statfunc(otuCLR.values, labelFloat)
+
     np.random.seed(seed)
     samples = np.zeros((nperms, nOTUs))
+
     for permi in range(nperms):
         samples[permi, :] = statfunc(
-            logMedianRatio.values,
+            otuCLR.values,
             labelFloat[np.random.permutation(nSamples)]
         )
 
@@ -327,15 +338,11 @@ def globalLRPermTest(otuDf, labels, statfunc=_sumTStat, nperms=999, seed=110820)
 
     nSamples, nOTUs = otuDf.shape
 
+    # Make sure the label values are binary
+    assert labels.unique().shape[0] == 2
+
     labelBool = labels.values.astype(bool)
-
-    nRatios = int(nOTUs * (nOTUs-1) / 2)
-
-    """List of tuples of two indices for each ratio [nRatios]"""
-    ratioIndices = [(otui, otuj) for otui in range(nOTUs - 1) for otuj in range(otui+1, nOTUs)]
-
-    """List of indices corresponding to the ratios that contain each OTU"""
-    otuIndices = [[j for j in range(nRatios) if otui in ratioIndices[j]] for otui in range(nOTUs)]
+    assert labels.unique().shape[0] == 2
 
     logRatio = otuLogRatios(otuDf)
     
@@ -382,7 +389,11 @@ def LRPermTest(otuDf, labels, statfunc=_dmeanStat, nperms=999, adjMethod='fdr_bh
 
     nSamples, nOTUs = otuDf.shape
 
+    # Make sure the label values are binary
+    assert labels.unique().shape[0] == 2
+
     labelBool = labels.values.astype(bool)
+    assert labels.unique().shape[0] == 2
 
     nRatios = int(nOTUs * (nOTUs-1) / 2)
 
