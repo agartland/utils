@@ -165,6 +165,7 @@ def otuLogRatios(otuDf):
 
     """Define minimum OTU abundance to avoid log(0)
     multiplicative_replacement takes matrix [samples x OTUs]"""
+    assert otuDf.min().min() > 0, "Cannot input 0 values to otuLogRatios (min value {})".format(otuDf.min().min())
     logOTU = np.log(otuDf).values
     
     nRatios = int(nOTUs * (nOTUs-1) / 2)
