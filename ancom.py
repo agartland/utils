@@ -188,7 +188,7 @@ def otuLogRatios(otuDf):
     return logRatio
 
 
-def globalCLRPermTest(otuDf, labels, statfunc=_sumRhoStat, nperms=999, seed=110820):
+def globalCLRPermTest(otuDf, labels, statfunc=_sumRhoStat, nperms=999, seed=110820, binary=False):
     """Calculates centered-log-ratios (CLR) for each sample and performs global
     permutation tests to determine if there is a significant correlation
     over all log-median-ratios, with respect to the label variable of interest.
@@ -218,7 +218,10 @@ def globalCLRPermTest(otuDf, labels, statfunc=_sumRhoStat, nperms=999, seed=1108
 
     nSamples, nOTUs = otuDf.shape
 
-    labelFloat = labels.values.astype(float)
+    if binary:
+        labelValues = labels.values.astype(bool)
+    else:
+        labelValues = labels.values.astype(float)
 
     # Make proportions
     otuDf = otuDf / otuDf.sum()
@@ -230,19 +233,19 @@ def globalCLRPermTest(otuDf, labels, statfunc=_sumRhoStat, nperms=999, seed=1108
     otuCLR = pd.DataFrame(otuCLR, index=otuDf.index, columns=otuDf.columns)
 
     np.random.seed(seed)
-    obs = statfunc(otuCLR.values, labelFloat)
+    obs = statfunc(otuCLR.values, labelValues)
     samples = np.array([
-        statfunc(otuCLR.values, labelFloat[np.random.permutation(nSamples)])
+        statfunc(otuCLR.values, labelValues[np.random.permutation(nSamples)])
         for permi in range(nperms)
     ])
-
+    
     """Since test is based on the abs statistic it is inherently two-sided"""
     pvalue = ((np.abs(samples) >= np.abs(obs)).sum() + 1) / (nperms + 1)
 
     return pvalue, obs
 
 
-def CLRPermTest(otuDf, labels, statfunc=_rhoStat, nperms=999, adjMethod='fdr_bh', seed=110820):
+def CLRPermTest(otuDf, labels, statfunc=_rhoStat, nperms=999, adjMethod='fdr_bh', seed=110820, binary=False):
     """Calculates centered-log-ratio (CLR) for all OTUs and performs
     permutation tests to determine if there is a significant correlation
     in OTU ratios with respect to the label variable of interest.
@@ -274,7 +277,10 @@ def CLRPermTest(otuDf, labels, statfunc=_rhoStat, nperms=999, adjMethod='fdr_bh'
 
     nSamples, nOTUs = otuDf.shape
 
-    labelFloat = labels.values.astype(float)
+    if binary:
+        labelValues = labels.values.astype(bool)
+    else:
+        labelValues = labels.values.astype(float)
 
     # Make proportions
     otuDf = otuDf / otuDf.sum()
@@ -285,7 +291,7 @@ def CLRPermTest(otuDf, labels, statfunc=_rhoStat, nperms=999, adjMethod='fdr_bh'
     # Make into a DataFrame
     otuCLR = pd.DataFrame(otuCLR, index=otuDf.index, columns=otuDf.columns)
 
-    obs = statfunc(otuCLR.values, labelFloat)
+    obs = statfunc(otuCLR.values, labelValues)
 
     np.random.seed(seed)
     samples = np.zeros((nperms, nOTUs))
@@ -293,7 +299,7 @@ def CLRPermTest(otuDf, labels, statfunc=_rhoStat, nperms=999, adjMethod='fdr_bh'
     for permi in range(nperms):
         samples[permi, :] = statfunc(
             otuCLR.values,
-            labelFloat[np.random.permutation(nSamples)]
+            labelValues[np.random.permutation(nSamples)]
         )
 
     pvalues = ((np.abs(samples) >= np.abs(obs[None, :])).sum(
