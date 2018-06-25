@@ -6,6 +6,7 @@ from scipy import stats
 from itertools import product
 from mytstats import tstatistic
 from skbio.stats import composition
+from skbio.stats.composition import clr, multiplicative_replacement
 
 __all__ = ['otuLogRatios',
            'ancom',
@@ -32,6 +33,27 @@ def _sumTStat(mat, boolInd, axis=0):
     return np.abs(_tStat(mat, boolInd)).sum()
 def _maxTStat(mat, boolInd, axis=0):
     return np.abs(_tStat(mat, boolInd)).max()
+
+def _rhoStat(mat, x, axis=0):
+    assert mat.shape[axis] == x.shape[0]
+    if axis == 0:
+        r = [
+            stats.spearmanr(x, mat[:, i]).correlation
+            for i in range(mat.shape[1 - axis])
+        ]
+    else:
+        r = [
+            stats.spearmanr(x, mat[i, :]).correlation
+            for i in range(mat.shape[1 - axis])
+        ]
+    r = np.array(r)
+    assert r.shape[0] == mat.shape[1 - axis], (r.shape[0], mat.shape[1 - axis])
+    return r
+def _sumRhoStat(mat, x):
+    return (_rhoStat(mat, x)**2).sum()
+def _maxRhoStat(mat, x):
+    return (_rhoStat(mat, x)**2).max()
+
 
 def loadAbundance(filename, compositionNorm=True, truncate=True):
     """Load OTU counts file (phylum, genus or species level)
@@ -143,6 +165,7 @@ def otuLogRatios(otuDf):
 
     """Define minimum OTU abundance to avoid log(0)
     multiplicative_replacement takes matrix [samples x OTUs]"""
+    assert otuDf.min().min() > 0, "Cannot input 0 values to otuLogRatios (min value {})".format(otuDf.min().min())
     logOTU = np.log(otuDf).values
     
     nRatios = int(nOTUs * (nOTUs-1) / 2)
@@ -163,6 +186,134 @@ def otuLogRatios(otuDf):
     cols = [(otuDf.columns[ratioIndices[r][0]], otuDf.columns[ratioIndices[r][1]]) for r in range(nRatios)]
     logRatio = pd.DataFrame(logRatio, index=otuDf.index, columns=cols)
     return logRatio
+
+
+def globalCLRPermTest(otuDf, labels, statfunc=_sumRhoStat, nperms=999, seed=110820, binary=False):
+    """Calculates centered-log-ratios (CLR) for each sample and performs global
+    permutation tests to determine if there is a significant correlation
+    over all log-median-ratios, with respect to the label variable of interest.
+
+    Parameters
+    ----------
+    otuDf : pd.DataFrame [samples x OTUs]
+        Contains relative abundance [0-1] for all samples (rows) and OTUs (colums)
+    labels: pd.Series (float)
+        Contains binary variable indicating membership into one of two categories
+        (e.g. treatment conditions). Must share index with otuDf.
+    statfunc : function
+        Takes a np.ndarray [n x k] and float index [n] as parameters and
+        returns a float summarizing over k.
+    nperms : int
+        Number of iterations for the permutation test.
+    seed :int
+        Seed for random permutation generation.
+    
+    Returns:
+    --------
+    pvalue : float
+        Global p-value for a significant association of OTU log-median-ratios
+        with label, based on the summary statistic.
+    obs : float
+        Statistic summarizing the label difference."""
+
+    nSamples, nOTUs = otuDf.shape
+
+    if binary:
+        labelValues = labels.values.astype(bool)
+    else:
+        labelValues = labels.values.astype(float)
+
+    # Make proportions
+    otuDf = otuDf / otuDf.sum()
+    # Apply multiplicative replacement for zero values
+    otuMR = multiplicative_replacement(otuDf.values)
+    # Calculate the CLR
+    otuCLR = clr(otuMR)
+    # Make into a DataFrame
+    otuCLR = pd.DataFrame(otuCLR, index=otuDf.index, columns=otuDf.columns)
+
+    np.random.seed(seed)
+    obs = statfunc(otuCLR.values, labelValues)
+    samples = np.array([
+        statfunc(otuCLR.values, labelValues[np.random.permutation(nSamples)])
+        for permi in range(nperms)
+    ])
+    
+    """Since test is based on the abs statistic it is inherently two-sided"""
+    pvalue = ((np.abs(samples) >= np.abs(obs)).sum() + 1) / (nperms + 1)
+
+    return pvalue, obs
+
+
+def CLRPermTest(otuDf, labels, statfunc=_rhoStat, nperms=999, adjMethod='fdr_bh', seed=110820, binary=False):
+    """Calculates centered-log-ratio (CLR) for all OTUs and performs
+    permutation tests to determine if there is a significant correlation
+    in OTU ratios with respect to the label variable of interest.
+
+    Parameters
+    ----------
+    otuDf : pd.DataFrame [samples x OTUs]
+        Contains relative abundance [0-1] for all samples (rows) and OTUs (colums)
+    labels: pd.Series (float)
+        Contains binary variable indicating membership into one of two categories
+        (e.g. treatment conditions). Must share index with otuDf.
+    statfunc : function
+        Takes a np.array [n x k] and float index [n] as parameters and
+        returns a 1-D array of the statistic [k].
+    nperms : int
+        Number of iterations for the permutation test.
+    adjMethod : string
+        Passed to sm.stats.multipletests for p-value multiplicity adjustment.
+        If value is None then no adjustment is made.
+    seed :int
+        Seed for random permutation generation.
+    
+    Returns:
+    --------
+    qvalues : pd.Series [index: OTU]
+        Q/P-values for each OTU computed.
+    observed : pd.Series [index: OTU]
+        Log-ratio statistic summarizing across samples."""
+
+    nSamples, nOTUs = otuDf.shape
+
+    if binary:
+        labelValues = labels.values.astype(bool)
+    else:
+        labelValues = labels.values.astype(float)
+
+    # Make proportions
+    otuDf = otuDf / otuDf.sum()
+    # Apply multiplicative replacement for zero values
+    otuMR = multiplicative_replacement(otuDf.values)
+    # Calculate the CLR
+    otuCLR = clr(otuMR)
+    # Make into a DataFrame
+    otuCLR = pd.DataFrame(otuCLR, index=otuDf.index, columns=otuDf.columns)
+
+    obs = statfunc(otuCLR.values, labelValues)
+
+    np.random.seed(seed)
+    samples = np.zeros((nperms, nOTUs))
+
+    for permi in range(nperms):
+        samples[permi, :] = statfunc(
+            otuCLR.values,
+            labelValues[np.random.permutation(nSamples)]
+        )
+
+    pvalues = ((np.abs(samples) >= np.abs(obs[None, :])).sum(
+        axis=0) + 1) / (nperms + 1)
+
+    if adjMethod is None or adjMethod.lower() == 'none':
+        qvalues = pvalues
+    else:
+        qvalues = _pvalueAdjust(pvalues, method=adjMethod)
+
+    qvalues = pd.Series(qvalues, index=otuDf.columns)
+    observed = pd.Series(obs, index=otuDf.columns)
+
+    return qvalues, observed
 
 def globalLRPermTest(otuDf, labels, statfunc=_sumTStat, nperms=999, seed=110820):
     """Calculates pairwise log ratios between all OTUs and performs global
@@ -194,15 +345,11 @@ def globalLRPermTest(otuDf, labels, statfunc=_sumTStat, nperms=999, seed=110820)
 
     nSamples, nOTUs = otuDf.shape
 
+    # Make sure the label values are binary
+    assert labels.unique().shape[0] == 2
+
     labelBool = labels.values.astype(bool)
-
-    nRatios = int(nOTUs * (nOTUs-1) / 2)
-
-    """List of tuples of two indices for each ratio [nRatios]"""
-    ratioIndices = [(otui, otuj) for otui in range(nOTUs - 1) for otuj in range(otui+1, nOTUs)]
-
-    """List of indices corresponding to the ratios that contain each OTU"""
-    otuIndices = [[j for j in range(nRatios) if otui in ratioIndices[j]] for otui in range(nOTUs)]
+    assert labels.unique().shape[0] == 2
 
     logRatio = otuLogRatios(otuDf)
     
@@ -249,7 +396,11 @@ def LRPermTest(otuDf, labels, statfunc=_dmeanStat, nperms=999, adjMethod='fdr_bh
 
     nSamples, nOTUs = otuDf.shape
 
+    # Make sure the label values are binary
+    assert labels.unique().shape[0] == 2
+
     labelBool = labels.values.astype(bool)
+    assert labels.unique().shape[0] == 2
 
     nRatios = int(nOTUs * (nOTUs-1) / 2)
 
