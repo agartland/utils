@@ -176,7 +176,7 @@ def catcorr(df, layout='spring', mode='mpl', titleStr='', testSig=0.05, sRange=(
         #nx.draw_networkx_nodes(g,pos,node_size=sznorm(nodesize,mn=500,mx=5000),node_color=nodecolors,alpha=1)
         ew = szscale(edgewidth, mn=wRange[0], mx=wRange[1])
 
-        for es, e in zip(ew, g.edges_iter()):
+        for es, e in zip(ew, g.edges()):
             x1, y1=pos[e[0]]
             x2, y2=pos[e[1]]
             props = dict(color='black', alpha=0.4, zorder=1)
@@ -211,7 +211,7 @@ def catcorr(df, layout='spring', mode='mpl', titleStr='', testSig=0.05, sRange=(
     elif PLOTLY:
         """Send the plot to plot.ly"""
         data = []
-        for es, e in zip(szscale(edgewidth, mn=wRange[0], mx=wRange[1]), g.edges_iter()):
+        for es, e in zip(szscale(edgewidth, mn=wRange[0], mx=wRange[1]), g.edges()):
             x1, y1=pos[e[0]]
             x2, y2=pos[e[1]]
             props = dict(color='black', opacity=0.4)
