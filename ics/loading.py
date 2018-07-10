@@ -14,7 +14,8 @@ __all__ = ['parseProcessed',
            'subset2label',
            'subsetdf',
            'applyResponseCriteria',
-           'computeMarginals']
+           'computeMarginals',
+           'generateGzAPerfExceptions']
 
 def unstackIR(df, uVars):
     """Return a response and magnitude df with one row per ptid
@@ -125,7 +126,23 @@ def parseRaw(fn):
     df = pdf['mag'].reset_index().join(ndf['bg'], on=ctrlCols)
     return df
 
-def applyResponseCriteria(df, subset=['IFNg', 'IL2'], ANY=1, indexCols=None, magCols=['cytnum'], nsubCols=['nsub']):
+def generateGzAPerfExceptions(cytokines):
+    """Exclude subsets as positive if they include only GrzA or Perf and no other cytokines"""
+    exceptions = []
+    symLookup = {True:'+', False:'-'}
+    for cys in itertools.product(*((True, False),)*len(cytokines)):
+        """Loop over all combinations of +/- cytokines"""
+        name = ''.join([cy + symLookup[include] for cy, include in zip(cytokines, cys)])
+        if 'GzA-' in name and 'Perf+' in name and name.count('+') == 1:
+            exceptions.append(name)
+        elif 'GzA+' in name and 'Perf-' in name and name.count('+') == 1:
+            exceptions.append(name)
+        elif 'GzA+' in name and 'Perf+' in name and name.count('+') == 2:
+            exceptions.append(name)
+    return exceptions
+
+
+def applyResponseCriteria(df, subset=['IFNg', 'IL2'], ANY=1, indexCols=None, magCols=['cytnum'], nsubCols=['nsub'], exceptions=[]):
     """Compress cytokine subsets into binary subsets (ie positive/negative)
     based on criteria such as ANY 1 of IFNg or IL2 (ie IFNg and/or IL2)
 
@@ -158,14 +175,14 @@ def applyResponseCriteria(df, subset=['IFNg', 'IL2'], ANY=1, indexCols=None, mag
     symLookup = {True:'+', False:'-'}
 
     
-    base = '/'.join([subset2label(ss) for ss in subset]) + ' ({} of {})'.format(ANY, len(subset))
+    base = '{} of {}'.format(ANY, len(subset)) + ' (' + '/'.join([subset2label(ss) for ss in subset]) + ')'
     pos = base
-    neg = base + '-'
+    neg = 'NOT ' + base
     convertLookup = {}
     for cys in itertools.product(*((True, False),)*len(subset)):
         """Loop over all combinations of +/- cytokines for the selected subset"""
         name = ''.join([cy + symLookup[include] for cy, include in zip(subset, cys)])
-        if np.sum(cys) >= ANY:
+        if np.sum(cys) >= ANY and not name in exceptions:
             convertLookup[name] = pos
         else:
             convertLookup[name] = neg

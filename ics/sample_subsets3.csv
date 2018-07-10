@@ -1,0 +1,18 @@
+type,name,value
+subset,gd T cells,/S/Time/Lv/14-SSlo/Keeper/L/3+/gd+
+subset,CD4+ T cells,/S/Time/Lv/14-SSlo/Keeper/L/16-56-/4+
+subset,DN T cells,/S/Time/Lv/14-SSlo/Keeper/L/16-56-/4-8-
+marker,CD45RA,45RA+
+marker,,CCR7+
+marker,CD4:CD45RA,4+45RA+
+function,,GzA+
+function,,Perf+
+function,CD4:IL22+,4+IL22+
+function,CD4:Th2+,4+Th2+
+function,CD154+,154+
+function,,IFNg+
+function,,IL2+
+function,,IL17a+
+function,,IL22+
+function,,Th2+
+function,,TNFa+
