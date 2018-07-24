@@ -132,7 +132,7 @@ def bootstrapSE(data,statFunc,nPerms=1000):
         samples[sampi] = statFunc([data[i] for i in inds])
     return samples.std()
     
-def bootstrapCI(data, statFunc=None, alpha=0.05, nPerms=10000, output='lowhigh'):
+def bootstrapCI(data, statFunc=None, alpha=0.05, nPerms=10000, output='lowhigh', method='pi'):
     """Wrapper around a function in the scikits_bootstrap module:
         https://pypi.python.org/pypi/scikits.bootstrap
 
@@ -150,7 +150,7 @@ def bootstrapCI(data, statFunc=None, alpha=0.05, nPerms=10000, output='lowhigh')
     if statFunc is None:
         statFunc = partial(np.nanmean, axis=0)
     try:
-        out = ci(data=data, statfunction=statFunc, alpha=alpha, n_samples=nPerms, output='lowhigh')
+        out = ci(data=data, statfunction=statFunc, alpha=alpha, n_samples=nPerms, output='lowhigh', method=method)
     except IndexError:
         shp = list(data.shape)
         shp[0] = 2
