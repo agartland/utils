@@ -34,7 +34,7 @@ for (i in 1:length(gs)){
     print(paste0('gs_', toString(i), '_sample_', sampleNames(gs[[i]]), '.feather'))
 }
 
-write.csv(pData(gs), file='metadata.csv')
+write.csv(pData(gs), file=paste0(folder, '/metadata.csv'))
 """
 
 def convertGatingSet(folder):
