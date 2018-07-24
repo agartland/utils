@@ -353,7 +353,7 @@ def extractFunctionsMarkers(f, subsets, functions, markers, compressions=[('ALL'
     cdf.index = np.arange(cdf.shape[0])
     return cdf
 
-def extractFunctionsGBY(f, subsets, functions, compressions=None):
+def extractFunctionsGBY(f, subsets, functions, compressions=None, mincells=0):
     """Extract functions from the GatingSet DataFrame and
     optionally apply response criteria.
 
@@ -365,6 +365,8 @@ def extractFunctionsGBY(f, subsets, functions, compressions=None):
         From a config file, with names of functions (keys) and column name subset post-fixes (values)
     compression : list
         Optionally, provide list of cytokine subsets and ANYs for response calls. Use 'ALL' for all functions.
+    mincells : int
+        Do not include function combinations with less than mincells.
     
     Returns
     -------
@@ -392,11 +394,13 @@ def extractFunctionsGBY(f, subsets, functions, compressions=None):
 
         for vals in itertools.product(*[(0,1)]*len(fkeys)):
             if vals in cytnums.index:
-                tmp = {'subset':ssName,
-                        'cytokine':vec2subset(vals[:len(fkeys)], fkeys_stripped),
-                        'nsub':nsub,
-                        'cytnum':cytnums.loc[vals]}
-            else:
+                cytnum = cytnums.loc[vals]
+                if cytnum >= mincells:
+                    tmp = {'subset':ssName,
+                            'cytokine':vec2subset(vals[:len(fkeys)], fkeys_stripped),
+                            'nsub':nsub,
+                            'cytnum':cytnum}
+            elif mincells > 0:
                 tmp = {'subset':ssName,
                         'cytokine':vec2subset(vals[:len(fkeys)], fkeys_stripped),
                         'nsub':nsub,

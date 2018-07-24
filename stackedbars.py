@@ -6,7 +6,7 @@ import seaborn as sns
 
 __all__ = ['stackedbars']
 
-def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=None, hueorder=None, facetorder=None, nhues=None, colors=None, handle=None):
+def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=None, hueorder=None, facetorder=None, nhues=None, colors=None, handle=None, legend=True):
     """Create a stacked bar plot.
 
     Parameters
@@ -38,6 +38,8 @@ def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=N
         Colors for hue variable
     handle : axes or figure handle
         Figure or axes to plot into
+    legend : bool
+        Display legend.
 
     Returns
     -------
@@ -82,7 +84,11 @@ def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=N
         figh = handle
         figh.clf()
             
-    gs = GridSpec(nrows=len(facetorder), ncols=1)
+    if legend:
+        """Leave room for the legend"""
+        gs = GridSpec(nrows=len(facetorder), ncols=1, right=0.6)
+    else:
+        gs = GridSpec(nrows=len(facetorder), ncols=1, right=0.9)
 
     for rowi, row in enumerate(facetorder):
         if not facetrow is None:
@@ -139,7 +145,7 @@ def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=N
         else:
             plt.ylabel(row)
 
-        if rowi == 0:
+        if rowi == 0 and legend:
             plt.legend([plt.Rectangle((0,0), 1, 1, color=c) for c in colors],
                         hueorder, 
                         loc='upper left',
