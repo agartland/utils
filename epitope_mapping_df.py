@@ -12,6 +12,8 @@ from functools import partial
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+from matplotlib.collections import PatchCollection
+from matplotlib.patches import Rectangle
 
 """Rewrite of epitope_mapping.py that avoids the use of objects,
 thereby permitting easy writing/reading of epitope mapping
@@ -45,7 +47,9 @@ __all__ = [ 'hamming',
             'sliceRespSeq',
             'groupby_parallel',
             'realignPeptides',
-            'coord_overlap']
+            'coord_overlap',
+            'plotEpitopeMap',
+            'plotEpitopeChiclets']
 
 
 
@@ -598,18 +602,20 @@ def plotIsland(island):
     handles = [mpl.patches.Patch(facecolor=colors[e], edgecolor='k') for e in uEpIDs]
     plt.legend(handles, uEpIDs, loc='best', title='Epitope')
 
-def _plotEpitopeMap(rxDf, respDf, order=None):
-    nPTIDs = rxDf.ptid.unique().shape[0]
-    uArms = rxDf.Arm.unique()
-    if not order is None:
-        uArms = np.asarray(order)
+def plotEpitopeMap(respDf, groupDf, uRespCol, groupCol, startCol, endCol, groupOrder=None):
+    """Plot map of all responses in respDf (could be epitopes or 15mers"""
+    nPTIDs = groupDf.ptid.unique().shape[0]
 
-    breadthDf = computeBreadth(rxDf, respDf)
+    if not groupOrder is None:
+        uArms = np.asarray(groupOrder)
+    else:
+        uArms = groupDf[groupCol].unique()
+
+    tmp = respDf.drop_duplicates(['ptid', uRespCol])[['ptid', uRespCol]]
+    breadthDf = tmp.groupby('ptid')[[uRespCol]].count().reset_index()
+    breadthDf = pd.merge(groupDf[['ptid', groupCol]].drop_duplicates(), breadthDf, left_on='ptid', right_on='ptid', how='left').fillna(0)
 
     armColors = sns.color_palette('Set1', n_colors=uArms.shape[0])[::-1]
-
-    #lims = [respDf['start'].min(), (respDf['start'] + respDf['seq'].map(len)).max()]
-    lims = [respDf['start'].min(), respDf['end'].max()]
 
     """Plot map of epitope responses by PTID"""
     keepRegions = ['Signal peptide', 'V1 loop', 'V2 loop',
@@ -619,50 +625,147 @@ def _plotEpitopeMap(rxDf, respDf, order=None):
     reg.loc[:, 'region'] = reg.region.str.replace(' loop', '').str.replace(' ', '\n')
 
     plt.clf()
+    axh = plt.axes([0.05, 0.1, 0.8, 0.8])
     np.random.seed(110820)
     lasty = 0
     yt = []
     for a, color in zip(uArms, armColors):
         """Sort PTIDs by breadth"""
-        sortedPtids = breadthDf.loc[breadthDf['Arm'] == a].sort_values(by='Breadth').ptid.tolist()
+        sortedPtids = breadthDf.loc[breadthDf[groupCol] == a].sort_values(by=uRespCol).ptid.tolist()
         # sortedPtids = np.random.permutation(respDf.ptid.unique())
         for y, ptid in enumerate(sortedPtids):
-            epDf = respDf.loc[respDf['ptid'] == ptid].drop_duplicates(subset=['ptid', 'IslandID', 'EpID'])
+            plotDf = respDf.loc[respDf['ptid'] == ptid].drop_duplicates(subset=['ptid', uRespCol])
             yt.append(y + lasty + 0.5)
-            yyvec = np.random.permutation(np.linspace(0, 1, epDf.shape[0]))
-            for yy, st, en in zip(yyvec, epDf['EpStart'], epDf['EpEnd']):
+            yyvec = np.random.permutation(np.linspace(0, 1, plotDf.shape[0]))
+            for yy, st, en in zip(yyvec, plotDf[startCol], plotDf[endCol]):
                 plt.plot([st, en], [y + yy + lasty, y + yy + lasty],
                          '-',
                          color=color,
-                         linewidth=3)
+                         linewidth=2)
         plt.plot([-5, -5], [lasty, lasty + y + 1], '-', color=color, linewidth=7)
         lasty += y + 3
-
-    for i, (region, st, en) in reg.iterrows():
-        plt.plot([st, en], [lasty + 1, lasty + 1], 'k-', linewidth=6)
-        plt.annotate(region,
-                     xy=(st + (en-st)/2., lasty+1),
-                     xycoords='data',
-                     textcoords='offset points',
-                     xytext=(0, 10),
-                     ha='center',
-                     va='bottom',
-                     size='medium',
-                     color='black')
+    if (respDf.protein == 'ENV').all():
+        for i, (region, st, en) in reg.iterrows():
+            plt.plot([st, en], [lasty + 1, lasty + 1], 'k-', linewidth=6)
+            plt.annotate(region,
+                         xy=(st + (en-st)/2., lasty+1),
+                         xycoords='data',
+                         textcoords='offset points',
+                         xytext=(0, 10),
+                         ha='center',
+                         va='bottom',
+                         size='medium',
+                         color='black')
 
     plt.ylabel('Participants', fontsize=16)
     plt.yticks(yt, ['' for i in range(nPTIDs)])
-    plt.ylim((-1, nPTIDs + 2 + 15))
+    plt.ylim((-1, nPTIDs + 15))
 
-    plt.xlabel('HIV gp160 HXB2 Position')
-    xt = np.arange(0, lims[1], 50)
+    plt.xlabel('HIV %s HXB2 Position' % respDf.protein.unique()[0])
+
+    #lims = [respDf['start'].min(), (respDf['start'] + respDf['seq'].map(len)).max()]
+    lims = [respDf[startCol].min(), respDf[endCol].max()]
+
+    xt = np.arange(0, lims[1] + 50, 50)
     xt[0] += 1
-    plt.xticks(xt, xt.astype(int))
-    plt.xlim((-10, lims[1]))
+    plt.xticks(xt, xt.astype(int), size=12)
+    plt.xlim((-10, lims[1] + 50))
+    axh.spines['right'].set_visible(False)
+    axh.spines['top'].set_visible(False)
 
     handles = [mpl.patches.Patch(facecolor=c, edgecolor='k') for c in armColors[::-1]]
     # plt.legend(handles, uArms[::-1], loc='upper left', bbox_to_anchor=[1,1], fontsize=14)
-    plt.legend(handles, uArms[::-1], loc='upper right', fontsize=14)
+    plt.legend(handles, uArms[::-1], loc='upper left', fontsize=14, bbox_to_anchor=[1.02, 1.05])
+
+def plotEpitopeChiclets(respDf, groupDf, uRespCol, groupCol, startCol, endCol, groupOrder=None, groupColors=None):
+    nPTIDs = groupDf.ptid.unique().shape[0]
+
+    if not groupOrder is None:
+        uArms = np.asarray(groupOrder)
+    else:
+        uArms = groupDf[groupCol].unique()
+    
+    if groupColors is None:
+        groupColors = sns.color_palette('Set1', n_colors=uArms.shape[0])[::-1]
+
+    #lims = [respDf['start'].min(), (respDf['start'] + respDf['seq'].map(len)).max()]
+    lims = [respDf[startCol].min(), respDf[endCol].max()]
+
+    tmp = respDf.drop_duplicates(['ptid', uRespCol])[['ptid', uRespCol]]
+    breadthDf = tmp.groupby('ptid')[[uRespCol]].count().reset_index()
+    breadthDf = pd.merge(groupDf[['ptid', groupCol]].drop_duplicates(), breadthDf,
+                         left_on='ptid', right_on='ptid', how='left').fillna(0)
+
+    """Plot map of epitope responses by PTID"""
+    keepRegions = ['Signal peptide', 'V1 loop', 'V2 loop',
+                   'Loop D', 'V3 loop', 'V4 loop', 'V5 loop', 'gp41']
+    reg = pd.read_csv('../HIV_alignments/env_locations.csv')
+    reg = reg.loc[reg.region.isin(keepRegions)]
+    reg.loc[:, 'region'] = reg.region.str.replace(' loop', '').str.replace(' ', '\n')
+
+    plt.clf()
+    axh = plt.axes([0.05, 0.1, 0.8, 0.8])
+    lasty = 0
+    yt = []
+    for a, color in zip(uArms, groupColors):
+        """Sort PTIDs by breadth"""
+        sortedPtids = breadthDf.loc[breadthDf[groupCol] == a].sort_values(by=uRespCol).ptid.tolist()
+        # sortedPtids = np.random.permutation(respDf.ptid.unique())
+        for y, ptid in enumerate(sortedPtids):
+            plotDf = respDf.loc[respDf['ptid'] == ptid].drop_duplicates(subset=['ptid', uRespCol])
+            yt.append(y + lasty)
+            rects = []
+            for st, en in zip(plotDf[startCol], plotDf[endCol]):
+                L = 5
+                lw = 0.6
+                xloc = np.mean([st, en])
+                xy = (xloc - L/2, y + lasty - lw/2)
+
+                rects.append(Rectangle(xy, width=L, height=lw))
+                '''plt.plot([xloc - L/2, xloc + L/2], [y + lasty, y + lasty],
+                         '-',
+                         color=color,
+                         linewidth=lw)'''
+
+            # Create patch collection with specified colour/alpha
+            pc = PatchCollection(rects, facecolor=color, alpha=1.0, edgecolor='black', lw=0.5)
+            # Add collection to axes
+            axh.add_collection(pc)
+
+            plt.plot([0, lims[1] + 50], [y + lasty]*2, '-', color='gray', lw=0.5, zorder=-10)
+        plt.plot([-5, -5], [lasty, lasty + y + 1], '-', color=color, linewidth=7)
+        lasty += y + 3
+    if (respDf.protein.isin(['ENV', 'env', 'gp120', 'gp160'])).all():
+        for i, (region, st, en) in reg.iterrows():
+            plt.plot([st, en], [lasty + 1, lasty + 1], 'k-', linewidth=6)
+            plt.annotate(region,
+                         xy=(st + (en-st)/2., lasty+1),
+                         xycoords='data',
+                         textcoords='offset points',
+                         xytext=(0, 10),
+                         ha='center',
+                         va='bottom',
+                         size='medium',
+                         color='black')
+
+    # plt.ylabel('Participants', fontsize=16)
+    # plt.yticks(yt, ['' for i in range(nPTIDs)])
+    plt.yticks(())
+    plt.ylim((-1, nPTIDs + 10))
+
+    plt.xlabel('HIV %s HXB2 Position' % respDf.protein.unique()[0])
+    
+    xt = np.arange(0, lims[1] + 50, 50)
+    xt[0] += 1
+    plt.xticks(xt, xt.astype(int), size=12)
+    plt.xlim((-10, lims[1] + 50))
+    axh.spines['right'].set_visible(False)
+    axh.spines['top'].set_visible(False)
+    axh.spines['left'].set_visible(False)
+
+    handles = [mpl.patches.Patch(facecolor=c, edgecolor='k') for c in groupColors[::-1]]
+    # plt.legend(handles, uArms[::-1], loc='upper left', bbox_to_anchor=[1,1], fontsize=14)
+    plt.legend(handles, uArms[::-1], loc='upper left', fontsize=14, bbox_to_anchor=[1.02, 0.8])
 
 def AlgnFreeOverlapRule(island, overlapD, minOverlap=7, minSharedAA=5, maxMismatches=3):
     """PROBLEM: Is working partly because it is still dependent on using the shared coords

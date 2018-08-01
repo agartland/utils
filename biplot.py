@@ -228,7 +228,7 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
     colors = palettable.colorbrewer.get_map('Set1', 'qualitative', min(12, max(3, len(uLabels)))).mpl_colors
     figh = plt.gcf()
     figh.clf()
-    axh = figh.add_axes([0.1, 0.1, 0.8, 0.8], aspect='equal')
+    axh = figh.add_axes([0.15, 0.15, 0.6, 0.7])
     axh.axis('on')
     figh.set_facecolor('white')
     annotationParams = dict(xytext=(0, 5), textcoords='offset points', size='medium')
@@ -253,7 +253,8 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
                             color='black',
                             arrowprops=arrowParams,
                             ha='center',
-                            va='center')
+                            va='center',
+                            size='small')
     mxx = np.max(np.abs(xy[:, plotDims[0]]))
     mxy = np.max(np.abs(xy[:, plotDims[1]]))
     scalar = min(mxx, mxy) * 0.8
@@ -278,7 +279,7 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
     #plt.xticks([0])
     #plt.yticks([0])
     if len(uLabels) > 1:
-        plt.legend(loc=0)
+        plt.legend(loc=0, bbox_to_anchor=(1, 1))
 
 def _test_iris():
     """Import the iris dataset from sklearn, and return as a result"""
