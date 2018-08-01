@@ -123,7 +123,7 @@ def assignResponseIslands(responses):
     out.index = responses.index
     return out
 
-def findEpitopes(responses, sharedRule, reduceResponses=True, **kwargs):
+def findEpitopes(responses, sharedRule, reduceResponses=True, returnResponseIndexed=True, **kwargs):
     """Given a list of responses find the minimum
     set of epitopes that "explain" all responses."""
 
@@ -192,7 +192,6 @@ def findEpitopes(responses, sharedRule, reduceResponses=True, **kwargs):
                 anyRemoved = True
                 """Start for s1 again with updated set of responses"""
                 break
-
     if reduceResponses:
         expSharedSets = []
         for ss in sharedSets:
@@ -205,16 +204,62 @@ def findEpitopes(responses, sharedRule, reduceResponses=True, **kwargs):
             expSharedSets.append(tmp)
     else:
         expSharedSets = sharedSets
-    """Return epitope columns indexed like responses"""
-    epitopes = [None] * responses.shape[0]
-    for epitopei, inds in enumerate(expSharedSets):
-        ep = sharedRule(responses.iloc[inds], **kwargs)[1]
-        ep['EpID'] = 'E%d' % epitopei
-        for i in inds:
-            epitopes[i] = ep
+    if returnResponseIndexed:
+        """Return epitope columns indexed like responses
+        Deprecated: issue is that response may contain multilpe epitopes
+        so index by epitope ID is more natural. Since every epitope has at
+        least one response that can only be explained by that epitope,
+        the response indexed result is still OK for breadth calc"""
+        epitopes = [None] * responses.shape[0]
+        for epitopei, inds in enumerate(expSharedSets):
+            """Some responses may be in multiple shared sets:
+                do not define/restrict epitope location based on these peptides"""
+            uinds = []
+            for i in inds:
+                notUnique = False
+                for ssi, ss in enumerate(expSharedSets):
+                    if not ssi == epitopei:
+                        if i in ss:
+                            notUnique = True
+                if not notUnique:
+                    uinds.append(i)
 
-    epitopesDf = pd.DataFrame(epitopes)
-    epitopesDf.index = responses.index
+            ep = sharedRule(responses.iloc[uinds], **kwargs)[1]
+            ep['EpID'] = 'E%d' % epitopei
+            """This will assign responses an EpID multiple times when it
+            could contain either epitope"""
+            for i in inds:
+                epitopes[i] = ep
+
+        epitopesDf = pd.DataFrame(epitopes)
+        epitopesDf.index = responses.index
+    else:
+        """Return DataFrame that is indexed by epitope and response,
+        with potentially more than one epitope per response"""
+        epitopes = []
+        for epitopei, inds in enumerate(expSharedSets):
+            """Some responses may be in multiple shared sets:
+                do not define/restrict epitope location based on these peptides"""
+            uinds = []
+            for i in inds:
+                notUnique = False
+                for ssi, ss in enumerate(expSharedSets):
+                    if not ssi == epitopei:
+                        if i in ss:
+                            notUnique = True
+                if not notUnique:
+                    uinds.append(i)
+
+            ep = sharedRule(responses.iloc[uinds], **kwargs)[1]
+            ep['EpID'] = 'E%d' % epitopei
+            for i in inds:
+                tmp = deepcopy(ep)
+                tmp['ptid'] = responses['ptid'].iloc[i]
+                tmp['IslandID'] = responses['IslandID'].iloc[i]
+                tmp['RespID'] = responses['RespID'].iloc[i]
+                tmp['Floater'] = 0 if i in uinds else 1
+                epitopes.append(tmp)
+        epitopesDf = pd.DataFrame(epitopes)
     return epitopesDf
 
 """
@@ -395,12 +440,17 @@ def findpeptide(pep, seq, returnGapped=False):
 def sliceRespSeq(r):
     """After the epitope has been identified, slice the response sequence to the appropriate size"""
     start, stop = int(r['EpStart'] - r['start']), int(r['EpStart'] - r['start'] + len(r['EpSeq']))
+    
     if 'align seq' in r:
-        out = r['align seq'][start:stop]
+        s = r['align seq']
     else:
-        out = r['seq'][start:stop]
-    return out
+        s = r['seq']
 
+    if start < 0 or stop > len(s):
+        out = ''
+    else:
+        out = s[start:stop]
+    return out
 
 def encodeVariants(peps):
     """Encode a list of aligned peptides as a single string
@@ -413,6 +463,7 @@ def encodeVariants(peps):
     
     'K[MK][QV]KEY[HA][LA]L'
     """
+    peps = [p for p in peps if len(p) > 0]
     Ls = np.array([len(s) for s in peps])
     assert np.unique(Ls).shape[0] == 1
     L = Ls[0]
