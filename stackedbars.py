@@ -90,12 +90,14 @@ def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=N
     else:
         gs = GridSpec(nrows=len(facetorder), ncols=1, right=0.9)
 
+    axesHandles = []
     for rowi, row in enumerate(facetorder):
         if not facetrow is None:
             axh = plt.subplot(gs[rowi])
         else:
             axh = plt.gca()
             axh.cla()
+        axesHandles.append(axh)
         if not facetrow is None:
             rowData = data.loc[data[facetrow] == row]
         else:
@@ -132,9 +134,6 @@ def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=N
         if yl[1] is None or curyl[1] > yl[1]:
             yl[1] = curyl[1]
 
-        plt.xlim(xl)
-        plt.ylim(yl)
-
         if rowi == len(facetorder) - 1:
             plt.xlabel(stack)
             plt.xticks(xcenters, xorder)
@@ -150,6 +149,11 @@ def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=N
                         hueorder, 
                         loc='upper left',
                         bbox_to_anchor=(1, 1))
+
+    for axh in axesHandles:
+        axh.set_ylim(yl)
+        axh.set_xlim(xl)
+
     if facetrow is None:
         handle = axh
     else:
