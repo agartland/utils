@@ -15,6 +15,8 @@ import matplotlib.pyplot as plt
 from matplotlib.collections import PatchCollection
 from matplotlib.patches import Rectangle
 
+from objhist import objhist
+
 """Rewrite of epitope_mapping.py that avoids the use of objects,
 thereby permitting easy writing/reading of epitope mapping
 results to/from files.
@@ -49,9 +51,11 @@ __all__ = [ 'hamming',
             'realignPeptides',
             'coord_overlap',
             'plotEpitopeMap',
-            'plotEpitopeChiclets']
-
-
+            'plotEpitopeChiclets',
+            'consensusPeptide',
+            'alignPeptides',
+            'unionCoords',
+            'respCoords']
 
 def hamming(str1, str2):
     """Hamming distance between two strings"""
@@ -71,6 +75,17 @@ def _coords(r, plot=False):
         return list(range(int(r.start), int(r.start) + len(r.seq)))
     else:
         return list(range(int(r.start), int(r.end)))
+
+def respCoords(r, plot=False):
+    """Return coordinates of the response peptide
+    Plot option returns coordinates based on start and length of peptide,
+    as opposed to end coordinate which is subject to indsertions/deletions
+    Use end like a stop in range(start, stop)"""
+    if plot:
+        return list(range(int(r.start), int(r.start) + len(r.seq)))
+    else:
+        return list(range(int(r.start), int(r.end)))
+
 def _epcoords(r, plot=False):
     if plot:
         return list(range(int(r.EpStart), int(r.EpStart) + len(r.EpSeq)))
@@ -97,6 +112,39 @@ def sharedCoords(island):
         return sorted(sc)
     else:
         return []
+
+def unionCoords(island):
+    """Find the coordinates that are in ANY of the responses"""
+    if island.shape[0] > 0:
+        sc = set(_coords(island.iloc[0]))
+        for ri in range(island.shape[0]):
+            response = island.iloc[ri]
+            sc = sc.union(_coords(response))
+        return sorted(sc)
+    else:
+        return []
+
+def alignPeptides(island):
+    coords = []
+    for i,r in island.iterrows():
+        coords.extend(_coords(r))
+    coords = np.unique(coords)
+    out = ['-'*(coords < r.start).sum() + r.seq + '-'*(coords > r.end).sum() for i,r in island.iterrows()]
+    return out
+
+def consensusPeptide(island, ignoreGaps=True):
+    """Aligns peptides and returns a consensus sequence
+    ignoresGaps unless all AA are gaps"""
+    align = alignPeptides(island)
+    L = len(align[0])
+
+    cons = ''
+    for aai in np.arange(L):
+        counts = objhist([seq[aai] for seq in align])
+        if ignoreGaps and len(counts)>1:
+            droppedGaps = counts.pop('-', 0)
+        cons += max(list(counts.keys()), key=counts.get)
+    return cons
 
 def assignResponseIslands(responses):
     """Return a pd.Series with an island ID that can be joined with
