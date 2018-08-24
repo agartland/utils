@@ -200,7 +200,7 @@ def applyResponseCriteria(df, subset=['IFNg', 'IL2'], ANY=1, indexCols=None, mag
     out = out.reset_index()
     return out
 
-def compressSubsets(df, subset=['IFNg', '2', 'TNFa'], indexCols=None, groups=None, magCols=['cytnum'], nsubCols=['nsub']):
+def compressSubsets(df, subset=['IFNg', '2', 'TNFa'], markerCol='cytokine', indexCols=None, groups=None, magCols=['cytnum'], nsubCols=['nsub']):
     """Combine cell subsets into a smaller number of subsets before performing the analysis.
     Data will be summed-over cytokines not included in the subset list.
 
@@ -229,7 +229,7 @@ def compressSubsets(df, subset=['IFNg', '2', 'TNFa'], indexCols=None, groups=Non
     if indexCols is None:
         indexCols = ['sample', 'visitno', 'testdt', 'tcellsub', 'nsub', 'antigen', 'nrepl']
         
-    cytokineSubsets = df.cytokine.unique()
+    cytokineSubsets = df[markerCol].unique()
     cytokines = cytokineSubsets[0].replace('-', '+').split('+')[:-1]
     L = np.array([len(c) for c in cytokines])
     boolSubsets = np.array([[x[sum(L[:i+1])+i] == '+' for i in range(len(L))] for x in cytokineSubsets], dtype=bool)
@@ -254,20 +254,20 @@ def compressSubsets(df, subset=['IFNg', '2', 'TNFa'], indexCols=None, groups=Non
         for g in groups:
             convertLookup.update({v:g for v in groups[g]})
     else:
-        print("Need to specify cytokine subsets!")
+        print("Need to specify cytokine/marker subsets!")
         return df
 
     preDf = df.copy()
-    preDf['cytokine'] = preDf.cytokine.map(convertLookup.get)
+    preDf[markerCol] = preDf[markerCol].map(convertLookup.get)
     """Groupby unique columns and agg-sum across cytokine subsets, then reset index"""
-    aggDf = preDf[indexCols + magCols + ['cytokine']].groupby(indexCols + ['cytokine']).agg(np.sum)
+    aggDf = preDf[indexCols + magCols + [markerCol]].groupby(indexCols + [markerCol]).agg(np.sum)
     if not nsubCols is None:
-        nsubDf = preDf[indexCols + nsubCols + ['cytokine']].groupby(indexCols + ['cytokine']).agg(np.median)
+        nsubDf = preDf[indexCols + nsubCols + [markerCol]].groupby(indexCols + [markerCol]).agg(np.median)
         aggDf = aggDf.join(nsubDf)
     aggDf = aggDf.reset_index()
     return aggDf
 
-def computeMarginals(df, indexCols, magCol='mag_bg'):
+def computeMarginals(df, indexCols, markerCol='cytokine', magCols=['cytnum'], nsubCols=['nsub']):
     """Compress df cytokine subsets to a single subset for each cytokine.
 
     Parameters
@@ -285,15 +285,16 @@ def computeMarginals(df, indexCols, magCol='mag_bg'):
         Rows for each of the samples that were indexed,
         and for each cytokine"""
 
-    cytokines = df.cytokine.iloc[0].replace('-', '+').split('+')[:-1]
+    cytokines = df[markerCol].iloc[0].replace('-', '+').split('+')[:-1]
     out = []
     for cy in cytokines:
-        marg = compressSubsets(df, indexCols=indexCols, subset=[cy], magCol=magCol)
-        marg = marg.loc[marg.cytokine == cy + '+']
+        marg = compressSubsets(df, indexCols=indexCols, subset=[cy], magCols=magCols, markerCol=markerCol, nsubCols=nsubCols)
+        marg = marg.loc[marg[markerCol] == cy + '+']
         out.append(marg)
     out = pd.concat(out, axis=0)
-    out.loc[:, magCol] = out
+    #out.loc[:, magCols] = out
     return out
+
 def subset2vec(cy):
     vec = np.array([1 if i == '+' else 0 for i in re.findall(r'[\+-]', cy)])
     return vec
