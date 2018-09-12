@@ -44,7 +44,7 @@ def optimism_bootstrap(X, y, model, fitMethod, predictMethod, metric, alpha=0.05
 
     Example
     -------
-    auc, lb, ub = optimism_bootstrap(y, X, SVC(), 'fit', 'decision_function', sklearn.metrics.roc_auc_score)"""
+    auc, lb, ub = optimism_bootstrap(X, y, SVC(), 'fit', 'decision_function', sklearn.metrics.roc_auc_score)"""
     
     n = len(y)
     res = getattr(model, fitMethod)(X, y)
@@ -95,7 +95,7 @@ def percentile_bootstrap(X, y, model, fitMethod, predictMethod, metric, alpha=0.
 
     Example
     -------
-    auc, lb, ub = percentile_bootstrap(y, X, SVC(), 'fit', 'decision_function', sklearn.metrics.roc_auc_score)"""
+    auc, lb, ub = percentile_bootstrap(X, y, SVC(), 'fit', 'decision_function', sklearn.metrics.roc_auc_score)"""
     
     n = len(y)
     res = getattr(model, fitMethod)(X, y)
@@ -144,7 +144,7 @@ def ob_roc_curve(X, y, model, fitMethod, predictMethod, alpha=0.05, nstraps=1000
 
     Example
     -------
-    auc, lb, ub = ob_roc_curve(y, X, SVC(), 'fit', 'decision_function')"""
+    auc, lb, ub = ob_roc_curve(X, y, SVC(), 'fit', 'decision_function')"""
     pos_label = np.max(y)
     n = len(y)
     res = getattr(model, fitMethod)(X, y)
@@ -217,7 +217,7 @@ def pb_roc_curve(X, y, model, fitMethod, predictMethod, alpha=0.05, nstraps=1000
 
     Example
     -------
-    auc, lb, ub = pb_roc_curve(y, X, SVC(), 'fit', 'decision_function')"""
+    auc, lb, ub = pb_roc_curve(X, y, SVC(), 'fit', 'decision_function')"""
     pos_label = np.max(y)
     n = len(y)
     res = getattr(model, fitMethod)(X, y)
@@ -291,12 +291,12 @@ def plotBootROC(rocDfL, labelL=None, aucL=None):
     plt.legend([plt.Line2D([0, 1], [0, 1], color=c, lw=2) for c in colors], labelL, loc='lower right', fontsize=10)
     plt.show()
 
-def _test_oboot():
-    X = np.random.randn(50,2)
-    data = X[:,0] + 10 * np.random.rand(50)
-    #data = np.random.rand(50)
+def _test_oboot(n=50):
+    X = np.random.randn(n,2)
+    data = X[:,0] + 10 * np.random.rand(n)
+    #data = np.random.rand(n)
     split = np.median(data)
-    y = np.zeros(50)
+    y = np.zeros(n)
     y[data>split] = 1
     y[data<=split] = 0
 
@@ -304,12 +304,12 @@ def _test_oboot():
     B = percentile_bootstrap(X, y, SVC(), 'fit', 'decision_function', roc_auc_score)
     return O, B
 
-def _test_oboot_roc():
-    X = np.random.randn(50,2)
-    data = X[:,0] + 10 * np.random.rand(50)
-    #data = np.random.rand(50)
+def _test_oboot_roc(n=50):
+    X = np.random.randn(n,2)
+    data = X[:,0] + 10 * np.random.rand(n)
+    #data = np.random.rand(n)
     split = np.median(data)
-    y = np.zeros(50)
+    y = np.zeros(n)
     y[data>split] = 1
     y[data<=split] = 0
 
@@ -317,12 +317,12 @@ def _test_oboot_roc():
     pbDf = pb_roc_curve(X, y, SVC(), 'fit', 'decision_function')
     return obDf, pbDf
 
-def _test_oboot_roc_plot():
-    X = np.random.randn(50,2)
-    data = X[:,0] + 10 * np.random.rand(50)
-    #data = np.random.rand(50)
+def _test_oboot_roc_plot(n=50):
+    X = np.random.randn(n,2)
+    data = X[:,0] + 10 * np.random.rand(n)
+    #data = np.random.rand(n)
     split = np.median(data)
-    y = np.zeros(50)
+    y = np.zeros(n)
     y[data>split] = 1
     y[data<=split] = 0
 

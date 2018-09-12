@@ -9,6 +9,8 @@ from glob import glob
 from functools import partial
 import time
 import sys
+import tempfile
+import traceback
 
 from .loading import applyResponseCriteria, generateGzAPerfExceptions
 
@@ -18,7 +20,9 @@ __all__ = ['matchSamples',
            'extractFunctionsMarkers',
            'extractFunctionsGBY',
            'extractFunctionsMarkersGBY',
-           'parseSubsets']
+           'extractRawFunctions',
+           'parseSubsets',
+           'mergeFeathers']
 
 """
 if sys.platform == 'win32':
@@ -58,6 +62,35 @@ exKwargs = dict(subsets=subsets, functions=functions, compressions=[('ALL', 1),
 
 outDf = mergeSamples(batchFolder, extractionFunc=extractFunctions, extractionKwargs=exKwargs)
 """
+def mergeFeathers(files, mergedFilename, writeCSV, deleteSource=True):
+    data = [feather.read_dataframe(f) for f in files if not f == '']
+    df = pd.concat(data, sort=False, axis=0, ignore_index=True, copy=False)
+    
+    if writeCSV:
+        df.to_csv(mergedFilename)
+    else:
+        try:
+            feather.write_dataframe(df, mergedFilename)
+        except:
+            print('Error writing merged feather: Trying CSV')
+            print(df.shape)
+            traceback.print_exc()
+            try:
+                df.to_csv(mergedFilename.replace('.feather', '.csv'))
+            except:
+                print('Error writing merged CSV: Writing list of unmerged temp files.')
+                with open(mergedFilename.replace('.feather', '.csv'), 'w') as fh:
+                    for f in files:
+                        fh.write(f + '\n')
+                deleteSource = False
+    if deleteSource:
+        for f in files:
+            if not f == '':
+                try:
+                    os.remove(f)
+                except:
+                    print('Could not delete merged temp file: %s' % f)
+    return mergedFilename
 
 def matchSamples(batchFolder, test=False):
     """Match each row of the metadata with each feather file (sample)
@@ -109,29 +142,56 @@ def matchSamples(batchFolder, test=False):
         featherLU = out
     return featherLU
 
-def mergeSamples(batchFolder, extractionFunc, extractionKwargs, test=False):
+def mergeSamples(batchFolder, extractionFunc, extractionKwargs, test=False, metaCols=None, filters=None):
     """Go through each feather file (sample) in a batch folder,
     apply the analysis function, and merge together."""
     mDf = pd.read_csv(opj(batchFolder, 'metadata.csv'))
     featherList = glob(opj(batchFolder, '*.feather'))
     featherLU = matchSamples(batchFolder, test=test)
-
-    mDf = pd.read_csv(opj(batchFolder, 'metadata.csv'))
+    
+    if not metaCols is None:
+        if not 'sample_name' in metaCols:
+            metaCols.append('sample_name')
+        mDf = mDf[metaCols]
+    
+    mDf = mDf.set_index('sample_name')
     feathers = []
     i = 1
     print('Extracting from batch %s (%s)' % (batchFolder, time.ctime()))
     sttime = time.time()
     for sample_name, fn in featherLU.items():
-        f = feather.read_dataframe(fn)
-        print('Extracting from sample %s (%d of %d)' % (sample_name, i, len(featherLU)))
-        x = extractionFunc(f, **extractionKwargs)
-        x.loc[:, 'sample_name'] = sample_name
-        feathers.append(x)
+        filterOut = False
+        if not filters is None:
+            """Keep only samples whose meta data matches all of the filters"""
+            filterOut = False
+            for col, valList in filters.items():
+                if not mDf.loc[sample_name, col] in valList:
+                    filterOut = True
+                    break
+        if not filterOut:
+            f = feather.read_dataframe(fn)
+            # print('Extracting from sample %s (%d of %d)' % (sample_name, i, len(featherLU)))
+            try:
+                x = extractionFunc(f, **extractionKwargs)
+                x.loc[:, 'sample_name'] = sample_name
+            except:
+                print('Error extracting from batch %s, sample %s (%d)' % (batchFolder, sample_name, i))
+                print(x.shape)
+                print(x.head())
+                traceback.print_exc()
+            feathers.append(x)
         i += 1
+    if len(feathers) > 0:
+        outDf = pd.merge(pd.concat(feathers, axis=0), mDf.reset_index(), how='left', left_on='sample_name', right_on='sample_name')
+        print('Finished batch %s (%1.0f minutes)' % (batchFolder, (time.time() - sttime) / 60), flush=True)
 
-    outDf = pd.merge(pd.concat(feathers, axis=0), mDf, how='left', left_on='sample_name', right_on='sample_name')
-    print('Finished batch %s (%1.0f minutes)' % (batchFolder, (time.time() - sttime) / 60), flush=True)
-    return outDf
+        """Write to a temporary merge file and return filename"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.feather', prefix='merged_tmp_', dir=batchFolder, delete=False) as fh:
+            tmpFilename = fh.name
+        feather.write_dataframe(outDf, tmpFilename)
+    else:
+        tmpFilename = ''
+    return tmpFilename
 
 def subset2vec(cy):
     """Convert: "IFNg+IL2-TNFa+"
@@ -521,3 +581,44 @@ def extractFunctionsMarkersGBY(f, subsets, functions, markers, compressions=[('A
     cdf.index = np.arange(cdf.shape[0])
     return cdf
 
+
+def extractRawFunctions(f, subsets, functions, downsample=1.):
+    """Extract all cells from the GatingSet DataFrame and
+    keep only the relevant columns for subsets and functions
+
+    Parameters
+    ----------
+    subsets : dict
+        From a config file, with names of subsets (keys) and column names (values)
+    functions : dict
+        From a config file, with names of functions (keys) and column name subset post-fixes (values)
+    downsample : float
+        Fraction of samples to keep.
+        
+    Returns
+    -------
+    df : pd.DataFrame
+        Data with one row per cell and columns for each marker"""
+    def _prepKeys(d):
+        fdict = {fk:fv for fk,fv in d.items() if j.join([ssVal, fv]) in f.columns}
+        fkeys = [fk for fk in fdict.keys()]
+        fvals = [fdict[fk] for fk in fkeys]
+        fkeys_stripped = [fk.replace('+','').replace('-','') for fk in fkeys]
+        return fkeys, fvals, fkeys_stripped
+    
+    j = '/'
+    keepCols = []
+    ssCols = []
+    for ssName, ssVal in subsets.items():
+        fkeys, fvals, fkeys_stripped = _prepKeys(functions)
+        keepCols.extend([j.join([ssVal, v]) for v in fvals])
+        ssCols.append(ssVal)
+    
+    """Only keep the cells that are positive for one of the subsets"""
+    f = f.loc[f[ssCols].any(axis=1)]
+    
+    if downsample < 1:
+        ind = np.random.rand(f.shape[0]) < downsample
+        f = f.loc[ind]
+    f = f[keepCols + ssCols]
+    return f

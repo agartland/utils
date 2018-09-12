@@ -1,0 +1,33 @@
+type,name,value
+subset,Total monocytes,/S/Time/14+SShi/Monos total
+subset,Total NK cells,/S/Time/Lv/14-SSlo/Keeper/3-/DR-/NK total
+subset,gd T cells,/S/Time/Lv/14-SSlo/Keeper/L/3+/gd+
+subset,B cells,/S/Time/Lv/14-SSlo/Keeper/3-/HLA-DR+
+subset,CD4+ T cells,/S/Time/Lv/14-SSlo/Keeper/L/16-56-/4+
+subset,DN T cells,/S/Time/Lv/14-SSlo/Keeper/L/16-56-/4-8-
+subset,CD8+ T cells,/S/Time/Lv/14-SSlo/Keeper/L/16-56-/8+
+subset,Va7.2+ MAITs,/S/Time/Lv/14-SSlo/Keeper/L/gd-/26+161+/Va7.2+
+subset,Va7.2- MAITs,/S/Time/Lv/14-SSlo/Keeper/L/gd-/26+161+/Va7.2-
+subset,NK T cells,/S/Time/Lv/14-SSlo/Keeper/L/Not26+161+/16+or56+
+function,CD4,4+
+function,CD8,8+
+function,,CCR6+
+function,CD45RA,45RA+
+function,,CCR7+
+function,,CXCR3+
+function,,DR+
+function,DR,HLA-DR+
+function,CD4:CD45RA,4+45RA+
+function,,KLRG1+
+function,CD4:KLRG1,4+KLRG1+
+function,,GzA+
+function,,Perf+
+function,CD4:IL22+,4+IL22+
+function,CD4:Th2+,4+Th2+
+function,CD154+,154+
+function,,IFNg+
+function,,IL2+
+function,,IL17a+
+function,,IL22+
+function,,Th2+
+function,,TNFa+
