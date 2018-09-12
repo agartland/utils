@@ -13,11 +13,12 @@ from .loading import subset2vec, vec2subset, compressSubsets
 
 __all__ = ['DenseICSDist',
            'pwICSDist',
-           'decomposeDist']
+           'decomposeDist',
+           'getDecomposed']
 
 """Formulating polyfunctionality distance as a min cost flow problem"""
 
-def pwICSDist(cdf, magCol='pctpos', cyCol='cytokine', indexCols=['ptid', 'visitday', 'tcellsub', 'antigen'], factor=100000, decompose=True, maxways=3):
+def pwICSDist(cdf, magCol='pctpos', cyCol='cytokine', indexCols=['ptid', 'visitday', 'tcellsub', 'antigen'], factor=100000):
     """Compute all pairwise ICS distances among samples indicated by index columns.
     
     Parameters
@@ -33,19 +34,12 @@ def pwICSDist(cdf, magCol='pctpos', cyCol='cytokine', indexCols=['ptid', 'visitd
     factor : int
         Since cost-flow estimates are based on integers, its effectively the number of
         decimal places to be accurate to. Default 1e5 means magCol is multiplied by 1e5 before rounding to int.
-    decompose : bool
-        Flag to indicate that distance should be decomposed into marginal and higher-order interactions.
-    maxways : int
-        Specify the degree of higher-order interactions evaluated in the decomposition
 
     Returns
     -------
     dmatDf : pd.DataFrame
-        Symetric pairwise distance matrix with hierarchical columns/index of indexCols
-    decompDf : pd.DataFrame
-        Optional accounting of costs-flows/distances decomposed into one-way, two-way and three-way interactions"""
+        Symetric pairwise distance matrix with hierarchical columns/index of indexCols"""
     cdf = cdf.set_index(indexCols + [cyCol])[magCol].unstack(indexCols).fillna(0)
-    metadata = cdf.columns.tolist()
     n = cdf.shape[1]
     dmat = np.zeros((n, n))
     tab = []
@@ -55,13 +49,8 @@ def pwICSDist(cdf, magCol='pctpos', cyCol='cytokine', indexCols=['ptid', 'visitd
                 d = DenseICSDist(cdf.iloc[:,i], cdf.iloc[:,j], factor=factor)
                 dmat[i, j] = d
                 dmat[j, i] = d
-                dec = decomposeDist(cdf.iloc[:,i], cdf.iloc[:,j], DenseICSDist, maxways=maxways, factor=factor)
-                dec.loc[:, 'samp_i'] = i
-                dec.loc[:, 'samp_j'] = j
-                tab.append(dec)
     dmatDf = pd.DataFrame(dmat, columns=cdf.columns, index=cdf.columns)
-    decompDf = pd.concat(tab, axis=0)
-    return dmatDf, decompDf
+    return dmatDf
 
 def DenseICSDist(freq1, freq2, factor=100000, verbose=False, tabulate=False):
     """Compute a positive, symetric distance between two frequency distributions,
@@ -188,7 +177,7 @@ def DenseICSDist(freq1, freq2, factor=100000, verbose=False, tabulate=False):
     else:
         return cost
 
-def decomposeDist(freq1, freq2, ICSDist=DenseICSDist, maxways=3, factor=100000):
+def decomposeDist(freq1, freq2, ICSDist=DenseICSDist, maxways=3, factor=100000, compressCache=None):
     """Compute decomposed distances between freq1 and freq2. The
     decomposition includes distances based on marginal/one-way marker
     combinations, two-way combinations, etc. up to maxways-way interactions.
@@ -238,17 +227,101 @@ def decomposeDist(freq1, freq2, ICSDist=DenseICSDist, maxways=3, factor=100000):
         """Number of times each marker appears in all decompositions"""
         norm_factor = np.sum([0 in cyi for cyi in icombs])
         for cyi in icombs:
-            cy = [markers[i] for i in cyi]
-            cfreq1 = compressSubsets(tmp1, subset=cy, indexCols=['ptid'], magCols=['freq'], nsubCols=None)
-            cfreq2 = compressSubsets(tmp2, subset=cy, indexCols=['ptid'], magCols=['freq'], nsubCols=None)
-            cost = ICSDist(cfreq1.set_index('cytokine')['freq'],
-                                    cfreq2.set_index('cytokine')['freq'], factor=factor)
+            cy = tuple((markers[i] for i in cyi))
+            if compressCache is None:
+                cfreq1 = compressSubsets(tmp1, subset=cy, indexCols=['ptid'], magCols=['freq'], nsubCols=None).set_index('cytokine')['freq']
+                cfreq2 = compressSubsets(tmp2, subset=cy, indexCols=['ptid'], magCols=['freq'], nsubCols=None).set_index('cytokine')['freq']
+            else:
+                cfreq1, cfreq2 = compressCache[cy]
+            cost = ICSDist(cfreq1, cfreq2, factor=factor)
             costs.append(cost / norm_factor)
             markerCombs.append(cy)
     ctDf = pd.DataFrame({'markers':['|'.join(mc) for mc in markerCombs],
                       'distance':costs,
                       'nmarkers':[len(mc) for mc in markerCombs]})
     return ctDf
+
+def pwDecomposeDist(cdf, magCol='pctpos', cyCol='cytokine', indexCols=['ptid', 'visitday', 'tcellsub', 'antigen'], factor=100000, maxways=3):
+    """Compute all pairwise ICS distances among samples indicated by index columns.
+    Distance is decomposed into marginal and higher-order interactions.
+    
+    Parameters
+    ----------
+    cdf : pd.DataFrame
+        Contains one row per cell population, many rows per sample.
+    magCol : str
+        Column containing the magnitude which should add up to 1 for all rows in a sample
+    cyCol : str
+        Column containing the marker combination for the row. E.g. IFNg+IL2-TNFa+
+    indexCols : list
+        List of columns that make each sample uniquely identifiable
+    factor : int
+        Since cost-flow estimates are based on integers, its effectively the number of
+        decimal places to be accurate to. Default 1e5 means magCol is multiplied by 1e5 before rounding to int.
+    maxways : int
+        Specify the degree of higher-order interactions evaluated in the decomposition
+
+    Returns
+    -------
+    decompDf : pd.DataFrame
+        Accounting of costs-flows/distances decomposed into one-way, two-way and three-way interactions"""
+    
+    """Do all the cytokine compressions once, upfront for efficiency"""
+    markers = cdf[cyCol].iloc[0].replace('-', '+').split('+')[:-1]
+    nmarkers = len(markers)
+    compressed = {}
+    norm_factor = {}
+    for nwaysi in range(min(nmarkers, maxways)):
+        icombs = [d for d in itertools.combinations(np.arange(nmarkers), nwaysi+1)]
+        """Number of times each marker appears in all decompositions"""
+        norm_factor[nwaysi+1] = np.sum([0 in cyi for cyi in icombs])
+        for cyi in icombs:
+            cy = tuple((markers[i] for i in cyi))
+            tmp = compressSubsets(cdf, markerCol=cyCol, subset=cy, indexCols=indexCols, magCols=[magCol], nsubCols=None)
+            compressed[cy] = tmp.set_index(indexCols + [cyCol])[magCol].unstack(indexCols).fillna(0)
+
+    cdf = cdf.set_index(indexCols + [cyCol])[magCol].unstack(indexCols).fillna(0)
+    metadata = cdf.columns.tolist()
+    n = cdf.shape[1]
+
+    tab = []
+    for i in range(n):
+        for j in range(n):
+            if i <= j:
+                dec = decomposeDist(cdf.iloc[:,i], cdf.iloc[:,j],
+                                    DenseICSDist,
+                                    maxways=maxways,
+                                    factor=factor,
+                                    compressCache={cy: [compressed[cy].iloc[:, ii] for ii in [i,j]] for cy in compressed.keys()})
+                dec.loc[:, 'samp_i'] = i
+                dec.loc[:, 'samp_j'] = j
+                tab.append(dec)
+    decompDf = pd.concat(tab, axis=0)
+    return decompDf
+
+def getDecomposed(decompDf, index, nway):
+    """Pull-out a square, symetric, positive distance matrix from the decomposed distance DataFrame
+
+    Parameters
+    ----------
+    decompDf : pd.DataFrame
+        Output from decomposeDist, containing several longform distance matrices
+    index : pd.MultiIndex or other array
+        From the pairwise distance matrix for which this is a decomposition
+    nway : int
+        Order of interactions for which a distance matrix will be extracted from the decompDf
+
+    Returns
+    -------
+    dmatDf : pd.DataFrame
+        Symetric pairwise distance matrix with hierarchical columns/index of indexCols"""
+        
+    tmp = decompDf.loc[decompDf['nmarkers'] == nway].groupby(['samp_i', 'samp_j'])['distance'].agg(np.sum).unstack('samp_j')
+    lower_i = np.tril_indices(tmp.values.shape[0], k=-1)
+    tmp.values[lower_i] = tmp.values.T[lower_i]
+    tmp.columns = index
+    tmp.index = index
+    return tmp
 
 _eg_3cytokine = ['IFNg-IL2-TNFa-',
                 'IFNg+IL2-TNFa-',
