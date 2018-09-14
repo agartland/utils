@@ -2,11 +2,18 @@ import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 
+try:
+    from scikits.bootstrap import ci
+except ModuleNotFoundError:
+    print('Could not load scikits-bootstrap: bootstrap CIs not available.')
+
 __all__ = ['kreg_perm',
             'argrank',
             'dist2kernel',
             'kernel2dist',
-            'computePWDist']
+            'computePWDist',
+            'computeKregStat']
+            
 """Tested one kernel, logistic regression.
 Multiple kernels and continuous outcome should be tested."""
 
@@ -105,7 +112,7 @@ def kreg_perm(y, Ks, X=None, binary=True, nperms=9999, seed=110820, returnPerms=
         else:
             return pvalue
 
-def computeKregStat(y, Ks, X=None, binary=True):
+def computeKregStat(y, K, X=None, binary=True, alpha=None, nstraps=1000):
     """Compute the statistic that is subjected to permutation testing
     in kernel regression of Y adjusting for covariates in X.
 
@@ -120,37 +127,53 @@ def computeKregStat(y, Ks, X=None, binary=True):
         Matrix of covariates for adjustment.
     binary : bool
         Use True for logistic regression.
+    alpha : float or None
+        If not None then compute the 1 - alpha % confidence interval
+        using a bootstrap.
+    nstraps : int
+        Number of random samples for the 1 - alpha CIs
 
     Returns
     -------
     Q : float
         Regression coefficient for K
-    pIndivid : ndarray shape (k)
-        Optionally returns vector of p-values, one
-        for each kernel provided."""
-
+    lb, ub : float (optional)
+        Upper and lower 1 - alpha confidence bounds based on
+        a percentile bootstrap with nstraps iterations."""
     n = len(y)
     if binary:
         family = sm.families.Binomial()
     else:
         family = sm.families.Gaussian()
 
+    
     if X is None:
         X = np.ones(y.shape, dtype=float)
-
-    model = sm.GLM(endog=y.astype(float), exog=sm.add_constant(X.astype(float)), family=family)
-    result = model.fit()
-    resid = result.resid_response
-
-    """Squared standard error of the parameters (i.e. Beta_se)"""
-    s2 = float(result.bse**2)
 
     if isinstance(K, pd.DataFrame):
         K = K.values
 
-    Q = np.linalg.multi_dot((resid/s2, K, resid))
-    return Q
+    def _computeQ(y, K, X):
+        model = sm.GLM(endog=y.astype(float), exog=sm.add_constant(X.astype(float)), family=family)
+        result = model.fit()
+        resid = result.resid_response
 
+        """Squared standard error of the parameters (i.e. Beta_se)"""
+        s2 = float(result.bse**2)
+        Q = np.linalg.multi_dot((resid/s2, K, resid))
+        return Q
+
+    Q = _computeQ(y, K, X)
+    
+    if alpha is None:
+        return Q
+    
+    samps = np.zeros(nstraps)
+    for i in range(nstraps):
+        rind = np.random.randint(n, size=n)
+        samps[i] = _computeQ(y[rind], K[:, rind][rind,:], X[rind])
+    lb, ub = np.percentile(samps, [100*alpha/2, 100 * (1 - alpha/2)])
+    return Q, lb, ub
 
 def argrank(vec):
     """Return the ascending rank (0-based) of the elements in vec

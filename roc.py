@@ -40,7 +40,10 @@ def plotROC(fprL, tprL, aucL=None, accL=None, labelL=None, outcomeVar=''):
     if labelL is None and aucL is None and accL is None:
         labelL = ['Model %d' % i for i in range(len(fprL))]
     else:
-        labelL = ['%s (AUC = %0.2f; ACC = %0.2f)' % (label, auc, acc) for label, auc, acc in zip(labelL, aucL, accL)]
+        if not accL is None:
+            labelL = ['%s (AUC = %0.2f; ACC = %0.2f)' % (label, auc, acc) for label, auc, acc in zip(labelL, aucL, accL)]
+        else:
+            labelL = ['%s (AUC = %0.2f)' % (label, auc) for label, auc in zip(labelL, aucL)]
 
     colors = sns.color_palette('Set1', n_colors=len(fprL))
 

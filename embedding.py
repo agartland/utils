@@ -203,7 +203,8 @@ def plotEmbedding(dmatDf,
                 legTit = labels.name
             else:
                 legTit = '%s | %s' % (labels.name, markerLabels.name)
-            plt.legend(loc=0, title=legTit)
+            # plt.legend(loc=0, title=legTit)
+            plt.legend(loc='upper left', title=legTit, bbox_to_anchor=(1, 1))
     if hasattr(xyDf, 'explained_variance_'):
         axh.set_xlabel('%s %1.0f (%1.0f%% variance explained)' % (method.upper(), plotDims[0]+1, 100*xyDf.explained_variance_[plotDims[0]]))
         axh.set_ylabel('%s %1.0f (%1.0f%% variance explained)' % (method.upper(), plotDims[1]+1, 100*xyDf.explained_variance_[plotDims[1]]))
@@ -354,4 +355,8 @@ def clusteredScatter(xyDf,
                 plot_point_cov(Xvar, ax=axh, color=colors[vi % len(colors)], alpha=0.2)
     axh.set_xticks(())
     axh.set_yticks(())
+    """Set a 3% padding around the edge of all the data"""
+    lim = lambda v,pad: [np.min(v) - pad*(np.max(v) - np.min(v)), np.max(v) + pad*(np.max(v) - np.min(v))]
+    axh.set_xlim(lim(xyDf[plotDims[0]], 0.03))
+    axh.set_ylim(lim(xyDf[plotDims[1]], 0.03))
     return axh
