@@ -125,11 +125,14 @@ def unionCoords(island):
         return []
 
 def alignPeptides(island):
-    coords = []
+    '''coords = []
     for i,r in island.iterrows():
         coords.extend(_coords(r))
-    coords = np.unique(coords)
-    out = ['-'*(coords < r.start).sum() + r.seq + '-'*(coords > r.end).sum() for i,r in island.iterrows()]
+    coords = np.unique(coords)'''
+    coords = np.array(unionCoords(island))
+    # assert (coords == np.arange(coords[0], coords[-1]+1)).all()
+
+    out = ['-'*(coords < r.start).sum() + r.seq + '-'*(coords > (r.end-1)).sum() for i,r in island.iterrows()]
     return out
 
 def consensusPeptide(island, ignoreGaps=True):
@@ -877,7 +880,7 @@ def realignPeptides(peptides, alignFn, minL=4):
         Collection of peptides (e.g. list or pd.Series)
     alignFn : str
         Filename of a FASTA formatted multiple sequence alignment
-    minL : None int
+    minL : None or int
         Value of None requires exact matches be found in the alignment
         or a minimum of minL AAs must match
 
