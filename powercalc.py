@@ -453,7 +453,7 @@ def RRCI(a, b, c, d, alpha=0.05, RR0=1, method='katz'):
 
     return rr, lb, ub, pvalue
 
-def sensitivityCI(a, b, c, d, alpha=0.05):
+def sensitivityCI(a, b, c, d, alpha=0.05, method='score'):
     """Compute sensitivity and confidence interval,
     given counts in each square of a 2 x 2 table.
 
@@ -497,7 +497,7 @@ def sensitivityCI(a, b, c, d, alpha=0.05):
         back2scalar = False
 
     sens = a / (a+c)
-    lb, ub = eventCI(x=a, N=a+c, alpha=alpha)
+    lb, ub = eventCI(x=a, N=a+c, alpha=alpha, method=method)
 
     if back2scalar and len(sens) == 1:
         sens = sens[0]
@@ -506,7 +506,7 @@ def sensitivityCI(a, b, c, d, alpha=0.05):
 
     return sens, lb, ub
 
-def specificityCI(a, b, c, d, alpha=0.05):
+def specificityCI(a, b, c, d, alpha=0.05, method='score'):
     """Compute specificity and confidence interval,
     given counts in each square of a 2 x 2 table.
 
@@ -550,7 +550,7 @@ def specificityCI(a, b, c, d, alpha=0.05):
         back2scalar = False
 
     spec = d / (b+d)
-    lb, ub = eventCI(x=d, N=b+d, alpha=alpha)
+    lb, ub = eventCI(x=d, N=b+d, alpha=alpha, method=method)
 
     if back2scalar and len(spec) == 1:
         spec = spec[0]
