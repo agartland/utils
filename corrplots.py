@@ -213,7 +213,7 @@ def combocorrplot(data,method='spearman',axLimits='variable',axTicks=False,axTic
     for r in range(n):
         for c in range(n):
             if r == c:
-                axh[r, c] = fh.add_subplot(gs[r, c], yticklabels=[], xticklabels=[], xticks=[], yticks=[], axisbg = 'gray')
+                axh[r, c] = fh.add_subplot(gs[r, c], yticklabels=[], xticklabels=[], xticks=[], yticks=[], facecolor='gray')
                 plt.text(0, 0, '%s' % (data.columns[r]), ha='center', va='center')
                 plt.axis([-1, 1, -1, 1])
             elif r>c:
