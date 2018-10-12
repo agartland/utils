@@ -167,13 +167,12 @@ def applyResponseCriteria(df, subset=['IFNg', 'IL2'], ANY=1, indexCols=None, mag
     
     """First compress to the relevant cytokines"""
     cdf = compressSubsets(df, subset=subset, indexCols=indexCols, groups=None, magCols=magCols, nsubCols=nsubCols)
-
+    
     cytokineSubsets = cdf.cytokine.unique()
     cytokines = cytokineSubsets[0].replace('-', '+').split('+')[:-1]
     L = np.array([len(c) for c in cytokines])
     boolSubsets = np.array([[x[sum(L[:i+1])+i] == '+' for i in range(len(L))] for x in cytokineSubsets], dtype=bool)
     symLookup = {True:'+', False:'-'}
-
     
     base = '{} of {}'.format(ANY, len(subset)) + ' (' + '/'.join([subset2label(ss) for ss in subset]) + ')'
     pos = base
@@ -260,9 +259,25 @@ def compressSubsets(df, subset=['IFNg', '2', 'TNFa'], markerCol='cytokine', inde
     preDf = df.copy()
     preDf[markerCol] = preDf[markerCol].map(convertLookup.get)
     """Groupby unique columns and agg-sum across cytokine subsets, then reset index"""
-    aggDf = preDf[indexCols + magCols + [markerCol]].groupby(indexCols + [markerCol]).agg(np.sum)
+    #print('idx', indexCols)
+    #print('m', markerCol, magCols)
+    #print(preDf[markerCol].unique().shape, preDf[markerCol].unique())
+    #print(preDf.groupby(markerCol)['ptid'].count())
+    if preDf[markerCol].unique().shape[0] == df[markerCol].unique().shape[0]:
+        """If subset == all cytokines then no need to groupby, just use the re-mapped column as an index"""
+        aggDf = preDf[indexCols + magCols + [markerCol]].set_index(indexCols + [markerCol])
+    else:
+        """This groupby had problems when grouping by markers with too many unique values: Segmentation fault
+        I never figured it out, but avoided it by skipping the groupby for the case when all markers are compressed.
+        There's still a problem for the all but one case (though I don't need that ATM)
+        This may be a memory constraint?"""
+        aggDf = preDf[indexCols + magCols + [markerCol]].groupby(indexCols + [markerCol]).agg(np.sum)
+    #print('OK')
     if not nsubCols is None:
-        nsubDf = preDf[indexCols + nsubCols + [markerCol]].groupby(indexCols + [markerCol]).agg(np.median)
+        if preDf[markerCol].unique().shape[0] == df[markerCol].unique().shape[0]:
+            nsubDf = preDf[indexCols + nsubCols + [markerCol]].set_index(indexCols + [markerCol])
+        else:  
+            nsubDf = preDf[indexCols + nsubCols + [markerCol]].groupby(indexCols + [markerCol]).agg(np.median)
         aggDf = aggDf.join(nsubDf)
     aggDf = aggDf.reset_index()
     return aggDf
