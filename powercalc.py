@@ -1,4 +1,3 @@
-
 from scipy import stats
 import numpy as np
 import itertools
@@ -109,7 +108,7 @@ def veEndpointsRequired(rr0=1, rralt=0.5, targetpow=0.9, K=1, alpha=0.025):
     xcrit = stats.binom.ppf(alpha, n, p0) - 1
     return n, xcrit
 
-def eventRatePower(rate, N, alpha=0.05,iterations=1e3,alternative='two-sided',rseed=820):
+def eventRatePower(rate, N, alpha=0.05, iterations=1e3, alternative='two-sided', rseed=820):
     """Use powerBySim() to compute power to detect a difference in event rate between two groups.
     Returns power, odds-ratio"""   
 
@@ -158,13 +157,13 @@ def powerBySim(dataFunc, testFunc, N, alpha=0.05, iterations=1e3, PMagInds=(1, 0
     """
     np.random.seed(rseed)
 
-    res = np.array([testFunc(dataFunc[0](N[0]), dataFunc[1](N[1])) for i in range(iterations)])
+    res = np.array([testFunc(dataFunc[0](N[0]), dataFunc[1](N[1])) for i in range(int(iterations))])
 
     """Note that these are swapped from how many tests work [pvalue, mag] which is why default is (1,0)"""
     p = res[:, PMagInds[0]]
     magnitude = np.nanmean(res[:, PMagInds[1]])
     
-    if isscalar(alpha):
+    if np.isscalar(alpha):
         return (p < alpha).mean(), magnitude
     else:
         tiledPow = (np.tile(p[None,:], (len(alpha), 1)) < np.tile(alpha[:, None], (1, iterations))).mean(axis=0)
@@ -453,7 +452,7 @@ def RRCI(a, b, c, d, alpha=0.05, RR0=1, method='katz'):
 
     return rr, lb, ub, pvalue
 
-def sensitivityCI(a, b, c, d, alpha=0.05):
+def sensitivityCI(a, b, c, d, alpha=0.05, method='score'):
     """Compute sensitivity and confidence interval,
     given counts in each square of a 2 x 2 table.
 
@@ -497,7 +496,7 @@ def sensitivityCI(a, b, c, d, alpha=0.05):
         back2scalar = False
 
     sens = a / (a+c)
-    lb, ub = eventCI(x=a, N=a+c, alpha=alpha)
+    lb, ub = eventCI(x=a, N=a+c, alpha=alpha, method=method)
 
     if back2scalar and len(sens) == 1:
         sens = sens[0]
@@ -506,7 +505,7 @@ def sensitivityCI(a, b, c, d, alpha=0.05):
 
     return sens, lb, ub
 
-def specificityCI(a, b, c, d, alpha=0.05):
+def specificityCI(a, b, c, d, alpha=0.05, method='score'):
     """Compute specificity and confidence interval,
     given counts in each square of a 2 x 2 table.
 
@@ -550,7 +549,7 @@ def specificityCI(a, b, c, d, alpha=0.05):
         back2scalar = False
 
     spec = d / (b+d)
-    lb, ub = eventCI(x=d, N=b+d, alpha=alpha)
+    lb, ub = eventCI(x=d, N=b+d, alpha=alpha, method=method)
 
     if back2scalar and len(spec) == 1:
         spec = spec[0]

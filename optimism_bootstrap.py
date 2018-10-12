@@ -5,13 +5,18 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+from roc import *
+from powercalc import *
+
 __all__ = ['optimism_bootstrap',
            'percentile_bootstrap',
            'ob_roc_curve',
            'pb_roc_curve',
+           'noboot_roc_curve',
+           'no_boot_metric',
            'plotBootROC']
 
-def optimism_bootstrap(X, y, model, fitMethod, predictMethod, metric, alpha=0.05, nstraps=1000):
+def optimism_bootstrap(X, y, model, fitMethod, predictMethod, metric, alpha=0.05, nstraps=1000, ignoreNan=True):
     """Compute optimism adjusted bootstrap of the performance metric for the classification model.
 
     "Multivariable prognostic models: issues in developing models,
@@ -36,6 +41,9 @@ def optimism_bootstrap(X, y, model, fitMethod, predictMethod, metric, alpha=0.05
         For computing 1 - alpha % confidence intervals
     nstraps : int
         Number of bootstrap samples.
+    ignoreNan : bool
+        Discard Nan values before computing percentiles,
+        otherwise a Nan will lead to Nan CI bounds.
 
     Returns
     -------
@@ -63,17 +71,21 @@ def optimism_bootstrap(X, y, model, fitMethod, predictMethod, metric, alpha=0.05
         Corig[i] = metric(y, y_score)
     
     adjustedC = Capp - (Cboot - Corig)
-    lb, ub = np.percentile(adjustedC, [100 * alpha/2, 100 * (1 - alpha/2)])
+    if ignoreNan:
+        lb, ub = np.nanpercentile(adjustedC, [100 * alpha/2, 100 * (1 - alpha/2)])
+    else:
+        lb, ub = np.percentile(adjustedC, [100 * alpha/2, 100 * (1 - alpha/2)])
 
     return np.median(adjustedC), lb, ub
 
-def percentile_bootstrap(X, y, model, fitMethod, predictMethod, metric, alpha=0.05, nstraps=1000):
+def percentile_bootstrap_metric(y, metric, X=None, y_score=None, model=None, fitMethod='', predictMethod='', alpha=0.05, nstraps=1000, ignoreNan=True):
     """Compute percentile bootstrap of the performance metric for the classification model.
 
     Parameters
     ----------
     X : np.ndarray [nsamples, nfeatures]
     y : np.ndarray [nsamples, ]
+    y_score : np.ndarray [nsamples, ]
     model : class object
         Instantiation of a sklearn model with fit and predict_proba-like methods
     fitMethod : str
@@ -87,6 +99,9 @@ def percentile_bootstrap(X, y, model, fitMethod, predictMethod, metric, alpha=0.
         For computing 1 - alpha % confidence intervals
     nstraps : int
         Number of bootstrap samples.
+    ignoreNan : bool
+        Discard Nan values before computing percentiles,
+        otherwise a Nan will lead to Nan CI bounds.
 
     Returns
     -------
@@ -98,21 +113,88 @@ def percentile_bootstrap(X, y, model, fitMethod, predictMethod, metric, alpha=0.
     auc, lb, ub = percentile_bootstrap(X, y, SVC(), 'fit', 'decision_function', sklearn.metrics.roc_auc_score)"""
     
     n = len(y)
-    res = getattr(model, fitMethod)(X, y)
-    y_score = getattr(res, predictMethod)(X)
+    if not model is None:
+        res = getattr(model, fitMethod)(X, y)
+        y_score = getattr(res, predictMethod)(X)
     C = metric(y, y_score)
 
-    Cboot = np.zeros(nstraps)
+    Cboot = np.nan * np.zeros(nstraps)
     for i in range(nstraps):
         rind = np.random.randint(n, size=n)
-        res = getattr(model, fitMethod)(X[rind, :], y[rind])
-        y_score = getattr(res, predictMethod)(X[rind, :])
-        Cboot[i] = metric(y[rind], y_score)
-
-    lb, ub = np.percentile(Cboot, [100 * alpha/2, 100 * (1 - alpha/2)])
+        try:
+            if not model is None:
+                res = getattr(model, fitMethod)(X[rind, :], y[rind])
+                y_score = getattr(res, predictMethod)(X[rind, :])
+                Cboot[i] = metric(y[rind], y_score)
+            else:
+                Cboot[i] = metric(y[rind], y_score[rind])
+        except ValueError:
+            Cboot[i] = np.nan
+        
+    if ignoreNan:
+        lb, ub = np.nanpercentile(Cboot, [100 * alpha/2, 100 * (1 - alpha/2)])
+    else:
+        lb, ub = np.percentile(Cboot, [100 * alpha/2, 100 * (1 - alpha/2)])
     return C, lb, ub
 
-def ob_roc_curve(X, y, model, fitMethod, predictMethod, alpha=0.05, nstraps=1000):
+def noboot_metric(y, metric, X=None, y_score=None, model=None, fitMethod='', predictMethod='', alpha=0.05, ignoreNan=True):
+    """Compute percentile bootstrap of the performance metric for the classification model.
+
+    Parameters
+    ----------
+    X : np.ndarray [nsamples, nfeatures]
+    y : np.ndarray [nsamples, ]
+    y_score : np.ndarray [nsamples, ]
+    model : class object
+        Instantiation of a sklearn model with fit and predict_proba-like methods
+    fitMethod : str
+        Name of the method that fits the model with X and y
+    predictMethod : str
+        Name of the method that makes a continuous prediction of y
+        Likely is predict_probability or decision_function, but predict will not work
+    metric : function
+        Any classification metric that takes y and y_score as inputs
+        Metric must return (est, lower-bound CI, upper-bound CI)
+    alpha : float
+        For computing 1 - alpha % confidence intervals
+    nstraps : int
+        Number of bootstrap samples.
+    ignoreNan : bool
+        Discard Nan values before computing percentiles,
+        otherwise a Nan will lead to Nan CI bounds.
+
+    Returns
+    -------
+    resDf : pd.DataFrame
+        Estimate, lower bound and upper bound of the metric.
+        Columns: est, lb, ub, thresholds"""
+    
+    pos_label = np.max(y)
+    n = len(y)
+    if not model is None:
+        res = getattr(model, fitMethod)(X, y)
+        y_score = getattr(res, predictMethod)(X)
+    # thresholds = np.linspace(np.max(y_score), np.min(y_score), 100)
+    thresholds = np.unique(y_score)[::-1]
+
+    thresholds = np.concatenate(([thresholds[0] + (thresholds[0] - thresholds[1])],
+                                  thresholds,
+                                  [thresholds[-1] - (thresholds[-2] - thresholds[-1])]))
+    
+    est = np.zeros(len(thresholds))
+    lb = np.zeros(len(thresholds))
+    ub = np.zeros(len(thresholds))
+    for threshi, thresh in enumerate(thresholds):
+        y_pred = (y_score >= thresh).astype(int)
+        est[threshi], lb[threshi], ub[threshi] = metric(y, y_pred)
+
+    outDf = pd.DataFrame({'est':est,
+                          'lb':lb,
+                          'ub':ub,
+                          'threshold':thresholds})
+    return outDf
+
+def ob_roc_curve(X, y, model, fitMethod, predictMethod, alpha=0.05, nstraps=1000, ignoreNan=True):
     """Compute optimism adjusted bootstrap of the ROC curve for the classification model.
 
     "Multivariable prognostic models: issues in developing models,
@@ -135,16 +217,15 @@ def ob_roc_curve(X, y, model, fitMethod, predictMethod, alpha=0.05, nstraps=1000
         For computing 1 - alpha % confidence intervals
     nstraps : int
         Number of bootstrap samples.
+    ignoreNan : bool
+        Discard Nan values before computing percentiles,
+        otherwise a Nan will lead to Nan CI bounds.
 
     Returns
     -------
     rocDf : pd.DataFrame
         Optimism-adjusted estimate, lower bound and upper bound of the ROC curve.
-        Columns: fpr_est, tpr_est, fpr_lb, fpr_ub, thresholds
-
-    Example
-    -------
-    auc, lb, ub = ob_roc_curve(X, y, SVC(), 'fit', 'decision_function')"""
+        Columns: fpr_est, tpr_est, fpr_lb, fpr_ub, thresholds"""
     pos_label = np.max(y)
     n = len(y)
     res = getattr(model, fitMethod)(X, y)
@@ -155,48 +236,66 @@ def ob_roc_curve(X, y, model, fitMethod, predictMethod, alpha=0.05, nstraps=1000
     thresholds = np.concatenate((thresholds[:1], thresholds, thresholds[-1:]))
     nthresholds = len(tpr_app)
 
-    #fpr_boot, tpr_boot = np.zeros((nstraps, nthresholds)), np.zeros((nstraps, nthresholds))
-    #fpr_orig, tpr_orig = np.zeros((nstraps, nthresholds)), np.zeros((nstraps, nthresholds))
     fpr_boot = np.zeros((nstraps, nthresholds))
     fpr_orig = np.zeros((nstraps, nthresholds))
+    tpr_boot = np.zeros((nstraps, nthresholds))
+    tpr_orig = np.zeros((nstraps, nthresholds))
     for i in range(nstraps):
         rind = np.random.randint(n, size=n)
         res = getattr(model, fitMethod)(X[rind, :], y[rind])
         y_score = getattr(res, predictMethod)(X[rind, :])
         fpr_tmp, tpr_tmp, thresh = roc_curve(y[rind], y_score)
-        # fpr_boot[i, :] = np.interp(thresholds, thresh, fpr_tmp)
-        # tpr_boot[i, :] = np.interp(thresholds, thresh, tpr_tmp)
+
+        tpr_boot[i, :] = np.interp(fpr_app, fpr_tmp, tpr_tmp)
         fpr_boot[i, :] = np.interp(tpr_app, tpr_tmp, fpr_tmp)
 
         y_score = getattr(res, predictMethod)(X)
         fpr_tmp, tpr_tmp, thresh = roc_curve(y, y_score)
-        #fpr_orig[i, :] = np.interp(thresholds, thresh[::-1], fpr_tmp[::-1])
-        #tpr_orig[i, :] = np.interp(thresholds, thresh[::-1], tpr_tmp[::-1])
+
+        tpr_orig[i, :] = np.interp(fpr_app, fpr_tmp, tpr_tmp)
         fpr_orig[i, :] = np.interp(tpr_app, tpr_tmp, fpr_tmp)
+
     
     fpr_adj = fpr_app[None, :] - (fpr_boot - fpr_orig)
-    # tpr_adj = tpr_app[None, :] - (tpr_boot - tpr_orig)
-    fpr_est, fpr_lb, fpr_ub = np.percentile(fpr_adj, [50, 100 * alpha/2, 100 * (1 - alpha/2)], axis=0)
-    #tpr_est, tpr_lb, tpr_ub = np.percentile(tpr_adj, [50, 100 * alpha/2, 100 * (1 - alpha/2)], axis=0)
+    tpr_adj = tpr_app[None, :] - (tpr_boot - tpr_orig)
+    if ignoreNan:
+        fpr_est, fpr_lb, fpr_ub = np.nanpercentile(fpr_adj, [50, 100 * alpha/2, 100 * (1 - alpha/2)], axis=0)
+        tpr_est, tpr_lb, tpr_ub = np.nanpercentile(tpr_adj, [50, 100 * alpha/2, 100 * (1 - alpha/2)], axis=0)
+    else:
+        fpr_est, fpr_lb, fpr_ub = np.percentile(fpr_adj, [50, 100 * alpha/2, 100 * (1 - alpha/2)], axis=0)
+        tpr_est, tpr_lb, tpr_ub = np.percentile(tpr_adj, [50, 100 * alpha/2, 100 * (1 - alpha/2)], axis=0)
 
     fpr_est[0], fpr_lb[0], fpr_ub[0] = 0, 0, 0
     fpr_est[-1], fpr_lb[-1], fpr_ub[-1] = 1, 1, 1
+
+    tpr_est[0], tpr_lb[0], tpr_ub[0] = 0, 0, 0
+    tpr_est[-1], tpr_lb[-1], tpr_ub[-1] = 1, 1, 1
     outDf = pd.DataFrame({'fpr_est':np.clip(fpr_est, 0, 1),
                           'fpr_lb':np.clip(fpr_lb, 0, 1),
                           'fpr_ub':np.clip(fpr_ub, 0, 1),
                           'tpr_est':np.clip(tpr_app, 0, 1),
-                          #'tpr_lb':tpr_lb,
-                          #'tpr_ub':tpr_ub,
+                          'tpr_lb':tpr_lb,
+                          'tpr_ub':tpr_ub,
                           'trheshold':thresholds})
     return outDf
 
-def pb_roc_curve(X, y, model, fitMethod, predictMethod, alpha=0.05, nstraps=1000):
+def pb_roc_curve(X=None, y=None, y_score=None, model=None, fitMethod='', predictMethod='', alpha=0.05, nstraps=1000, ignoreNan=True):
     """Compute percentile bootstrap of the ROC curve for the classification model.
+
+    Examples
+    --------
+    resDf = pb_roc_curve(y=y_actual, y_score=y_predicted)
+
+    resDf = pb_roc_curve(X=gram_matrix, y=y_actual,
+                             model=SVC(kernel='precomputed'),
+                             fitMethod='fit', predictMethod='decision_function', nstraps=5000)
 
     Parameters
     ----------
     X : np.ndarray [nsamples, nfeatures]
     y : np.ndarray [nsamples, ]
+    y_score : np.ndarray [nsamples, ]
+        Optionally provide pre-computed y_scores instead of a model to fit.
     model : class object
         Instantiation of a sklearn model with fit and predict_proba-like methods
     fitMethod : str
@@ -213,46 +312,132 @@ def pb_roc_curve(X, y, model, fitMethod, predictMethod, alpha=0.05, nstraps=1000
     -------
     rocDf : pd.DataFrame
         Estimate, lower bound and upper bound of the ROC curve.
-        Columns: fpr_est, tpr_est, fpr_lb, fpr_ub, thresholds
-
-    Example
-    -------
-    auc, lb, ub = pb_roc_curve(X, y, SVC(), 'fit', 'decision_function')"""
+        Columns: fpr_est, tpr_est, fpr_lb, fpr_ub, thresholds"""
     pos_label = np.max(y)
     n = len(y)
-    res = getattr(model, fitMethod)(X, y)
-    y_score = getattr(res, predictMethod)(X)
+    if not model is None:
+        res = getattr(model, fitMethod)(X, y)
+        y_score = getattr(res, predictMethod)(X)
     fpr, tpr, thresholds = roc_curve(y, y_score, pos_label=pos_label)
     fpr = np.concatenate(([0], fpr, [1]))
     tpr = np.concatenate(([0], tpr, [1]))
     thresholds = np.concatenate((thresholds[:1], thresholds, thresholds[-1:]))
     nthresholds = len(tpr)
 
-    # tpr_boot = np.zeros((nstraps, nthresholds))
+    tpr_boot = np.zeros((nstraps, nthresholds))
     fpr_boot = np.zeros((nstraps, nthresholds))
     for i in range(nstraps):
         rind = np.random.randint(n, size=n)
-        res = getattr(model, fitMethod)(X[rind, :], y[rind])
-        y_score = getattr(res, predictMethod)(X[rind, :])
-        fpr_tmp, tpr_tmp, thresh = roc_curve(y[rind], y_score)
-        # tpr_boot[i, :] = np.interp(fpr, fpr_tmp, tpr_tmp)
+        if not model is None:
+            res = getattr(model, fitMethod)(X[rind, :], y[rind])
+            y_score = getattr(res, predictMethod)(X[rind, :])
+            fpr_tmp, tpr_tmp, thresh = roc_curve(y[rind], y_score)
+        else:
+            fpr_tmp, tpr_tmp, thresh = roc_curve(y[rind], y_score[rind])
+        
+        tpr_boot[i, :] = np.interp(fpr, fpr_tmp, tpr_tmp)
         fpr_boot[i, :] = np.interp(tpr, tpr_tmp, fpr_tmp)
     
-    # tpr_lb, tpr_ub = np.percentile(tpr_boot, [100 * alpha/2, 100 * (1 - alpha/2)], axis=0)
-    fpr_lb, fpr_ub = np.percentile(fpr_boot, [100 * alpha/2, 100 * (1 - alpha/2)], axis=0)
+    if ignoreNan:
+        tpr_lb, tpr_ub = np.nanpercentile(tpr_boot, [100 * alpha/2, 100 * (1 - alpha/2)], axis=0)
+        fpr_lb, fpr_ub = np.nanpercentile(fpr_boot, [100 * alpha/2, 100 * (1 - alpha/2)], axis=0)
+    else:
+        tpr_lb, tpr_ub = np.percentile(tpr_boot, [100 * alpha/2, 100 * (1 - alpha/2)], axis=0)
+        fpr_lb, fpr_ub = np.percentile(fpr_boot, [100 * alpha/2, 100 * (1 - alpha/2)], axis=0)
 
-    fpr_lb[0], fpr_ub[0] = 0, 0
-    fpr_lb[-1], fpr_ub[-1] = 1, 1
+    #fpr_lb[0], fpr_ub[0] = 0, 0
+    #fpr_lb[-1], fpr_ub[-1] = 1, 1
     outDf = pd.DataFrame({'fpr_est':fpr,
                           'tpr_est':tpr,
-                          #'tpr_lb':tpr_lb,
-                          #'tpr_ub':tpr_ub,
+                          'tpr_lb':tpr_lb,
+                          'tpr_ub':tpr_ub,
                           'fpr_lb':fpr_lb,
                           'fpr_ub':fpr_ub,
                           'threshold':thresholds})
     return outDf
 
-def plotBootROC(rocDfL, labelL=None, aucL=None):
+def noboot_roc_curve(X=None, y=None, y_score=None, model=None, fitMethod='', predictMethod='', alpha=0.05, method='score'):
+    """Compute ROC curve with confidence intervals using score test and other methods, for the classification model.
+
+    Code in powercalc.py has been checked against R binom package. "Score" was derived
+    from the Agresti paper and is equivalent to Wilson (copied from the R package).
+    From the paper this seems to be the best in most situations.
+
+    A. Agresti, B. A. Coull, T. A. Statistician, N. May,
+    Approximate Is Better than "Exact" for Interval Estimation of Binomial Proportions,
+    52, 119–126 (2007).
+
+    Examples
+    --------
+    resDf = pb_roc_curve(y=y_actual, y_score=y_predicted)
+
+    resDf = pb_roc_curve(X=gram_matrix, y=y_actual,
+                             model=SVC(kernel='precomputed'),
+                             fitMethod='fit', predictMethod='decision_function', nstraps=5000)
+
+    Parameters
+    ----------
+    X : np.ndarray [nsamples, nfeatures]
+    y : np.ndarray [nsamples, ]
+    y_score : np.ndarray [nsamples, ]
+        Optionally provide pre-computed y_scores instead of a model to fit.
+    model : class object
+        Instantiation of a sklearn model with fit and predict_proba-like methods
+    fitMethod : str
+        Name of the method that fits the model with X and y
+    predictMethod : str
+        Name of the method that makes a continuous prediction of y
+        Likely is predict_probability or decision_function, but predict will not work
+    alpha : float
+        For computing 1 - alpha % confidence intervals
+    method : str
+        Method for CI: score, wilson, wald, agresti-coull, exact
+
+    Returns
+    -------
+    rocDf : pd.DataFrame
+        Estimate, lower bound and upper bound of the ROC curve.
+        Columns: fpr_est, tpr_est, fpr_lb, fpr_ub, thresholds"""
+    pos_label = np.max(y)
+    n = len(y)
+    if not model is None:
+        res = getattr(model, fitMethod)(X, y)
+        y_score = getattr(res, predictMethod)(X)
+    # thresholds = np.linspace(np.max(y_score), np.min(y_score), 100)
+    thresholds = np.unique(y_score)[::-1]
+
+    thresholds = np.concatenate(([thresholds[0] + (thresholds[0] - thresholds[1])],
+                                  thresholds,
+                                  [thresholds[-1] - (thresholds[-2] - thresholds[-1])]))
+    
+    fpr = np.zeros(len(thresholds))
+    tpr = np.zeros(len(thresholds))
+    fpr_lb = np.zeros(len(thresholds))
+    tpr_lb = np.zeros(len(thresholds))
+    fpr_ub = np.zeros(len(thresholds))
+    tpr_ub = np.zeros(len(thresholds))
+
+    for threshi, thresh in enumerate(thresholds):
+        y_pred = (y_score >= thresh).astype(int)
+        a, b, c, d = compute2x2(y, y_pred)
+        tpr[threshi], tpr_lb[threshi], tpr_ub[threshi] = sensitivityCI(a, b, c, d, alpha=alpha, method=method)
+        fpr[threshi], fpr_lb[threshi], fpr_ub[threshi] = specificityCI(a, b, c, d, alpha=alpha, method=method)
+    fpr = 1 - fpr
+    fpr_lb = 1 - fpr_lb
+    fpr_ub = 1 - fpr_ub
+
+    #fpr_lb[0], fpr_ub[0] = 0, 0
+    #fpr_lb[-1], fpr_ub[-1] = 1, 1
+    outDf = pd.DataFrame({'fpr_est':fpr,
+                          'tpr_est':tpr,
+                          'tpr_lb':tpr_lb,
+                          'tpr_ub':tpr_ub,
+                          'fpr_lb':fpr_lb,
+                          'fpr_ub':fpr_ub,
+                          'threshold':thresholds})
+    return outDf
+
+def plotBootROC(rocDfL, labelL=None, aucL=None, ciParam='fpr'):
     """Plot of ROC curves with confidence intervals.
 
     Parameters
@@ -273,10 +458,13 @@ def plotBootROC(rocDfL, labelL=None, aucL=None):
 
     colors = sns.color_palette('Set1', n_colors=len(rocDfL))
 
-    plt.clf()
+    plt.cla()
     plt.gca().set_aspect('equal')
     for i, (rocDf, label) in enumerate(zip(rocDfL, labelL)):
-        plt.fill_betweenx(rocDf['tpr_est'], rocDf['fpr_lb'], rocDf['fpr_ub'], alpha=0.3, color=colors[i])
+        if ciParam == 'fpr':
+            plt.fill_betweenx(rocDf['tpr_est'], rocDf['fpr_lb'], rocDf['fpr_ub'], alpha=0.3, color=colors[i])
+        elif ciParam == 'tpr':
+            plt.fill_between(rocDf['fpr_est'], rocDf['tpr_lb'], rocDf['tpr_ub'], alpha=0.3, color=colors[i])
         plt.plot(rocDf['fpr_est'], rocDf['tpr_est'],'-', color=colors[i], lw=2)
         # plt.plot(rocDf['fpr_est'], rocDf['tpr_lb'], '.--', color=colors[i], lw=1)
         # plt.plot(rocDf['fpr_est'], rocDf['tpr_ub'], '.--', color=colors[i], lw=1)
@@ -288,6 +476,35 @@ def plotBootROC(rocDfL, labelL=None, aucL=None):
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
     plt.title('ROC')
+    plt.legend([plt.Line2D([0, 1], [0, 1], color=c, lw=2) for c in colors], labelL, loc='lower right', fontsize=10)
+    plt.show()
+
+def plotBootSensSpec(rocDfL, labelL=None, param='tpr'):
+    """Plot of sensitivity curves with confidence intervals.
+
+    Parameters
+    ----------
+    rocDfL : list of pd.DataFrames
+        Each DataFram is one model and must include columns
+        fpr_est, tpr_est, fpr_lb, fpr_ub
+    labelL : list of str
+        Names of each model for legend"""
+    if labelL is None:
+        labelL = ['Model %d' % (i) for i, auc in enumerate(rocDfL)]
+
+    colors = sns.color_palette('Set1', n_colors=len(rocDfL))
+
+    plt.cla()
+    plt.gca().set_aspect('equal')
+    for i, (rocDf, label) in enumerate(zip(rocDfL, labelL)):
+        plt.fill_between(rocDf['threshold'], rocDf['%s_lb' % param], rocDf['%s_ub' % param], alpha=0.3, color=colors[i])
+        plt.plot(rocDf['threshold'], rocDf['%s_est' % param],'-', color=colors[i], lw=2)
+    plt.ylim([0, 1])
+    plt.xlabel('Threshold')
+    if param == 'tpr':
+        plt.ylabel('True Positive Rate')
+    else:
+        plt.ylabel('False positive rate')
     plt.legend([plt.Line2D([0, 1], [0, 1], color=c, lw=2) for c in colors], labelL, loc='lower right', fontsize=10)
     plt.show()
 

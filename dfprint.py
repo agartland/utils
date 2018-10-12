@@ -93,7 +93,7 @@ def toPDF(df,
     
     footer = ['\\end{document}']
 
-    with open(texFn, 'w') as fh:
+    with open(texFn, 'w', encoding='utf-8') as fh:
         for h in header:
             fh.write(h + '\n')
         sout = df.to_latex(float_format=lambda f: float_format % f,
