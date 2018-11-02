@@ -64,7 +64,11 @@ outDf = mergeSamples(batchFolder, extractionFunc=extractFunctions, extractionKwa
 """
 def mergeFeathers(files, mergedFilename, writeCSV, deleteSource=True):
     data = [feather.read_dataframe(f) for f in files if not f == '']
-    df = pd.concat(data, sort=False, axis=0, ignore_index=True, copy=False)
+    if len(data) > 0:
+        df = pd.concat(data, sort=False, axis=0, ignore_index=True, copy=False)
+    else:
+        print('mergeFeathers: No files to merge!')
+        return ''
     
     if writeCSV:
         df.to_csv(mergedFilename)
@@ -92,11 +96,14 @@ def mergeFeathers(files, mergedFilename, writeCSV, deleteSource=True):
                     print('Could not delete merged temp file: %s' % f)
     return mergedFilename
 
-def matchSamples(batchFolder, test=False):
+def matchSamples(batchFolder, matchStr='*.feather', test=False):
     """Match each row of the metadata with each feather file (sample)
     in the batch folder"""
     mDf = pd.read_csv(opj(batchFolder, 'metadata.csv'))
-    featherList = glob(opj(batchFolder, '*.feather'))
+    featherList = glob(opj(batchFolder, matchStr))
+    if len(featherList) == 0:
+        print('No feather files matching "%s" in "%s"' % (matchStr, batchFolder))
+        return {}
     featherLU = {sample_name:[fn for fn in featherList if sample_name in fn] for sample_name in mDf.sample_name}
     fallback = False
     if not len(featherLU) == mDf.shape[0]:
@@ -142,12 +149,12 @@ def matchSamples(batchFolder, test=False):
         featherLU = out
     return featherLU
 
-def mergeSamples(batchFolder, extractionFunc, extractionKwargs, test=False, metaCols=None, filters=None):
+def mergeSamples(batchFolder, extractionFunc, extractionKwargs, matchStr='*.feather', test=False, metaCols=None, filters=None):
     """Go through each feather file (sample) in a batch folder,
     apply the analysis function, and merge together."""
     mDf = pd.read_csv(opj(batchFolder, 'metadata.csv'))
-    featherList = glob(opj(batchFolder, '*.feather'))
-    featherLU = matchSamples(batchFolder, test=test)
+    featherList = glob(opj(batchFolder, matchStr))
+    featherLU = matchSamples(batchFolder, matchStr=matchStr, test=test)
     
     if not metaCols is None:
         if not 'sample_name' in metaCols:

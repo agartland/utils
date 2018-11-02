@@ -14,14 +14,39 @@ try:
     import tsne
 except ImportError:
     import pytsne as tsne
-    print("seqdistance: Could not load tsne; falling back on pytsne")
+    print("embedding: Could not load tsne; falling back on pytsne")
+
+try:
+    import umap
+except ImportError:
+    print("embedding: Could not load UMAP")
 
 """Embedding of pairwise-distance matrices."""
 
 __all__ = [ 'embedDistanceMatrix',
+            'embedObservations',
             'computePWDist',
             'plotEmbedding',
             'clusteredScatter']
+
+def embedObservations(df, method='kpca', n_components=2, metric='euclidean', **kwargs):
+    """Two-dimensional embedding of data in df
+    returning Nx2 x,y-coords: tsne, isomap, pca, mds, kpca, sklearn-tsne, umap"""
+    if method == 'umap':
+        if isinstance(df, pd.DataFrame):
+            data = df.values
+        else:
+            data = df
+
+        umapObj = umap.UMAP(n_components=n_components, metric=metric, **kwargs)
+        xy = umapObj.fit_transform(data)
+        assert xy.shape[0] == df.shape[0]
+        xyDf = pd.DataFrame(xy[:, :n_components], index=df.index, columns=np.arange(n_components))
+        return xyDf
+    
+    dmatDf = computePWDist(df, metric=metric, dfunc=None, minN=10, symetric=True)
+    xyDf = embedDistanceMatrix(dmatDf, method=method, n_components=n_components, **kwargs)
+    return xyDf
 
 def embedDistanceMatrix(dmatDf, method='kpca', n_components=2, **kwargs):
     """Two-dimensional embedding of sequence distances in dmatDf,
@@ -62,6 +87,9 @@ def embedDistanceMatrix(dmatDf, method='kpca', n_components=2, **kwargs):
         xy = lle.fit_transform(dist)
     elif method == 'sklearn-tsne':
         tsneObj = TSNE(n_components=n_components, metric='precomputed', random_state=0, perplexity=kwargs['perplexity'])
+        xy = tsneObj.fit_transform(dmat)
+    elif method == 'umap':
+        umapObj = umap.UMAP(n_components=n_components, **kwargs)
         xy = tsneObj.fit_transform(dmat)
     else:
         print('Method unknown: %s' % method)
