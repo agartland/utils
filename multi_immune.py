@@ -140,8 +140,8 @@ def plotHeatmap(df, row_labels=None, col_labels=None, titleStr=None, vRange=None
                  'scale':scale_cbAX,
                  'colCB':col_cbAX}
     else:
-        row_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.05, bottom=0.05, right=0.09, top=0.90)[0, 0])
-        col_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.1, bottom=0.05, right=0.09, top=0.09)[0, 0])
+        row_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.05, bottom=0.1, right=0.09, top=0.90)[0, 0])
+        col_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.1, bottom=0.05, right=0.78, top=0.09)[0, 0])
         heatmapAX = fig.add_subplot(GridSpec(1, 1, left=0.1, bottom=0.1, right=0.78, top=0.90)[0, 0])
         scale_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.87, bottom=0.05, right=0.93, top=0.90)[0, 0])
         outAX = {'heatmap':heatmapAX,
@@ -152,7 +152,7 @@ def plotHeatmap(df, row_labels=None, col_labels=None, titleStr=None, vRange=None
     my_norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
 
     if not row_labels is None:
-        row_cbSE = np.concatenate(_colors2labels(row_labels).values).reshape((roww_labels.shape[0], 1, 3))
+        row_cbSE = np.concatenate(_colors2labels(row_labels).values).reshape((row_labels.shape[0], 1, 3))
         axi = row_cbAX.imshow(row_cbSE, interpolation='nearest', aspect='auto', origin='lower')
         _clean_axis(row_cbAX)
     if not col_labels is None:

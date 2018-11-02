@@ -156,7 +156,7 @@ def partialcorr(x, y, adjust=[], method='pearson', minN = None):
 
     return pc, pvalue
 
-def combocorrplot(data,method='spearman',axLimits='variable',axTicks=False,axTicklabels=False,valueFlag=True,ms=2, plotLine = False):
+def combocorrplot(data, method='spearman', axLimits='variable', axTicks=False, axTicklabels=False, valueFlag=True, ms=2, plotLine=False, textSz='medium'):
     """Shows correlation scatter plots in combination with a heatmap for small sets of variables.
 
     Parameters
@@ -175,7 +175,9 @@ def combocorrplot(data,method='spearman',axLimits='variable',axTicks=False,axTic
     ms : int
         Scatter plot marker size in points.
     plotLine : bool
-        Plot fit-line on the subplots?"""
+        Plot fit-line on the subplots?
+    textSz : int or str
+        Size of the text displayed in each box"""
 
     border = 0.05
     pad = 0.02
@@ -214,7 +216,7 @@ def combocorrplot(data,method='spearman',axLimits='variable',axTicks=False,axTic
         for c in range(n):
             if r == c:
                 axh[r, c] = fh.add_subplot(gs[r, c], yticklabels=[], xticklabels=[], xticks=[], yticks=[], facecolor='gray')
-                plt.text(0, 0, '%s' % (data.columns[r]), ha='center', va='center')
+                plt.text(0, 0, '%s' % (data.columns[r]), ha='center', va='center', size=textSz)
                 plt.axis([-1, 1, -1, 1])
             elif r>c:
                 if axTicks:
@@ -267,7 +269,7 @@ def combocorrplot(data,method='spearman',axLimits='variable',axTicks=False,axTic
                              family='monospace',
                              color=txtcol,
                              weight='bold',
-                             size='large')
+                             size=textSz)
     cbax = fh.add_axes([1.-cbwidth-border/2, border, cbwidth-border-0.02, 1.-2*border])
     cb = plt.colorbar(plth[0, 0], cax=cbax)
     method = method[0].upper() + method[1:]

@@ -206,7 +206,7 @@ def swarmbox(x, y, data, hue=None, palette=None, order=None, hue_order=None, con
     params = dict(data=data, x=x, y=y, hue=hue, order=order, hue_order=hue_order)
     box_axh = sns.boxplot(**params,
                             fliersize=0,
-                            linewidth=1.5,
+                            linewidth=1,
                             palette=palette)
     for patch in box_axh.artists:
         patch.set_edgecolor((0, 0, 0, 1))
