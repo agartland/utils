@@ -89,8 +89,8 @@ def embedDistanceMatrix(dmatDf, method='kpca', n_components=2, **kwargs):
         tsneObj = TSNE(n_components=n_components, metric='precomputed', random_state=0, perplexity=kwargs['perplexity'])
         xy = tsneObj.fit_transform(dmat)
     elif method == 'umap':
-        umapObj = umap.UMAP(n_components=n_components, **kwargs)
-        xy = tsneObj.fit_transform(dmat)
+        umapObj = umap.UMAP(n_components=n_components, metric='precomputed', **kwargs)
+        xy = umapObj.fit_transform(dmat)
     else:
         print('Method unknown: %s' % method)
         return
@@ -188,18 +188,17 @@ def plotEmbedding(dmatDf,
                   edgecolors='gray'):
     """Two-dimensional plot of embedded distance matrix, colored by labels"""
     
-    if labels is None:
-        labels = np.zeros(dmatDf.shape[0])
+    if xyDf is None:
+        assert dmatDf.shape[0] == dmatDf.shape[1]
+        assert labels.shape[0] == dmatDf.shape[0]
+        xyDf = embedDistanceMatrix(dmatDf, method=method, n_components=np.max(plotDims) + 1)
 
-    assert dmatDf.shape[0] == dmatDf.shape[1]
-    assert labels.shape[0] == dmatDf.shape[0]
+    if not labels is None:
+        assert labels.shape[0] == xyDf.shape[0]
 
     oh = objhist(labels)
     uLabels = sorted(np.unique(labels), key=oh.get, reverse=True)
-    
-    if xyDf is None:
-        xyDf = embedDistanceMatrix(dmatDf, method=method, n_components=np.max(plotDims) + 1)
-    
+
     axh = clusteredScatter(xyDf,
                      labels=labels,
                      plotDims=plotDims,
