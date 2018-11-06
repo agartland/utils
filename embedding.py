@@ -185,12 +185,15 @@ def plotEmbedding(dmatDf,
                   markerLabels=None,
                   continuousLabel=False,
                   linewidths=0,
-                  edgecolors='gray'):
+                  edgecolors='gray',
+                  vmin=None,
+                  vmax=None):
     """Two-dimensional plot of embedded distance matrix, colored by labels"""
     
     if xyDf is None:
         assert dmatDf.shape[0] == dmatDf.shape[1]
-        assert labels.shape[0] == dmatDf.shape[0]
+        if not labels is None:
+            assert labels.shape[0] == dmatDf.shape[0]
         xyDf = embedDistanceMatrix(dmatDf, method=method, n_components=np.max(plotDims) + 1)
 
     if not labels is None:
@@ -212,7 +215,9 @@ def plotEmbedding(dmatDf,
                      continuousLabel=continuousLabel,
                      colors=colors,
                      linewidths=linewidths,
-                     edgecolors=edgecolors)
+                     edgecolors=edgecolors,
+                     vmin=vmin,
+                     vmax=vmax)
     
     if plotLabels:
         annotationParams = dict(xytext=(0, 5), textcoords='offset points', size=txtSize)
@@ -254,7 +259,9 @@ def clusteredScatter(xyDf,
                      colors=None,
                      continuousLabel=False,
                      linewidths=0,
-                     edgecolors='gray'):
+                     edgecolors='gray',
+                     vmin=None,
+                     vmax=None):
     """Produce a scatter plot with axes, shaded by values in labels and with specified markers
 
     Parameters
@@ -353,7 +360,9 @@ def clusteredScatter(xyDf,
                         label=labS,
                         cmap=cmap,
                         linewidths=linewidths,
-                        edgecolors=edgecolors)
+                        edgecolors=edgecolors,
+                        vmin=vmin,
+                        vmax=vmax)
     else:
         for vi, v in enumerate(uLabels):
             for mi, m in enumerate(uMLabels):
