@@ -5,6 +5,7 @@ Usage:
 
 python featherembed.py --listcolumns /fh/fast/gilbert_p/grp/compass_hvtn602_aw/tmpdata/flow-data-2of9-responses.feather
 python featherembed.py --columns CCR6,CCR7,CD154,CD45RA,CXCR3,GzA,HLA-DR,IFNg,IL13/4,IL17a,IL2,IL22,KLRG1,Perforin,TNFa /fh/fast/gilbert_p/grp/compass_hvtn602_aw/tmpdata/flow-data-2of9-responses.feather
+"""
 
 n_neighbors_help = """This parameter controls how UMAP balances local versus global
 structure in the data. It does this by constraining the size of the
@@ -66,6 +67,7 @@ if __name__ == '__main__':
 
     if args.listcolumns:
         print(','.join(fDf.columns))
+        print('Rows: %d' % fDf.shape[0])
     else:
         umapObj = umap.UMAP(n_components=2, metric=args.metric, n_neighbors=args.n_neighbors, min_dist=args.min_dist)
         xy = umapObj.fit_transform(fDf.values)
