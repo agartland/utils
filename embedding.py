@@ -187,14 +187,14 @@ def plotEmbedding(dmatDf,
                   linewidths=0,
                   edgecolors='gray',
                   vmin=None,
-                  vmax=None):
+                  vmax=None, **embedParams):
     """Two-dimensional plot of embedded distance matrix, colored by labels"""
     
     if xyDf is None:
         assert dmatDf.shape[0] == dmatDf.shape[1]
         if not labels is None:
             assert labels.shape[0] == dmatDf.shape[0]
-        xyDf = embedDistanceMatrix(dmatDf, method=method, n_components=np.max(plotDims) + 1)
+        xyDf = embedDistanceMatrix(dmatDf, method=method, n_components=int(np.max(plotDims) + 1), **embedParams)
 
     if not labels is None:
         assert labels.shape[0] == xyDf.shape[0]
