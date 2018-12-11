@@ -43,8 +43,14 @@ def embedObservations(df, method='kpca', n_components=2, metric='euclidean', **k
         assert xy.shape[0] == df.shape[0]
         xyDf = pd.DataFrame(xy[:, :n_components], index=df.index, columns=np.arange(n_components))
         return xyDf
+    elif method == 'pca':
+        pcaObj = PCA(n_components=None)
+        xy = pcaObj.fit_transform(df)
+        assert xy.shape[0] == df.shape[0]
+        xyDf = pd.DataFrame(xy[:, :n_components], index=df.index, columns=np.arange(n_components))
+        return xyDf
     
-    dmatDf = computePWDist(df, metric=metric, dfunc=None, minN=10, symetric=True)
+    dmatDf = computePWDist(df.T, metric=metric, dfunc=None, minN=10, symetric=True)
     xyDf = embedDistanceMatrix(dmatDf, method=method, n_components=n_components, **kwargs)
     return xyDf
 
@@ -137,7 +143,7 @@ def computePWDist(df, metric='pearson-signed', dfunc=None, minN=10, symetric=Tru
             dmat[np.isnan(dmat)] = 1.
         else:
             try:
-                dvec = scipy.spatial.distance.pdist(df.values, metric=metric)
+                dvec = scipy.spatial.distance.pdist(df.values.T, metric=metric)
                 dmat = scipy.spatial.distance.squareform(dvec, force='tomatrix', checks=True)
             except:
                 raise NameError('metric name not recognized')
@@ -172,6 +178,7 @@ def plotEmbedding(dmatDf,
                   labels=None,
                   method='kpca',
                   plotLabels=False,
+                  labelDensity=1.,
                   plotDims=[0, 1],
                   plotElipse=False,
                   weights=None,
@@ -184,6 +191,7 @@ def plotEmbedding(dmatDf,
                   colors=None,
                   markerLabels=None,
                   continuousLabel=False,
+                  showColorbar=False,
                   linewidths=0,
                   edgecolors='gray',
                   vmin=None,
@@ -222,8 +230,9 @@ def plotEmbedding(dmatDf,
     if plotLabels:
         annotationParams = dict(xytext=(0, 5), textcoords='offset points', size=txtSize)
         for coli, col in enumerate(dmatDf.columns):
-            if plotLabels:
+            if labelDensity == 1 or np.random.rand() < labelDensity:
                 axh.annotate(col, xy=(xyDf.loc[col, plotDims[0]], xyDf.loc[col, plotDims[1]]), **annotationParams)
+
 
     if len(uLabels) > 1 and plotLegend:
         if labels is None and markerLabels is None:
@@ -237,6 +246,10 @@ def plotEmbedding(dmatDf,
                 legTit = '%s | %s' % (labels.name, markerLabels.name)
             # plt.legend(loc=0, title=legTit)
             plt.legend(loc='upper left', title=legTit, bbox_to_anchor=(1, 1))
+    if continuousLabel and showColorbar:
+        figh = plt.gcf()
+        scale_cbAX = figh.add_axes(left=0.94, bottom=0.05, right=0.97, top=0.35)
+        addColorbar(figh, scale_cbAX, axh, label='Correlation')
     if hasattr(xyDf, 'explained_variance_'):
         axh.set_xlabel('%s %1.0f (%1.0f%% variance explained)' % (method.upper(), plotDims[0]+1, 100*xyDf.explained_variance_[plotDims[0]]))
         axh.set_ylabel('%s %1.0f (%1.0f%% variance explained)' % (method.upper(), plotDims[1]+1, 100*xyDf.explained_variance_[plotDims[1]]))
@@ -245,6 +258,16 @@ def plotEmbedding(dmatDf,
         axh.set_ylabel('%s %1.0f' % (method.upper(), plotDims[1]+1))
     # plt.show()
     return xyDf
+
+def addColorbar(fig, cb_ax, data_ax, label='Correlation'):
+    """Colorbar"""
+    cb = fig.colorbar(mappable=data_ax, cax=cb_ax) # note that we could pass the norm explicitly with norm=my_norm
+    #matplotlib.colorbar.ColorbarBase(ax, cmap=None, norm=None, alpha=None, values=None, boundaries=None, 
+    cb.set_label(label)
+    """Make colorbar labels smaller"""
+    for t in cb.ax.yaxis.get_ticklabels():
+        t.set_fontsize('small')
+
 
 def clusteredScatter(xyDf,
                      labels=None,
