@@ -250,7 +250,7 @@ def plotEmbedding(dmatDf,
     if continuousLabel and showColorbar:
         figh = plt.gcf()
         scale_cbAX = figh.add_axes([0.93, 0.05, 0.02, 0.35])
-        cb = mpl.colorbar.ColorbarBase(scale_cbAX, cmap=cmap, norm=mpl.colors.Normalize(vmin=vmin, vmax=vmax)) 
+        cb = mpl.colorbar.ColorbarBase(scale_cbAX, cmap=colors, norm=mpl.colors.Normalize(vmin=vmin, vmax=vmax)) 
         cb.set_label('')
         """Make colorbar labels smaller"""
         for t in cb.ax.yaxis.get_ticklabels():
