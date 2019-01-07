@@ -126,8 +126,8 @@ def plotHeatmap(df, row_labels=None, col_labels=None, titleStr=None, vRange=None
         outAX = {'heatmap':heatmapAX,
                 'scale':scale_cbAX}
     elif col_labels is None:
-        row_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.05, bottom=0.05, right=0.09, top=0.90)[0, 0])
-        heatmapAX = fig.add_subplot(GridSpec(1, 1, left=0.1, bottom=0.05, right=0.78, top=0.90)[0, 0])
+        row_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.05, bottom=0.05, right=0.11, top=0.90)[0, 0])
+        heatmapAX = fig.add_subplot(GridSpec(1, 1, left=0.12, bottom=0.05, right=0.78, top=0.90)[0, 0])
         scale_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.87, bottom=0.05, right=0.93, top=0.90)[0, 0])
         outAX = {'heatmap':heatmapAX,
                  'scale':scale_cbAX,
@@ -140,9 +140,9 @@ def plotHeatmap(df, row_labels=None, col_labels=None, titleStr=None, vRange=None
                  'scale':scale_cbAX,
                  'colCB':col_cbAX}
     else:
-        row_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.05, bottom=0.1, right=0.09, top=0.90)[0, 0])
-        col_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.1, bottom=0.05, right=0.78, top=0.09)[0, 0])
-        heatmapAX = fig.add_subplot(GridSpec(1, 1, left=0.1, bottom=0.1, right=0.78, top=0.90)[0, 0])
+        row_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.05, bottom=0.1, right=0.11, top=0.90)[0, 0])
+        col_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.12, bottom=0.05, right=0.78, top=0.09)[0, 0])
+        heatmapAX = fig.add_subplot(GridSpec(1, 1, left=0.12, bottom=0.1, right=0.78, top=0.90)[0, 0])
         scale_cbAX = fig.add_subplot(GridSpec(1, 1, left=0.87, bottom=0.05, right=0.93, top=0.90)[0, 0])
         outAX = {'heatmap':heatmapAX,
                  'scale':scale_cbAX,
