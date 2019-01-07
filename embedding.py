@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import palettable
 import scipy
 from sklearn.decomposition import PCA, KernelPCA
@@ -248,26 +249,21 @@ def plotEmbedding(dmatDf,
             plt.legend(loc='upper left', title=legTit, bbox_to_anchor=(1, 1))
     if continuousLabel and showColorbar:
         figh = plt.gcf()
-        scale_cbAX = figh.add_axes(left=0.94, bottom=0.05, right=0.97, top=0.35)
-        addColorbar(figh, scale_cbAX, axh, label='Correlation')
+        scale_cbAX = figh.add_axes([0.93, 0.05, 0.02, 0.35])
+        cb = mpl.colorbar.ColorbarBase(scale_cbAX, cmap=colors, norm=mpl.colors.Normalize(vmin=vmin, vmax=vmax)) 
+        cb.set_label('')
+        """Make colorbar labels smaller"""
+        for t in cb.ax.yaxis.get_ticklabels():
+            t.set_fontsize('x-small')
     if hasattr(xyDf, 'explained_variance_'):
         axh.set_xlabel('%s %1.0f (%1.0f%% variance explained)' % (method.upper(), plotDims[0]+1, 100*xyDf.explained_variance_[plotDims[0]]))
         axh.set_ylabel('%s %1.0f (%1.0f%% variance explained)' % (method.upper(), plotDims[1]+1, 100*xyDf.explained_variance_[plotDims[1]]))
     else:
         axh.set_xlabel('%s %1.0f' % (method.upper(), plotDims[0]+1))
         axh.set_ylabel('%s %1.0f' % (method.upper(), plotDims[1]+1))
+    plt.sca(axh)
     # plt.show()
     return xyDf
-
-def addColorbar(fig, cb_ax, data_ax, label='Correlation'):
-    """Colorbar"""
-    cb = fig.colorbar(mappable=data_ax, cax=cb_ax) # note that we could pass the norm explicitly with norm=my_norm
-    #matplotlib.colorbar.ColorbarBase(ax, cmap=None, norm=None, alpha=None, values=None, boundaries=None, 
-    cb.set_label(label)
-    """Make colorbar labels smaller"""
-    for t in cb.ax.yaxis.get_ticklabels():
-        t.set_fontsize('small')
-
 
 def clusteredScatter(xyDf,
                      labels=None,

@@ -103,7 +103,7 @@ def _clean_axis(ax):
     ax.grid(False)
     ax.set_facecolor('white')
 
-def plotHeatmap(df, row_labels=None, col_labels=None, titleStr=None, vRange=None, tickSz='small', cmap=None, cmapLabel='', annotation=False, xtickRot=90, xtickLabels=False, ytickLabels=False):
+def plotHeatmap(df, row_labels=None, col_labels=None, titleStr=None, vRange=None, tickSz='small', cmap=None, cmapLabel='', annotation=False, xtickRot=90, xtickLabels=False, ytickLabels=False, row_cmap=None, col_cmap=None):
     """Display a heatmap with labels."""
     if vRange is None:
         vmin = np.min(np.ravel(df.values))
@@ -152,11 +152,11 @@ def plotHeatmap(df, row_labels=None, col_labels=None, titleStr=None, vRange=None
     my_norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
 
     if not row_labels is None:
-        row_cbSE = np.concatenate(_colors2labels(row_labels).values).reshape((row_labels.shape[0], 1, 3))
+        row_cbSE = np.concatenate(_colors2labels(row_labels, cmap=row_cmap).values).reshape((row_labels.shape[0], 1, 3))
         axi = row_cbAX.imshow(row_cbSE, interpolation='nearest', aspect='auto', origin='lower')
         _clean_axis(row_cbAX)
     if not col_labels is None:
-        col_cbSE = np.concatenate(_colors2labels(col_labels).values).reshape((1, col_labels.shape[0], 3))
+        col_cbSE = np.concatenate(_colors2labels(col_labels).values, cmap=col_cmap).reshape((1, col_labels.shape[0], 3))
         axi = col_cbAX.imshow(col_cbSE, interpolation='nearest', aspect='auto', origin='lower')
         _clean_axis(col_cbAX)
 
