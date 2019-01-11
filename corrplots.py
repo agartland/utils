@@ -584,8 +584,8 @@ def scatterfit(x, y, method='pearson', adjustVars=[], labelLookup={}, plotLine=T
     """Drop any row with a nan in either column"""
     tmpDf = tmpDf.dropna(axis=0, how='any')
 
-    plt.gca().set_xmargin(0.2)
-    plt.gca().set_ymargin(0.2)
+    plt.gca().set_xmargin(0.1)
+    plt.gca().set_ymargin(0.1)
     
     unrho, unp = partialcorr(tmpDf[xlab], tmpDf[ylab], method=method)
 
@@ -620,17 +620,17 @@ def scatterfit(x, y, method='pearson', adjustVars=[], labelLookup={}, plotLine=T
 
     if annotateFit:
         if unp>0.001:    
-            s = 'p = %1.3f\nrho = %1.2f\nn = %d' % (unp, unrho, tmpDf.shape[0])
+            s = '\u03C1 = %1.2f\np = %1.3f\nn = %d' % (unp, unrho, tmpDf.shape[0])
         else:
-            s = 'p = %1.1e\nrho = %1.2f\nn = %d' % (unp, unrho, tmpDf.shape[0])
+            s = '\u03C1 = %1.2f\np = %1.1e\nn = %d' % (unp, unrho, tmpDf.shape[0])
         textTL(plt.gca(), s, color='black')
 
         if len(adjustVars) > 0:
             rho, p = partialcorr(tmpDf[xlab], tmpDf[ylab], adjust = adjustVars, method = method)
             if p>0.001:    
-                s = 'adj-p = %1.3f\nadj-rho = %1.2f\nn = %d' % (p, rho, tmpDf.shape[0])
+                s = 'adj-p = %1.3f\nadj-\u03C1 = %1.2f\nn = %d' % (p, rho, tmpDf.shape[0])
             else:
-                s = 'adj-p = %1.1e\nadj-rho = %1.2f\nn = %d' % (p, rho, tmpDf.shape[0])
+                s = 'adj-p = %1.1e\nadj-\u03C1 = %1.2f\nn = %d' % (p, rho, tmpDf.shape[0])
 
             textTR(plt.gca(), s, color='red')
 
