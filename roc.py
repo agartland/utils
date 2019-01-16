@@ -8,6 +8,7 @@ import sklearn
 import sklearn.ensemble
 from sklearn.model_selection import StratifiedKFold, cross_val_score, LeaveOneOut, LeavePOut, GridSearchCV
 import sklearn.linear_model
+import warnings
 
 sns.set(style='darkgrid', palette='muted', font_scale=1.5)
 
@@ -835,16 +836,18 @@ def rocStats2x2(a, b, c, d):
     #c = c / n
     #d = d / n
 
-    sens = a / (a+c)
-    spec = d / (b+d)
-    ppv = a / (a+b)
-    npv = d / (c+d)
-    nnt = 1 / (a/(a+b) - c/(c+d))
-    acc = (a + d)/n
-    rr = (a / (a+b)) / (c / (c+d))
-    OR = (a/c) / (b/d)
-    prevOut = (a + c) / n
-    prevPred = (a + b) / n
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        sens = a / (a+c)
+        spec = d / (b+d)
+        ppv = a / (a+b)
+        npv = d / (c+d)
+        nnt = 1 / (a/(a+b) - c/(c+d))
+        acc = (a + d)/n
+        rr = (a / (a+b)) / (c / (c+d))
+        OR = (a/c) / (b/d)
+        prevOut = (a + c) / n
+        prevPred = (a + b) / n
 
     vec = [sens, spec, ppv, npv, nnt, acc, rr, OR, prevOut, prevPred, a, b, c, d, n]
     labels = ['Sensitivity', 'Specificity',
