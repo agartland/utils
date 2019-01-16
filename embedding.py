@@ -39,7 +39,7 @@ def embedObservations(df, method='kpca', n_components=2, metric='euclidean', **k
         else:
             data = df
 
-        umapObj = umap.UMAP(n_components=n_components, metric=metric, **kwargs)
+        umapObj = umap.UMAP(n_components=n_components, metric=metric, random_state=110820, **kwargs)
         xy = umapObj.fit_transform(data)
         assert xy.shape[0] == df.shape[0]
         xyDf = pd.DataFrame(xy[:, :n_components], index=df.index, columns=np.arange(n_components))
