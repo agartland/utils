@@ -1,10 +1,15 @@
 import pandas as pd
 import numpy as np
-from lifelines import KaplanMeierFitter, NelsonAalenFitter
-from lifelines.statistics import logrank_test
-from lifelines import CoxPHFitter
 from myfisher import *
 from scipy import stats
+
+try:
+    from lifelines import KaplanMeierFitter, NelsonAalenFitter
+    from lifelines.statistics import logrank_test
+    from lifelines import CoxPHFitter
+except ModuleNotFoundError:
+    print('Module "lifelines" could not be imported.')
+
 
 __all__ = ['estCumTE',
             'estCoxPHTE',

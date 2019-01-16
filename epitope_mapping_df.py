@@ -728,8 +728,12 @@ def plotEpitopeMap(respDf, groupDf, uRespCol, groupCol, startCol, endCol, groupO
     # plt.legend(handles, uArms[::-1], loc='upper left', bbox_to_anchor=[1,1], fontsize=14)
     plt.legend(handles, uArms[::-1], loc='upper left', fontsize=14, bbox_to_anchor=[1.02, 1.05])
 
-def plotEpitopeChiclets(respDf, groupDf, uRespCol, groupCol, startCol, endCol, groupOrder=None, groupColors=None):
-    nPTIDs = groupDf.ptid.unique().shape[0]
+def plotEpitopeChiclets(respDf, groupDf, uRespCol, groupCol, startCol, endCol, uPTIDs=None, groupOrder=None, groupColors=None):
+    if uPTIDs is None:
+        uPTIDs = groupDf.ptid.unique().tolist()
+        nPTIDs = len(uPTIDs)
+    else:
+        nPTIDs = len(uPTIDs)
 
     if not groupOrder is None:
         uArms = np.asarray(groupOrder)
@@ -761,6 +765,7 @@ def plotEpitopeChiclets(respDf, groupDf, uRespCol, groupCol, startCol, endCol, g
     for a, color in zip(uArms, groupColors):
         """Sort PTIDs by breadth"""
         sortedPtids = breadthDf.loc[breadthDf[groupCol] == a].sort_values(by=uRespCol).ptid.tolist()
+        
         # sortedPtids = np.random.permutation(respDf.ptid.unique())
         for y, ptid in enumerate(sortedPtids):
             plotDf = respDf.loc[respDf['ptid'] == ptid].drop_duplicates(subset=['ptid', uRespCol])
