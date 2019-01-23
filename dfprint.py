@@ -14,7 +14,7 @@ def toPNG(df, outFn, dpi=200, **kwargs):
     toPDF(df, pdfFn, **kwargs)
     cmd = ['convert',# '-interaction=nonstopmode',
            '-density %d' % dpi,
-           '-alpha remove', 
+           '-alpha off', 
            pdfFn,
            'PNG32:%s' % outFn]
     #print ' '.join(cmd)

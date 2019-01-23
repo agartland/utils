@@ -72,6 +72,7 @@ def runRscript(Rcmd, inDf=None, outputFiles=0, removeTempFiles=None):
     except subprocess.CalledProcessError as e:
         res = bytes('STDOUT:\n%s\nSTDERR:\n%s' % (e.stdout, e.stderr), 'utf-8')
         print('R process returned an error')
+        print(res.decode('utf-8'))
         
         if removeTempFiles is None:
             print('Leaving tempfiles for debugging.')
