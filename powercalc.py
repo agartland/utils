@@ -203,7 +203,7 @@ def powerBySubsample(df, func, subsamples, nStraps=1000, aplha=0.05):
 
 def probGTEX(x, N, prob):
     """Probability of x or more events (x>0) given,
-    N trials and per trial probability prob"""
+    N trials and per trial probability prob."""
     return 1 - stats.binom.cdf(x-1, N, prob)
 
 def eventCI(x, N, alpha=0.05, method='score'):
