@@ -20,7 +20,8 @@ __all__ = ['plotHCluster',
             'computeDMat',
             'computeHCluster',
             'plotBicluster',
-            'labeledDendrogram']
+            'labeledDendrogram',
+            'clusterOrder']
 
 def clean_axis(ax):
     """Remove ticks, tick labels, and frame from axis"""
@@ -75,6 +76,21 @@ def computeDMat(df, metric=None, minN=1, dfunc=None):
     assert dmat.shape[0] == dmat.shape[1]
     assert dmat.shape[0] == df.shape[1]
     return dmat
+
+def clusterOrder(df, axis=0, metric='correlation', method='complete'):
+    if axis == 0:
+        dvec = distance.pdist(df, metric=metric)
+    else:
+        dvec = distance.pdist(df.T, metric=metric)
+    
+    clusters = sch.linkage(dvec, method=method)
+    den = sch.dendrogram(clusters, color_threshold=np.inf, no_plot=True)
+    
+    if axis == 0:
+        order = df.index[den['leaves']].tolist()
+    else:
+        order = df.T.index[den['leaves']].tolist()
+    return order
 
 def computeHCluster(dmat, method='complete'):
     """Compute dmat, clusters and dendrogram of df using

@@ -81,10 +81,13 @@ def hierClusterFunc(dmatDf, K=6, method='complete', returnLinkageMat=False):
     else:
         return labels, hclusters
 
-def _colors2labels(labels, setStr='Set1', cmap=None):
+def _colors2labels(labels, setStr='Set1', cmap=None, freqSort=True):
     """Return pd.Series of colors based on labels"""
-    oh = objhist(labels)
-    uLabels = sorted(np.unique(labels), key=oh.get, reverse=True)
+    if freqSort:
+        oh = objhist(labels)
+        uLabels = sorted(np.unique(labels), key=oh.get, reverse=True)
+    else:
+        uLabels = sorted(np.unique(labels))
     if cmap is None:
         N = max(3, min(9, len(uLabels)))
         cmap = palettable.colorbrewer.get_map(setStr, 'Qualitative', N).mpl_colors
@@ -152,11 +155,11 @@ def plotHeatmap(df, row_labels=None, col_labels=None, titleStr=None, vRange=None
     my_norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
 
     if not row_labels is None:
-        row_cbSE = np.concatenate(_colors2labels(row_labels, cmap=row_cmap).values).reshape((row_labels.shape[0], 1, 3))
+        row_cbSE = np.concatenate(_colors2labels(row_labels, cmap=row_cmap, freqSort=False).values).reshape((row_labels.shape[0], 1, 3))
         axi = row_cbAX.imshow(row_cbSE, interpolation='nearest', aspect='auto', origin='lower')
         _clean_axis(row_cbAX)
     if not col_labels is None:
-        col_cbSE = np.concatenate(_colors2labels(col_labels).values, cmap=col_cmap).reshape((1, col_labels.shape[0], 3))
+        col_cbSE = np.concatenate(_colors2labels(col_labels, freqSort=False).values, cmap=col_cmap).reshape((1, col_labels.shape[0], 3))
         axi = col_cbAX.imshow(col_cbSE, interpolation='nearest', aspect='auto', origin='lower')
         _clean_axis(col_cbAX)
 
@@ -244,12 +247,12 @@ def plotHierClust(dmatDf, Z, labels=None, titleStr=None, vRange=None, tickSz='sm
     _clean_axis(denAX)
 
     if not labels is None:
-        cbSE = _colors2labels(labels)
+        cbSE = _colors2labels(labels, freqSort=False)
         axi = cbAX.imshow([[x] for x in cbSE.iloc[colInd].values], interpolation='nearest', aspect='auto', origin='lower')
         _clean_axis(cbAX)
         if plotLegend:
             uLabels = np.unique(labels)
-            handles = [mpl.patches.Patch(facecolor=c, edgecolor='k') for c in _colors2labels(uLabels)]
+            handles = [mpl.patches.Patch(facecolor=c, edgecolor='k') for c in _colors2labels(uLabels, freqSort=False)]
             # fig.legend(handles, uLabels, loc=(0, 0), title=labels.name)
             # bbox = mpl.transforms.Bbox(((0,0),(1,1))).anchored('NE')
             fig.legend(handles, uLabels, loc='upper left', title=labels.name)
