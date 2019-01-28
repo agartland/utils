@@ -653,7 +653,7 @@ def plotIsland(island):
     handles = [mpl.patches.Patch(facecolor=colors[e], edgecolor='k') for e in uEpIDs]
     plt.legend(handles, uEpIDs, loc='best', title='Epitope')
 
-def plotEpitopeMap(respDf, groupDf, uRespCol, groupCol, startCol, endCol, groupOrder=None):
+def plotEpitopeMap(respDf, groupDf, uRespCol, groupCol, startCol, endCol, groupOrder=None, groupColors=None):
     """Plot map of all responses in respDf (could be epitopes or 15mers"""
     nPTIDs = groupDf.ptid.unique().shape[0]
 
@@ -666,7 +666,8 @@ def plotEpitopeMap(respDf, groupDf, uRespCol, groupCol, startCol, endCol, groupO
     breadthDf = tmp.groupby('ptid')[[uRespCol]].count().reset_index()
     breadthDf = pd.merge(groupDf[['ptid', groupCol]].drop_duplicates(), breadthDf, left_on='ptid', right_on='ptid', how='left').fillna(0)
 
-    armColors = sns.color_palette('Set1', n_colors=uArms.shape[0])[::-1]
+    if groupColors is None:
+        groupColors = sns.color_palette('Set1', n_colors=uArms.shape[0])[::-1]
 
     """Plot map of epitope responses by PTID"""
     keepRegions = ['Signal peptide', 'V1 loop', 'V2 loop',
@@ -680,7 +681,7 @@ def plotEpitopeMap(respDf, groupDf, uRespCol, groupCol, startCol, endCol, groupO
     np.random.seed(110820)
     lasty = 0
     yt = []
-    for a, color in zip(uArms, armColors):
+    for a, color in zip(uArms, groupColors):
         """Sort PTIDs by breadth"""
         sortedPtids = breadthDf.loc[breadthDf[groupCol] == a].sort_values(by=uRespCol).ptid.tolist()
         # sortedPtids = np.random.permutation(respDf.ptid.unique())
@@ -724,11 +725,11 @@ def plotEpitopeMap(respDf, groupDf, uRespCol, groupCol, startCol, endCol, groupO
     axh.spines['right'].set_visible(False)
     axh.spines['top'].set_visible(False)
 
-    handles = [mpl.patches.Patch(facecolor=c, edgecolor='k') for c in armColors[::-1]]
+    handles = [mpl.patches.Patch(facecolor=c, edgecolor='k') for c in groupColors[::-1]]
     # plt.legend(handles, uArms[::-1], loc='upper left', bbox_to_anchor=[1,1], fontsize=14)
     plt.legend(handles, uArms[::-1], loc='upper left', fontsize=14, bbox_to_anchor=[1.02, 1.05])
 
-def plotEpitopeChiclets(respDf, groupDf, uRespCol, groupCol, startCol, endCol, uPTIDs=None, groupOrder=None, groupColors=None):
+def plotEpitopeChiclets(respDf, groupDf, uRespCol, groupCol, startCol, endCol, uPTIDs=None, groupOrder=None, groupColors=None, epColorCol=None):
     if uPTIDs is None:
         uPTIDs = groupDf.ptid.unique().tolist()
         nPTIDs = len(uPTIDs)
@@ -742,6 +743,12 @@ def plotEpitopeChiclets(respDf, groupDf, uRespCol, groupCol, startCol, endCol, u
     
     if groupColors is None:
         groupColors = sns.color_palette('Set1', n_colors=uArms.shape[0])[::-1]
+
+    if epColorCol is None:
+        respDf.loc[:, 'EpColor'] = 'None'
+    else:
+        respDf.loc[:, 'EpColor'] = respDf[epColorCol]
+
 
     #lims = [respDf['start'].min(), (respDf['start'] + respDf['seq'].map(len)).max()]
     lims = [respDf[startCol].min(), respDf[endCol].max()]
@@ -771,20 +778,19 @@ def plotEpitopeChiclets(respDf, groupDf, uRespCol, groupCol, startCol, endCol, u
             plotDf = respDf.loc[respDf['ptid'] == ptid].drop_duplicates(subset=['ptid', uRespCol])
             yt.append(y + lasty)
             rects = []
-            for st, en in zip(plotDf[startCol], plotDf[endCol]):
+            for st, en, c in zip(plotDf[startCol], plotDf[endCol], plotDf['EpColor']):
                 L = 5
                 lw = 0.6
                 xloc = np.mean([st, en])
                 xy = (xloc - L/2, y + lasty - lw/2)
 
-                rects.append(Rectangle(xy, width=L, height=lw))
-                '''plt.plot([xloc - L/2, xloc + L/2], [y + lasty, y + lasty],
-                         '-',
-                         color=color,
-                         linewidth=lw)'''
+                if c == 'None':
+                    c = color
+                rects.append(Rectangle(xy, width=L, height=lw, facecolor=c, alpha=1.0, edgecolor='black', lw=0.5))
 
             # Create patch collection with specified colour/alpha
-            pc = PatchCollection(rects, facecolor=color, alpha=1.0, edgecolor='black', lw=0.5)
+            pc = PatchCollection(rects, match_original=True)
+
             # Add collection to axes
             axh.add_collection(pc)
 
