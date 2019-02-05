@@ -18,7 +18,8 @@ __all_ = ['veEndpointsRequired',
           'sumAnyNBinom',
           'sensitivityCI',
           'specificityCI',
-          'rocStats']
+          'rocStats',
+          'ccsize']
 
 """NOTE: Many of these were hacked together in very short time, but they code may still be useful for next time."""
 
@@ -645,3 +646,39 @@ def rocStats(a, b, c, d, returnSeries=True):
     else:
         out = (sens, spec, ppv, npv, nnt, acc, rr, OR)
     return out
+
+def ccsize(n, q, pD, p1, theta, alpha=0.05):
+    """Power with case-cohort design, from:
+    Cai and Zeng. "Sample Size/Power Calculation for Case–Cohort Studies." Biometrics, 2004.
+
+    R code from the gap package, except this code assumes a two-sided test.
+    
+    Based on a log-rank test comparing event rates in two groups, with full sampling of the
+    cases and partial smapling of the controls.
+
+    Parameters
+    ----------
+    n : int
+        Total number of participants in the cohort
+    q : float [0, 1]
+        Sampling fraction of the subcohort
+    pD : float [0, 1]
+        Proportion of the failures in the full cohort
+    p1 : float [0, 1]
+        Proportions of the two groups (p2 = 1 - p1)
+    theta : float
+        Log-hazard ratio for two groups (effect size)
+    alpha : float
+        Two-sided significance level
+
+    Returns
+    -------
+    power : float [0, 1]
+        Power to reject the null hypothesis that the event rate
+        is equal in the two groups."""
+
+    p2 = 1 - p1
+    z_alpha = stats.norm.ppf(alpha / 2)
+    z = z_alpha + np.sqrt(n) * theta * np.sqrt(p1 * p2 / (1 / pD + (1 / q - 1)))
+    power = stats.norm.cdf(z)
+    return power
