@@ -30,7 +30,7 @@ __all__ = [ 'embedDistanceMatrix',
             'plotEmbedding',
             'clusteredScatter']
 
-def embedObservations(df, method='kpca', n_components=2, metric='euclidean', **kwargs):
+def embedObservations(df, method='kpca', n_components=2, metric='euclidean', downSample=None **kwargs):
     """Two-dimensional embedding of data in df
     returning Nx2 x,y-coords: tsne, isomap, pca, mds, kpca, sklearn-tsne, umap"""
     if method == 'umap':
@@ -40,7 +40,12 @@ def embedObservations(df, method='kpca', n_components=2, metric='euclidean', **k
             data = df
 
         umapObj = umap.UMAP(n_components=n_components, metric=metric, random_state=110820, **kwargs)
-        xy = umapObj.fit_transform(data)
+        if downSample is None:
+            xy = umapObj.fit_transform(data)
+        else:
+            rind = np.random.permutation(data.shape[0])[:downSample]
+            fitted = umapObj.fit(data[rind, :])
+            xy = fitted.transform(data)
         assert xy.shape[0] == df.shape[0]
         xyDf = pd.DataFrame(xy[:, :n_components], index=df.index, columns=np.arange(n_components))
         return xyDf
