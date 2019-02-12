@@ -30,7 +30,7 @@ __all__ = [ 'embedDistanceMatrix',
             'plotEmbedding',
             'clusteredScatter']
 
-def embedObservations(df, method='kpca', n_components=2, metric='euclidean', downSample=None **kwargs):
+def embedObservations(df, method='kpca', n_components=2, metric='euclidean', downSample=None, **kwargs):
     """Two-dimensional embedding of data in df
     returning Nx2 x,y-coords: tsne, isomap, pca, mds, kpca, sklearn-tsne, umap"""
     if method == 'umap':
