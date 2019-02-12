@@ -221,6 +221,8 @@ def eventCI(x, N, alpha=0.05, method='score'):
     52, 119–126 (2007)."""
 
     x = np.asarray(x)
+    if isinstance(N, list):
+        N = np.asarray(N)
     p = x/N
     z = stats.norm.ppf(1.-alpha/2.)
     if method == 'score':

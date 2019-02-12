@@ -399,7 +399,6 @@ def clusteredScatter(xyDf,
                     labS = '%s (N=%d)' % (m, ind.sum())
                 else:
                     labS = None
-                
                 plt.scatter(xyDf.loc[ind, plotDims[0]],
                             xyDf.loc[ind, plotDims[1]],
                             marker=markers[mi],
