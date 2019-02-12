@@ -131,7 +131,7 @@ def getClusterMembers(Z):
     members = {i:_getIndices(clusters, i) for i in range(Z.shape[0] + 1, max(clusters.keys()) + 1)}
     return members
 
-def plotHClustProportions(figh, Z, resDf, alpha_col='pvalue', alpha=0.05, colors=None, ann='N', xLim=None):
+def plotHClustProportions(figh, Z, resDf, alpha_col='pvalue', alpha=0.05, colors=None, ann='N', xLim=None, maxY=None):
     """Plot tree of linkage-based hierarchical clustering, with nodes colored with stacked bars
     representing proportion of cluster members associated with specific conditions. Nodes also optionally
     annotated with pvalue, number of members or cluster ID.
@@ -166,13 +166,14 @@ def plotHClustProportions(figh, Z, resDf, alpha_col='pvalue', alpha=0.05, colors
                              link_color_func=lambda lid: hex(lid),
                              above_threshold_color='FFFFF')
     figh.clf()
-    axh = plt.axes((0.05, 0.07, 0.7, 0.93), facecolor='w')
+    axh = plt.axes((0.05, 0.07, 0.8, 0.8), facecolor='w')
 
     lowestY = None
     annotateCount = 0
     for xx, yy, hex_cid in zip(dend['icoord'], dend['dcoord'], dend['color_list']):
         cid = int(hex_cid, 16)
-        axh.plot(xx, yy, zorder=1, lw=1, color='k', alpha=0.5)
+        xx = np.array(xx) / 10
+        axh.plot(xx, yy, zorder=1, lw=0.5, color='k', alpha=1)
         if resDf.loc[cid, alpha_col] < alpha:
             obs = np.asarray(resDf.loc[cid, 'observed_prop'])
             obs = obs / np.sum(obs)
@@ -209,16 +210,29 @@ def plotHClustProportions(figh, Z, resDf, alpha_col='pvalue', alpha=0.05, colors
                 lowestY = yy[1]
     yl = axh.get_ylim()
     if not lowestY is None:
-        axh.set_ylim((0.9*lowestY, yl[1]))
+        yl0 = 0.9*lowestY
+    else:
+        yl0 = yl[0]
+    if not maxY is None:
+        yl1 = maxY
+    else:
+        yl1 = yl[1]
+    axh.set_ylim((yl0, yl1))
+    
     axh.set_yticks(())
     if not xLim is None:
+        if xLim[1] is None:
+            xl1 = axh.get_xlim()[1]
+            xLim = (xLim[0], xl1)
         axh.set_xlim(xLim)
     else:
         xLim = axh.get_xlim()
-    xt = [x for x in range(0, 10*Z.shape[0], 1000) if x <= xLim[1] and x>= xLim[0]]
-    xtl = [x//10 for x in xt]
+
+    xt = [x for x in range(0, Z.shape[0]) if x <= xLim[1] and x>= xLim[0]]
+    xt = xt[::len(xt) // 10]
+    # xtl = [x//10 for x in xt]
     axh.set_xticks(xt)
-    axh.set_xticklabels(xtl)
+    # axh.set_xticklabels(xtl)
     legh = axh.legend([plt.Rectangle((0,0), 1, 1, color=c) for c in colors],
             labels,
             loc='upper left', bbox_to_anchor=(1, 1))
