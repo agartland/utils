@@ -5,11 +5,17 @@ import matplotlib.patheffects
 import matplotlib.transforms as mtrans
 from matplotlib import transforms
 import skbio
-from objhist import objhist
 import io
+import warnings
+
+try:
+    from muscle import *
+except ImportError:
+    print('Importing seqlogo without alignment support from MUSCLE.')
 
 __all__ = ['computeMotif',
-           'plotMotif']
+           'plotMotif',
+           'reduceGaps']
 
 _shapely_colors = "Amino Acids,Color Name,RGB Values,Hexadecimal\nD|E,bright red,[230,10,10],E60A0A\nC|M,yellow,[230,230,0],E6E600\nK|R,blue,[20,90,255],145AFF\nS|T,orange,[250,150,0],FA9600\nF|Y,mid blue,[50,50,170],3232AA\nN|Q,cyan,[0,220,220],00DCDC\nG,light grey,[235,235,235],EBEBEB\nL|V|I,green,[15,130,15],0F820F\nA,dark grey,[200,200,200],C8C8C8\nW,pink,[180,90,180],B45AB4\nH,pale blue,[130,130,210],8282D2\nP,flesh,[220,150,130],DC9682"
 
@@ -35,13 +41,15 @@ def parseColor(aa, colorsDf):
         arr = [float(a)/255. for a in tmp]
         return arr
 
-def computeMotif(seqs):
+def computeMotif(seqs, weights=None, alignFirst=True, gap_reduce=None):
     """Compute heights for a sequence logo
 
     Parameters
     ----------
     seqs : list or pd.Series
         Alignment of AA sequences
+    weights : np.array
+        Weights for each sequence
 
     Returns
     -------
@@ -50,24 +58,34 @@ def computeMotif(seqs):
         Heights reflect the fraction of total entropy contributed
         by that AA within each column of the alignment."""
 
-    alphabet = skbio.sequence.Protein.alphabet
+    alphabet = sorted([aa for aa in skbio.sequence.Protein.alphabet if not aa in '*.'])
+
+    if weights is None:
+        weights = np.ones(len(seqs))
     
-    if not isinstance(seqs, pd.Series):
-        align = pd.Series(seqs)
+    if alignFirst:
+        align = muscle_align(seqs)
     else:
-        align = seqs
+        if not isinstance(seqs, pd.Series):
+            align = pd.Series(seqs)
+        else:
+            align = seqs
+    if not gap_reduce is None:
+        align = reduceGaps(align, thresh=gap_reduce)
 
     L = len(align.iloc[0])
     nAA = len(alphabet)
-
-    heights = np.zeros((nAA, L))
+    
+    freq = np.zeros((nAA, L,))
     for coli in range(L):
-        aaOH = objhist([s[coli] for s in align])
-        freq = aaOH.freq()
-        p = np.array([freq.get(k, 0) for k in alphabet])
-        pNZ = p[p>0]
-        totEntropy = np.log2(nAA) - ((-pNZ * np.log2(pNZ)).sum())
-        heights[:, coli] = p * totEntropy
+        for si,s in enumerate(align):
+            freq[alphabet.index(s[coli]), coli] += weights[si]
+    freq = freq / freq.sum(axis=0, keepdims=True)
+    
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        totEntropy = np.log2(nAA) - np.nansum(-freq * np.log2(freq), axis=0, keepdims=True)
+    heights = freq * totEntropy
 
     return pd.DataFrame(heights, columns=list(range(L)), index=alphabet)
 
@@ -137,3 +155,17 @@ def plotMotif(x, y, motif, axh=None, fontsize=30, aa_colors='shapely'):
         xshift += baseW * 1.
     plt.show()
     return np.array([[x, y], [xshift, mxy]])
+
+def reduceGaps(align, thresh=0.7):
+    """Identifies columns with thresh fraction of gaps,
+    removes the sequences that have AAs there and
+    removes the column from the alignment"""
+
+    removePos = []
+    for pos in range(len(align.iloc[0])):
+        if np.mean(align.map(lambda seq: seq[pos] == '-')) > thresh:
+            removePos.append(pos)
+    for pos in removePos:
+        align = align.loc[align.map(lambda seq: seq[pos] == '-')]
+
+    return align.map(lambda seq: ''.join([aa for pos, aa in enumerate(seq) if not pos in removePos]))
