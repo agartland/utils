@@ -17,7 +17,7 @@ __all__ = ['computeMotif',
            'plotMotif',
            'reduceGaps']
 
-_shapely_colors = "Amino Acids,Color Name,RGB Values,Hexadecimal\nD|E,bright red,[230,10,10],E60A0A\nC|M,yellow,[230,230,0],E6E600\nK|R,blue,[20,90,255],145AFF\nS|T,orange,[250,150,0],FA9600\nF|Y,mid blue,[50,50,170],3232AA\nN|Q,cyan,[0,220,220],00DCDC\nG,light grey,[235,235,235],EBEBEB\nL|V|I,green,[15,130,15],0F820F\nA,dark grey,[200,200,200],C8C8C8\nW,pink,[180,90,180],B45AB4\nH,pale blue,[130,130,210],8282D2\nP,flesh,[220,150,130],DC9682"
+_shapely_colors = 'Amino Acids,Color Name,RGB Values,Hexadecimal\nD|E,bright red,"[230,10,10]",E60A0A\nC|M,yellow,"[230,230,0]",E6E600\nK|R,blue,"[20,90,255]",145AFF\nS|T,orange,"[250,150,0]",FA9600\nF|Y,mid blue,"[50,50,170]",3232AA\nN|Q,cyan,"[0,220,220]",00DCDC\nG,light grey,"[235,235,235]",EBEBEB\nL|V|I,green,"[15,130,15]",0F820F\nA,dark grey,"[200,200,200]",C8C8C8\nW,pink,"[180,90,180]",B45AB4\nH,pale blue,"[130,130,210]",8282D2\nP,flesh,"[220,150,130]",DC9682'
 
 class Scale(matplotlib.patheffects.RendererBase):
     def __init__(self, sx=1., sy=1.):
@@ -41,7 +41,7 @@ def parseColor(aa, colorsDf):
         arr = [float(a)/255. for a in tmp]
         return arr
 
-def computeMotif(seqs, weights=None, alignFirst=True, gap_reduce=None):
+def computeMotif(seqs, weights=None, alignFirst=True, gapReduce=None):
     """Compute heights for a sequence logo
 
     Parameters
@@ -70,8 +70,8 @@ def computeMotif(seqs, weights=None, alignFirst=True, gap_reduce=None):
             align = pd.Series(seqs)
         else:
             align = seqs
-    if not gap_reduce is None:
-        align = reduceGaps(align, thresh=gap_reduce)
+    if not gapReduce is None:
+        align = reduceGaps(align, thresh=gapReduce)
 
     L = len(align.iloc[0])
     nAA = len(alphabet)
@@ -89,7 +89,7 @@ def computeMotif(seqs, weights=None, alignFirst=True, gap_reduce=None):
 
     return pd.DataFrame(heights, columns=list(range(L)), index=alphabet)
 
-def plotMotif(x, y, motif, axh=None, fontsize=30, aa_colors='shapely'):
+def plotMotif(x, y, motif, axh=None, fontsize=16, aa_colors='black', highlightAAs=None, highlightColor='red'):
     """Sequence logo of the motif at data coordinates x,y using matplotlib.
 
     Note: logo will be distorted by zooming after it is plotted
@@ -111,10 +111,20 @@ def plotMotif(x, y, motif, axh=None, fontsize=30, aa_colors='shapely'):
         Pointsize of font passed to axh.text
     aa_colors : str
         Either 'shapely' or a color to use for all symbols.
+    highlightAAs : list of lists
+        Lists AAs in each position that should be plotted in highlight color.
+    highlightColor : string or RGB
+        Valid color for highlighted AAs
 
     Returns
     -------
+    letters : list of lists of tuples (Text, height)
+        List of lists of the Text objects in the order they are plotted
+        (lower left to upper right). Useful for putting annotations relative
+        to specific objects in the motif.
     bbox : [[x0, y0], [x1, y1]]
+        Full extent of the logo in screen coodinates.
+    bbox_data : [[x0, y0], [x1, y1]]
         Full extent of the logo in data coodinates."""
 
     if aa_colors == 'shapely':
@@ -126,35 +136,62 @@ def plotMotif(x, y, motif, axh=None, fontsize=30, aa_colors='shapely'):
 
     if axh is None:
         axh = plt.gca()
-
-    mxy = 0
+  
+    trans_offset = transforms.offset_copy(axh.transData, 
+                                      fig=axh.figure, 
+                                      x=0, y=0, 
+                                      units='dots')
+    first = None
     xshift = 0
+    mxy = 0
+    letters = [[] for i in range(motif.shape[1])]
     for xi in range(motif.shape[1]):
         scores = motif.iloc[:, xi].sort_values()
         yshift = 0
         for yi, (aa, score) in enumerate(scores.items()):
             if score > 0:
-                txt = axh.text(x + xshift,
-                              y + yshift,
+                if aa in highlightAAs[xi]:
+                    color = highlightColor
+                else:
+                    color = aa_colors[aa]
+                txt = axh.text(x, 
+                              y, 
                               aa, 
+                              transform=trans_offset,
                               fontsize=fontsize, 
-                              color=aa_colors[aa],
+                              color=color,
+                              ha='left',
                               family='monospace')
-                # axh.figure.canvas.draw()
-                # window_ext = txt.get_window_extent(txt._renderer)
-                window_ext = txt.get_window_extent(axh.figure.canvas.get_renderer())
-                ext_data = axh.transData.inverted().transform(window_ext)
+                txt.set_path_effects([Scale(1.5, score)])
+                axh.figure.canvas.draw()
+                window_ext = txt.get_window_extent(txt._renderer)
+                letters[xi].append((txt, window_ext.height * score))
+                if first is None:
+                    first = window_ext
 
-                baseW = (ext_data[1][0] - ext_data[0][0])
-                baseH = (ext_data[1][1] - ext_data[0][1])
+                if yshift == 0:
+                    xshift += window_ext.width * 1.5
+                    bottom_offset = transforms.offset_copy(txt._transform, 
+                                                          fig=axh.figure,
+                                                          x=window_ext.width * 1.5,
+                                                          units='dots')
 
-                txt.set_path_effects([Scale(1., score)])
-                yshift += baseH * score
+                yshift += window_ext.height * score
+                
+                # print(xi, aa, '%1.1f' % score, '%1.0f' % window_ext.height, '%1.0f' % window_ext.width, '%1.1f' % yshift)
+                trans_offset = transforms.offset_copy(txt._transform, 
+                                                      fig=axh.figure,
+                                                      y=window_ext.height * score,
+                                                      units='dots')
+
+        trans_offset = bottom_offset
         if yshift > mxy:
             mxy = yshift
-        xshift += baseW * 1.
+
     plt.show()
-    return np.array([[x, y], [xshift, mxy]])
+    bbox = np.array([[first.x0, first.y0], [window_ext.x1, window_ext.y0 + window_ext.height * score]])
+    bbox_data = axh.transData.inverted().transform(bbox)
+    return letters, bbox, bbox_data
 
 def reduceGaps(align, thresh=0.7):
     """Identifies columns with thresh fraction of gaps,
