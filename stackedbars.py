@@ -57,7 +57,7 @@ def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=N
         dd = data[[stack, x, facetrow]].drop_duplicates()
         xsizes = dd.groupby([x, facetrow])[stack].agg(lambda v: v.unique().shape[0]).unstack(facetrow).max(axis=1)
     
-    xcenters = (xsizes + 5).loc[xorder].cumsum()
+    xcenters = (xsizes + 2).loc[xorder].cumsum()
     xlefts = xcenters - xsizes/2
 
     xl = [None, None]
@@ -107,7 +107,8 @@ def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=N
             plotDf = rowData.loc[rowData[x] == curx].set_index([stack, hue])[y].unstack(hue)
             if plotDf.shape[0] > 0:
                 if stackorder is None:
-                    plotDf = plotDf[hueorder].sort_values(by=hueorder, ascending=False)
+                    ho = [h for h in hueorder if h in plotDf.columns]
+                    plotDf = plotDf[ho].sort_values(by=ho, ascending=False)
                     sorder = plotDf.index
                 else:
                     sorder = stackorder
@@ -115,12 +116,14 @@ def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=N
                 for stacki, s in enumerate(sorder):
                     bottom = 0
                     for bari, barl in enumerate(hueorder):
-                        axh.bar(x=(xcenters[curx] - len(sorder)/2) + stacki,
-                                bottom=bottom,
-                                height=plotDf.loc[s, barl],
-                                width=1,
-                                color=colors[bari])
-                        bottom += plotDf.loc[s, barl]
+                        if barl in plotDf.columns and not np.isnan(plotDf.loc[s, barl]):
+                            axh.bar(x=(xcenters[curx] - len(sorder)/2) + stacki,
+                                    bottom=bottom,
+                                    height=plotDf.loc[s, barl],
+                                    width=0.9,
+                                    color=colors[bari])
+                            # print(curx, s, barl, bottom, plotDf.loc[s, barl])
+                            bottom += plotDf.loc[s, barl]
         
         curxl = plt.xlim()
         curyl = plt.ylim()
@@ -136,9 +139,11 @@ def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=N
 
         if rowi == len(facetorder) - 1:
             plt.xlabel(stack)
-            plt.xticks(xcenters, xorder)
+            """Applied this -0.5 fix to work for two stacks but not sure about more"""
+            plt.xticks(xcenters - 0.5, xorder)
         else:
             plt.xticks(xcenters, ['']*len(xcenters))
+
         if facetrow is None:
             plt.ylabel(y)
         else:
@@ -148,7 +153,8 @@ def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=N
             plt.legend([plt.Rectangle((0,0), 1, 1, color=c) for c in colors],
                         hueorder, 
                         loc='upper left',
-                        bbox_to_anchor=(1, 1))
+                        bbox_to_anchor=(1, 1),
+                        title=hue)
 
     for axh in axesHandles:
         axh.set_ylim(yl)

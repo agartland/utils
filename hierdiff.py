@@ -174,7 +174,7 @@ def plotHClustProportions(figh, Z, resDf, alpha_col='pvalue', alpha=0.05, colors
         cid = int(hex_cid, 16)
         xx = np.array(xx) / 10
         axh.plot(xx, yy, zorder=1, lw=0.5, color='k', alpha=1)
-        if resDf.loc[cid, alpha_col] < alpha:
+        if resDf.loc[cid, alpha_col] <= alpha:
             obs = np.asarray(resDf.loc[cid, 'observed_prop'])
             obs = obs / np.sum(obs)
             L = (xx[2] - xx[1])
