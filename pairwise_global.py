@@ -58,10 +58,9 @@ class CachedNWDistance:
         self.gap_extend = gap_extend
         self.gap_open = gap_open
 
-        self.paraParams = dict(open=self.gap_open, extend=self.gap_extend, matrix=self.matrix)
-
         if useIdentity:
             self.matrix = parasail.matrix_create(alphabet='ACDEFGHIKLMNPQRSTVWXY', match=1, mismatch=0)
+        self.paraParams = dict(open=self.gap_open, extend=self.gap_extend, matrix=self.matrix)
 
     def indices(self):
         return np.arange(len(self.elements), dtype=np.float)[:, None]
