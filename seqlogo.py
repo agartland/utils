@@ -89,6 +89,17 @@ def computeMotif(seqs, weights=None, alignFirst=True, gapReduce=None):
 
     return pd.DataFrame(heights, columns=list(range(L)), index=alphabet)
 
+def _extend_bbox(bbox, ext):
+    if ext.x0 < bbox[0, 0]:
+        bbox[0, 0] = ext.x0
+    if ext.y0 < bbox[0, 1]:
+        bbox[0, 1] = ext.y0
+    if ext.x1 > bbox[1, 0]:
+        bbox[1, 0] = ext.x1
+    if ext.y1 < bbox[1, 1]:
+        bbox[1, 1] = ext.y1
+    return bbox
+
 def plotMotif(x, y, motif, axh=None, fontsize=16, aa_colors='black', highlightAAs=None, highlightColor='red'):
     """Sequence logo of the motif at data coordinates x,y using matplotlib.
 
@@ -127,6 +138,8 @@ def plotMotif(x, y, motif, axh=None, fontsize=16, aa_colors='black', highlightAA
     bbox_data : [[x0, y0], [x1, y1]]
         Full extent of the logo in data coodinates."""
 
+    if highlightAAs is None:
+        highlightAAs = ['' for i in range(motif.shape[1])]
     if aa_colors == 'shapely':
         colorsDf = pd.read_csv(io.StringIO(_shapely_colors), delimiter=',')
         aa_colors = {aa:parseColor(aa, colorsDf=colorsDf) for aa in motif.index}
@@ -141,57 +154,134 @@ def plotMotif(x, y, motif, axh=None, fontsize=16, aa_colors='black', highlightAA
                                       fig=axh.figure, 
                                       x=0, y=0, 
                                       units='dots')
-    first = None
-    xshift = 0
-    mxy = 0
+    bottom_offset = trans_offset
+    neg_trans_offset = trans_offset
+    first_pos = None
+    last_neg = None
+    bbox = np.array([[x, y], [x, y]])
+    mxy = y 
+    mny = y
     letters = [[] for i in range(motif.shape[1])]
     for xi in range(motif.shape[1]):
-        scores = motif.iloc[:, xi].sort_values()
+        scores = motif.iloc[:, xi]
+        pos_scores = scores[scores > 0].sort_values()
+        neg_scores = (-scores[scores < 0]).sort_values()
         yshift = 0
-        for yi, (aa, score) in enumerate(scores.items()):
-            if score > 0:
-                if aa in highlightAAs[xi]:
-                    color = highlightColor
-                else:
-                    color = aa_colors[aa]
-                txt = axh.text(x, 
-                              y, 
-                              aa, 
-                              transform=trans_offset,
-                              fontsize=fontsize, 
-                              color=color,
-                              ha='left',
-                              family='monospace')
-                txt.set_path_effects([Scale(1.5, score)])
-                axh.figure.canvas.draw()
-                window_ext = txt.get_window_extent(txt._renderer)
-                letters[xi].append((txt, window_ext.height * score))
-                if first is None:
-                    first = window_ext
+        neg_trans_offset = trans_offset
+        for yi, (aa, score) in enumerate(pos_scores.items()):
+            if aa in highlightAAs[xi]:
+                color = highlightColor
+            else:
+                color = aa_colors[aa]
+            txt = axh.text(x, 
+                          y, 
+                          aa, 
+                          transform=trans_offset,
+                          fontsize=fontsize, 
+                          color=color,
+                          ha='left',
+                          family='monospace')
+            txt.set_path_effects([Scale(1.5, score)])
+            axh.figure.canvas.draw()
+            window_ext = txt.get_window_extent(txt._renderer)
+            
+            #bbox_data = axh.transData.inverted().transform(np.array([[window_ext.x0, window_ext.y0], [window_ext.x1, window_ext.y1]]))
+            #bbox_data = window_ext.inverse_transformed(axh.transData)
+            #plt.plot(bbox_data.corners()[:, 0], bbox_data.corners()[:, 1], '-k')
 
-                if yshift == 0:
-                    xshift += window_ext.width * 1.5
-                    bottom_offset = transforms.offset_copy(txt._transform, 
-                                                          fig=axh.figure,
-                                                          x=window_ext.width * 1.5,
-                                                          units='dots')
+            bbox = _extend_bbox(bbox, window_ext)
+            letters[xi].append((txt, window_ext.height * score))
+            if first_pos is None:
+                first_pos = window_ext
 
-                yshift += window_ext.height * score
-                
-                # print(xi, aa, '%1.1f' % score, '%1.0f' % window_ext.height, '%1.0f' % window_ext.width, '%1.1f' % yshift)
-                trans_offset = transforms.offset_copy(txt._transform, 
+            if yshift == 0:
+                bottom_offset = transforms.offset_copy(txt._transform, 
                                                       fig=axh.figure,
-                                                      y=window_ext.height * score,
+                                                      x=window_ext.width * 1.5,
                                                       units='dots')
 
+            yshift += window_ext.height * score
+            
+            # print(xi, aa, window_ext.x0, window_ext.y0, '%1.1f' % score, '%1.0f' % window_ext.height, '%1.0f' % window_ext.width, '%1.1f' % yshift)
+            trans_offset = transforms.offset_copy(txt._transform, 
+                                                  fig=axh.figure,
+                                                  y=window_ext.height * score,
+                                                  units='dots')
         trans_offset = bottom_offset
         if yshift > mxy:
             mxy = yshift
 
+    trans_offset = transforms.offset_copy(axh.transData, 
+                                          fig=axh.figure, 
+                                          x=0, y=0, 
+                                          units='dots')    
+    for xi in range(motif.shape[1]):
+        scores = motif.iloc[:, xi]
+        pos_scores = scores[scores > 0].sort_values()
+        neg_scores = (-scores[scores < 0]).sort_values()
+        yshift = 0
+        for yi, (aa, score) in enumerate(neg_scores.items()):
+            if aa in highlightAAs[xi]:
+                color = highlightColor
+            else:
+                color = aa_colors[aa]
+            txt = axh.text(x, 
+                          y, 
+                          aa, 
+                          transform=trans_offset,
+                          fontsize=fontsize, 
+                          color='r',
+                          ha='left',
+                          va='top',
+                          family='monospace')
+            txt.set_path_effects([Scale(1.5, -score)])
+            axh.figure.canvas.draw()
+            window_ext = txt.get_window_extent(txt._renderer)
+            bbox = _extend_bbox(bbox, window_ext)
+            letters[xi].append((txt, window_ext.height * score))
+            last_neg = window_ext
+
+            if yshift == 0:
+                bottom_offset = transforms.offset_copy(txt._transform, 
+                                                      fig=axh.figure,
+                                                      x=window_ext.width * 1.5,
+                                                      units='dots')
+            yshift -= window_ext.height * score
+            
+            # print(xi, aa, '%1.1f' % score, '%1.0f' % window_ext.height, '%1.0f' % window_ext.width, '%1.1f' % yshift)
+            trans_offset = transforms.offset_copy(txt._transform, 
+                                                      fig=axh.figure,
+                                                      y=-window_ext.height * score,
+                                                      units='dots')
+        trans_offset = bottom_offset
+        if yshift < mny:
+            mny = yshift
+        
+
+    if last_neg is None:
+        last_neg = first_pos
     plt.show()
-    bbox = np.array([[first.x0, first.y0], [window_ext.x1, window_ext.y0 + window_ext.height * score]])
+    
+    #bbox = np.array([[first_pos.x0, last_neg.y0], [window_ext.x1, window_ext.y0 + window_ext.height * score]])
     bbox_data = axh.transData.inverted().transform(bbox)
     return letters, bbox, bbox_data
+
+"""Make a simple test motif"""
+test = []
+
+plt.figure(1)
+plt.clf()
+axh1 = plt.subplot(111)
+plotMotif(x=0, y=0, motif=m, axh=axh1)
+plt.ylim((-0.2, 0.2))
+
+plt.figure(2)
+plt.clf()
+axh2 = plt.subplot(111)
+letters, bbox, bbox_data = plotMotif(x=0, y=0, motif=A.T, axh=axh2)
+plt.ylim((-0.2, 0.2))
+plt.plot([bbox_data[0,0], bbox_data[1,0], bbox_data[1,0], bbox_data[0,0], bbox_data[0,0]],
+             [bbox_data[0,1], bbox_data[0,1], bbox_data[1,1], bbox_data[1,1], bbox_data[0,1]], '-k')
 
 def reduceGaps(align, thresh=0.7):
     """Identifies columns with thresh fraction of gaps,
@@ -206,3 +296,72 @@ def reduceGaps(align, thresh=0.7):
         align = align.loc[align.map(lambda seq: seq[pos] == '-')]
 
     return align.map(lambda seq: ''.join([aa for pos, aa in enumerate(seq) if not pos in removePos]))
+
+
+
+import parasail
+
+ssDf = df.loc[(df.PTID.isin(['V006'])) & (df['Timepoint'].isin(['Pre', 'Post']))].dropna(subset=['CDR3gamma'])
+
+
+centroid = 'CATWDRPHDNTTGWFKIF'
+
+gopen, gextend = 3, 3
+
+seqs = ( 'CATWDRPHDNTTGWFKIF',
+         'CAAWDRPHDNTTGWFKIF',
+         'CATWDRPHDNTTGWFNIF',
+         'CAIWDRPHDNTTGWFKIF',
+         'CATWDRPHDNTTGWFMIF',
+         'CATWDRPHDNTTGWSKIF',
+         'CATWDRPHGNTTGWFKIF',
+         'CATWDRPHDNTTGXFKIF',
+         'CATWDRPHDNTTGRFKIF',
+         'CATWDRNTTGWFKIF',
+         'CATWDXNTTGWFKIF',
+         'CATWDLXTTGWFKIF',
+         'CALWAYHTTGWFKIF',
+         'CATWDGGGGATGWFKIF',
+         'CATWDWTGWFKIF',
+         'CATWVSTGWFKIF')
+
+"""Can/should have duplicate sequences to reflect frequencies"""
+reference = ssDf.CDR3gamma.tolist()
+
+def pairwise_alignment_frequencies(centroid, seqs, gopen=3, gextend=3, matrix=parasail.blosum62):
+    alphabet = sorted([aa for aa in skbio.sequence.Protein.alphabet if not aa in '*.'])
+    centroid_query = parasail.profile_create_stats_sat(centroid, matrix=matrix)
+    
+    seq_algn = np.zeros((len(centroid), len(alphabet)))
+    for s in seqs:
+        # a = parasail.nw_trace(centroid, s, open=3, extend=3, matrix=parasail.blosum62)
+        a = parasail.nw_trace_scan_profile_sat(centroid_query, s, open=gopen, extend=gextend)
+        
+        pos = 0
+        for ref_aa, q_aa in zip(a.traceback.ref, a.traceback.query):
+            if not q_aa == '-':
+                seq_algn[pos, alphabet.index(ref_aa)] = seq_algn[pos, alphabet.index(ref_aa)] + 1
+                pos += 1
+    return pd.DataFrame(seq_algn, index=list(centroid), columns=alphabet)
+
+seq_algn = pairwise_alignment_frequencies(centroid, seqs)
+ref_algn = pairwise_alignment_frequencies(centroid, reference)
+
+"""
+p_i is reference
+q_i is observed
+
+A = q * np.log2(q / p) - c(N)
+
+"""
+
+p = (ref_algn.values + 1) / (ref_algn.values + 1).sum(axis=1, keepdims=True)
+q = seq_algn.values / seq_algn.values.sum(axis=1, keepdims=True)
+with warnings.catch_warnings():
+    warnings.simplefilter('ignore')
+    A = q * np.log2(q / p)
+A[np.isnan(A)] = 0
+A = pd.DataFrame(A, index=ref_algn.index, columns=ref_algn.columns)
+
+m = computeMotif(seqs)
+
