@@ -746,7 +746,7 @@ def plotEpitopeMap(respDf, groupDf, uRespCol, groupCol, startCol, endCol, groupO
     #plt.legend(handles, uArms, loc='upper left', fontsize=15, bbox_to_anchor=[1.02, 1.05])
     #plt.legend(handles, uArms, loc='upper right', fontsize=15)
 
-def plotEpitopeChiclets(respDf, groupDf, uRespCol, groupCol, startCol, endCol, uPTIDs=None, groupOrder=None, groupColors=None, epColorCol=None):
+def plotEpitopeChiclets(respDf, groupDf, uRespCol, groupCol, startCol, endCol, uPTIDs=None, groupOrder=None, groupColors=None, epColorCol=None, chiclet_height=0.6):
     if uPTIDs is None:
         uPTIDs = groupDf.ptid.unique().tolist()
         nPTIDs = len(uPTIDs)
@@ -776,7 +776,7 @@ def plotEpitopeChiclets(respDf, groupDf, uRespCol, groupCol, startCol, endCol, u
 
     """Plot map of epitope responses by PTID"""
     plt.clf()
-    axh = plt.axes([0.05, 0.1, 0.9, 0.9])
+    axh = plt.axes([0.05, 0.1, 0.85, 0.9])
     lasty = 0
     yt = []
     for a, color in zip(uArms[::-1], groupColors[::-1]):
@@ -790,13 +790,12 @@ def plotEpitopeChiclets(respDf, groupDf, uRespCol, groupCol, startCol, endCol, u
             rects = []
             for st, en, c in zip(plotDf[startCol], plotDf[endCol], plotDf['EpColor']):
                 L = 5
-                lw = 0.6
                 xloc = np.mean([st, en])
-                xy = (xloc - L/2, y + lasty - lw/2)
+                xy = (xloc - L/2, y + lasty - chiclet_height/2)
 
                 if c == 'None':
                     c = color
-                rects.append(Rectangle(xy, width=L, height=lw, facecolor=c, alpha=1.0, edgecolor='black', lw=0.5))
+                rects.append(Rectangle(xy, width=L, height=chiclet_height, facecolor=c, alpha=1.0, edgecolor='black', lw=0.5))
 
             # Create patch collection with specified colour/alpha
             pc = PatchCollection(rects, match_original=True)
