@@ -8,6 +8,10 @@ import skbio
 import io
 import warnings
 
+import parasail
+
+from svg_logo import svg_logo as SVGMotif
+
 try:
     from muscle import *
 except ImportError:
@@ -18,6 +22,8 @@ __all__ = ['computeMotif',
            'reduceGaps']
 
 _shapely_colors = 'Amino Acids,Color Name,RGB Values,Hexadecimal\nD|E,bright red,"[230,10,10]",E60A0A\nC|M,yellow,"[230,230,0]",E6E600\nK|R,blue,"[20,90,255]",145AFF\nS|T,orange,"[250,150,0]",FA9600\nF|Y,mid blue,"[50,50,170]",3232AA\nN|Q,cyan,"[0,220,220]",00DCDC\nG,light grey,"[235,235,235]",EBEBEB\nL|V|I,green,"[15,130,15]",0F820F\nA,dark grey,"[200,200,200]",C8C8C8\nW,pink,"[180,90,180]",B45AB4\nH,pale blue,"[130,130,210]",8282D2\nP,flesh,"[220,150,130]",DC9682'
+
+__all__ = ['computeMotif', 'computePALMotif', 'plotMotif', 'reduceGaps', 'SVGMotif']
 
 class Scale(matplotlib.patheffects.RendererBase):
     def __init__(self, sx=1., sy=1.):
@@ -266,23 +272,6 @@ def plotMotif(x, y, motif, axh=None, fontsize=16, aa_colors='black', highlightAA
     bbox_data = axh.transData.inverted().transform(bbox)
     return letters, bbox, bbox_data
 
-"""Make a simple test motif"""
-test = []
-
-plt.figure(1)
-plt.clf()
-axh1 = plt.subplot(111)
-plotMotif(x=0, y=0, motif=m, axh=axh1)
-plt.ylim((-0.2, 0.2))
-
-plt.figure(2)
-plt.clf()
-axh2 = plt.subplot(111)
-letters, bbox, bbox_data = plotMotif(x=0, y=0, motif=A.T, axh=axh2)
-plt.ylim((-0.2, 0.2))
-plt.plot([bbox_data[0,0], bbox_data[1,0], bbox_data[1,0], bbox_data[0,0], bbox_data[0,0]],
-             [bbox_data[0,1], bbox_data[0,1], bbox_data[1,1], bbox_data[1,1], bbox_data[0,1]], '-k')
-
 def reduceGaps(align, thresh=0.7):
     """Identifies columns with thresh fraction of gaps,
     removes the sequences that have AAs there and
@@ -297,36 +286,6 @@ def reduceGaps(align, thresh=0.7):
 
     return align.map(lambda seq: ''.join([aa for pos, aa in enumerate(seq) if not pos in removePos]))
 
-
-
-import parasail
-
-ssDf = df.loc[(df.PTID.isin(['V006'])) & (df['Timepoint'].isin(['Pre', 'Post']))].dropna(subset=['CDR3gamma'])
-
-
-centroid = 'CATWDRPHDNTTGWFKIF'
-
-gopen, gextend = 3, 3
-
-seqs = ( 'CATWDRPHDNTTGWFKIF',
-         'CAAWDRPHDNTTGWFKIF',
-         'CATWDRPHDNTTGWFNIF',
-         'CAIWDRPHDNTTGWFKIF',
-         'CATWDRPHDNTTGWFMIF',
-         'CATWDRPHDNTTGWSKIF',
-         'CATWDRPHGNTTGWFKIF',
-         'CATWDRPHDNTTGXFKIF',
-         'CATWDRPHDNTTGRFKIF',
-         'CATWDRNTTGWFKIF',
-         'CATWDXNTTGWFKIF',
-         'CATWDLXTTGWFKIF',
-         'CALWAYHTTGWFKIF',
-         'CATWDGGGGATGWFKIF',
-         'CATWDWTGWFKIF',
-         'CATWVSTGWFKIF')
-
-"""Can/should have duplicate sequences to reflect frequencies"""
-reference = ssDf.CDR3gamma.tolist()
 
 def pairwise_alignment_frequencies(centroid, seqs, gopen=3, gextend=3, matrix=parasail.blosum62):
     alphabet = sorted([aa for aa in skbio.sequence.Protein.alphabet if not aa in '*.'])
@@ -344,24 +303,47 @@ def pairwise_alignment_frequencies(centroid, seqs, gopen=3, gextend=3, matrix=pa
                 pos += 1
     return pd.DataFrame(seq_algn, index=list(centroid), columns=alphabet)
 
-seq_algn = pairwise_alignment_frequencies(centroid, seqs)
-ref_algn = pairwise_alignment_frequencies(centroid, reference)
+def computePALMotif(centroid, seqs, refs, gopen=3, gextend=3, matrix=parasail.blosum62):
+    """Compute pairwise alignments between the centroid and all sequences in seqs and refs. The motif
+    will have the same length as the centroid with log-OR scores indicating how likely it was to see the AA
+    in the seqs vs. the refs.
 
-"""
-p_i is reference
-q_i is observed
+    Parameters
+    ----------
+    centroid : str
+        Amino-acid sequence that is also among the seqs
+    seqs : list
+        List of AA sequences that are all similar to each other and the centroid
+    refs : list
+        List of all other sequences in the experiment as a reference.
+    gopen : int
+        Gap open penalty for parasail
+    gextend : int
+        Gap extend penalty for parasail
+    matrix : substitution matrix
+        Matrix from parasail for the alignment
 
-A = q * np.log2(q / p) - c(N)
+    Returns
+    -------
+    A : pd.DataFrame [AA alphabet x position]
+        A matrix of log-OR scores that can be used directly with the plotPALLogo function"""
 
-"""
+    seq_algn = pairwise_alignment_frequencies(centroid, seqs, gopen=gopen, gextend=gextend, matrix=matrix)
+    ref_algn = pairwise_alignment_frequencies(centroid, refs, gopen=gopen, gextend=gextend, matrix=matrix)
 
-p = (ref_algn.values + 1) / (ref_algn.values + 1).sum(axis=1, keepdims=True)
-q = seq_algn.values / seq_algn.values.sum(axis=1, keepdims=True)
-with warnings.catch_warnings():
-    warnings.simplefilter('ignore')
-    A = q * np.log2(q / p)
-A[np.isnan(A)] = 0
-A = pd.DataFrame(A, index=ref_algn.index, columns=ref_algn.columns)
+    """
+    p_i is reference
+    q_i is observed
 
-m = computeMotif(seqs)
+    A = q * np.log2(q / p) - c(N)
 
+    """
+
+    p = (ref_algn.values + 1) / (ref_algn.values + 1).sum(axis=1, keepdims=True)
+    q = seq_algn.values / seq_algn.values.sum(axis=1, keepdims=True)
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        A = q * np.log2(q / p)
+    A[np.isnan(A)] = 0
+    A = pd.DataFrame(A, index=ref_algn.index, columns=ref_algn.columns)
+    return A.T
