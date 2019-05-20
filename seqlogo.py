@@ -266,23 +266,6 @@ def plotMotif(x, y, motif, axh=None, fontsize=16, aa_colors='black', highlightAA
     bbox_data = axh.transData.inverted().transform(bbox)
     return letters, bbox, bbox_data
 
-"""Make a simple test motif"""
-test = []
-
-plt.figure(1)
-plt.clf()
-axh1 = plt.subplot(111)
-plotMotif(x=0, y=0, motif=m, axh=axh1)
-plt.ylim((-0.2, 0.2))
-
-plt.figure(2)
-plt.clf()
-axh2 = plt.subplot(111)
-letters, bbox, bbox_data = plotMotif(x=0, y=0, motif=A.T, axh=axh2)
-plt.ylim((-0.2, 0.2))
-plt.plot([bbox_data[0,0], bbox_data[1,0], bbox_data[1,0], bbox_data[0,0], bbox_data[0,0]],
-             [bbox_data[0,1], bbox_data[0,1], bbox_data[1,1], bbox_data[1,1], bbox_data[0,1]], '-k')
-
 def reduceGaps(align, thresh=0.7):
     """Identifies columns with thresh fraction of gaps,
     removes the sequences that have AAs there and
@@ -296,72 +279,3 @@ def reduceGaps(align, thresh=0.7):
         align = align.loc[align.map(lambda seq: seq[pos] == '-')]
 
     return align.map(lambda seq: ''.join([aa for pos, aa in enumerate(seq) if not pos in removePos]))
-
-
-
-import parasail
-
-ssDf = df.loc[(df.PTID.isin(['V006'])) & (df['Timepoint'].isin(['Pre', 'Post']))].dropna(subset=['CDR3gamma'])
-
-
-centroid = 'CATWDRPHDNTTGWFKIF'
-
-gopen, gextend = 3, 3
-
-seqs = ( 'CATWDRPHDNTTGWFKIF',
-         'CAAWDRPHDNTTGWFKIF',
-         'CATWDRPHDNTTGWFNIF',
-         'CAIWDRPHDNTTGWFKIF',
-         'CATWDRPHDNTTGWFMIF',
-         'CATWDRPHDNTTGWSKIF',
-         'CATWDRPHGNTTGWFKIF',
-         'CATWDRPHDNTTGXFKIF',
-         'CATWDRPHDNTTGRFKIF',
-         'CATWDRNTTGWFKIF',
-         'CATWDXNTTGWFKIF',
-         'CATWDLXTTGWFKIF',
-         'CALWAYHTTGWFKIF',
-         'CATWDGGGGATGWFKIF',
-         'CATWDWTGWFKIF',
-         'CATWVSTGWFKIF')
-
-"""Can/should have duplicate sequences to reflect frequencies"""
-reference = ssDf.CDR3gamma.tolist()
-
-def pairwise_alignment_frequencies(centroid, seqs, gopen=3, gextend=3, matrix=parasail.blosum62):
-    alphabet = sorted([aa for aa in skbio.sequence.Protein.alphabet if not aa in '*.'])
-    centroid_query = parasail.profile_create_stats_sat(centroid, matrix=matrix)
-    
-    seq_algn = np.zeros((len(centroid), len(alphabet)))
-    for s in seqs:
-        # a = parasail.nw_trace(centroid, s, open=3, extend=3, matrix=parasail.blosum62)
-        a = parasail.nw_trace_scan_profile_sat(centroid_query, s, open=gopen, extend=gextend)
-        
-        pos = 0
-        for ref_aa, q_aa in zip(a.traceback.ref, a.traceback.query):
-            if not q_aa == '-':
-                seq_algn[pos, alphabet.index(ref_aa)] = seq_algn[pos, alphabet.index(ref_aa)] + 1
-                pos += 1
-    return pd.DataFrame(seq_algn, index=list(centroid), columns=alphabet)
-
-seq_algn = pairwise_alignment_frequencies(centroid, seqs)
-ref_algn = pairwise_alignment_frequencies(centroid, reference)
-
-"""
-p_i is reference
-q_i is observed
-
-A = q * np.log2(q / p) - c(N)
-
-"""
-
-p = (ref_algn.values + 1) / (ref_algn.values + 1).sum(axis=1, keepdims=True)
-q = seq_algn.values / seq_algn.values.sum(axis=1, keepdims=True)
-with warnings.catch_warnings():
-    warnings.simplefilter('ignore')
-    A = q * np.log2(q / p)
-A[np.isnan(A)] = 0
-A = pd.DataFrame(A, index=ref_algn.index, columns=ref_algn.columns)
-
-m = computeMotif(seqs)
-
