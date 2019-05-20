@@ -172,7 +172,7 @@ def screeplot(df, method='pca', n_components=10, standardize=False, smatFunc=Non
 
 def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
            plotVars='all', standardize=False, smatFunc=None, varThresh=0.1,
-           ldaShrinkage='auto', dropna=False, plotElipse=True):
+           ldaShrinkage='auto', dropna=False, plotElipse=True, colors=None):
     """Perform dimensionality reduction on columns of df using PCA, KPCA or LDA,
     then produce a biplot in two-dimensions.
     
@@ -225,10 +225,9 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
     n_components = max(plotDims) + 1
     xy, pca = _dimReduce(df, method=method, n_components=n_components, standardize=standardize, smatFunc=smatFunc, labels=labels, ldaShrinkage=ldaShrinkage)
 
-    colors = palettable.colorbrewer.get_map('Set1', 'qualitative', min(12, max(3, len(uLabels)))).mpl_colors
-    figh = plt.gcf()
-    figh.clf()
-    axh = figh.add_axes([0.15, 0.15, 0.6, 0.7])
+    if colors is None:
+        colors = palettable.colorbrewer.get_map('Set1', 'qualitative', min(12, max(3, len(uLabels)))).mpl_colors
+    axh = plt.gca()
     axh.axis('on')
     figh.set_facecolor('white')
     annotationParams = dict(xytext=(0, 5), textcoords='offset points', size='medium')
@@ -236,10 +235,11 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
     for i, obs in enumerate(df.index):
         if plotLabels:
             axh.annotate(obs, xy=(xy[i, plotDims[0]], xy[i, plotDims[1]]), **annotationParams)
+    colorArray = np.zeros((1, 3))
     for labi, lab in enumerate(uLabels):
-        col = colors[labi]
+        colorArray[0, :] = colors[labi]
         ind = np.where(labels==lab)[0]
-        axh.scatter(xy[ind, plotDims[0]], xy[ind, plotDims[1]], marker='o', s=50, alpha=alpha, c=col, label=lab)
+        axh.scatter(xy[ind, plotDims[0]], xy[ind, plotDims[1]], marker='o', s=50, alpha=alpha, c=colorArray, label=lab + '(N = %d)' % len(ind))
         #axh.scatter(xy[ind, plotDims[0]].mean(axis=0), xy[ind, plotDims[1]].mean(axis=0), marker='o', s=300, alpha=alpha/1.5, c=col)
         Xvar = xy[ind,:][:, plotDims]
         if len(ind) > 2 and plotElipse:
@@ -257,7 +257,7 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
                             size='small')
     mxx = np.max(np.abs(xy[:, plotDims[0]]))
     mxy = np.max(np.abs(xy[:, plotDims[1]]))
-    scalar = min(mxx, mxy) * 0.8
+    scalar = min(mxx, mxy) * 0.7
     
     if method in ['lda', 'pca']:
         """Project a unit vector for each feature, into the new space"""    
@@ -273,13 +273,20 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
             if v in plotVars and np.any(np.abs(varfracxy[vi,:]) > varThresh):
                 axh.annotate(v, xytext=(arrowx, arrowy), **annotationParams)
 
-    plt.xlabel('%s%d (%1.1f%%)' % (method.upper(), plotDims[0] + 1, pca.explained_variance_ratio_[plotDims[0]] * 100))
-    plt.ylabel('%s%d (%1.1f%%)' % (method.upper(), plotDims[1] + 1, pca.explained_variance_ratio_[plotDims[1]] * 100))
+    plt.xlabel('%s%d (%1.1f%% var. exp.)' % (method.upper(), plotDims[0] + 1, pca.explained_variance_ratio_[plotDims[0]] * 100))
+    plt.ylabel('%s%d (%1.1f%% var. exp.)' % (method.upper(), plotDims[1] + 1, pca.explained_variance_ratio_[plotDims[1]] * 100))
 
     #plt.xticks([0])
     #plt.yticks([0])
+    padding = 0.05
+    xl = plt.xlim()
+    dx = xl[1] - xl[0]
+    plt.xlim((xl[0] - dx*padding, xl[1] + dx*padding))
+    yl = plt.ylim()
+    dy = yl[1] - yl[0]
+    plt.ylim((yl[0] - dy*padding, yl[1] + dy*padding))
     if len(uLabels) > 1:
-        plt.legend(loc=0, bbox_to_anchor=(1, 1))
+        plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
 
 def _test_iris():
     """Import the iris dataset from sklearn, and return as a result"""
