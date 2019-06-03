@@ -171,7 +171,7 @@ def screeplot(df, method='pca', n_components=10, standardize=False, smatFunc=Non
     plt.ylabel('Fraction of\ncomponent variance')
 
 def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
-           plotVars='all', standardize=False, smatFunc=None, varThresh=0.1,
+           plotVars='all', label_order=None, standardize=False, smatFunc=None, varThresh=0.1,
            ldaShrinkage='auto', dropna=False, plotElipse=True, colors=None):
     """Perform dimensionality reduction on columns of df using PCA, KPCA or LDA,
     then produce a biplot in two-dimensions.
@@ -210,6 +210,7 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
 
     if labels is None:
         labels = pd.Series(np.zeros(df.index.shape[0]), index=df.index)
+
     if plotVars == 'all':
         plotVars = df.columns
 
@@ -220,8 +221,10 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
         keepInd = (~df.isnull()).all(axis=1)
         df = df.loc[keepInd]
         labels = labels.loc[keepInd]
-
-    uLabels = np.unique(labels).tolist()
+    if label_order is None:
+        uLabels = np.unique(labels).tolist()
+    else:
+        uLabels = label_order
     n_components = max(plotDims) + 1
     xy, pca = _dimReduce(df, method=method, n_components=n_components, standardize=standardize, smatFunc=smatFunc, labels=labels, ldaShrinkage=ldaShrinkage)
 
@@ -229,7 +232,7 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
         colors = palettable.colorbrewer.get_map('Set1', 'qualitative', min(12, max(3, len(uLabels)))).mpl_colors
     axh = plt.gca()
     axh.axis('on')
-    figh.set_facecolor('white')
+    # figh.set_facecolor('white')
     annotationParams = dict(xytext=(0, 5), textcoords='offset points', size='medium')
     alpha = 0.8
     for i, obs in enumerate(df.index):
