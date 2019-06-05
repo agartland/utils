@@ -242,11 +242,11 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
     for labi, lab in enumerate(uLabels):
         colorArray[0, :] = colors[labi]
         ind = np.where(labels==lab)[0]
-        axh.scatter(xy[ind, plotDims[0]], xy[ind, plotDims[1]], marker='o', s=50, alpha=alpha, c=colorArray, label=lab + '(N = %d)' % len(ind))
+        axh.scatter(xy[ind, plotDims[0]], xy[ind, plotDims[1]], marker='o', s=50, alpha=alpha, c=colorArray, label=str(lab) + '(N = %d)' % len(ind))
         #axh.scatter(xy[ind, plotDims[0]].mean(axis=0), xy[ind, plotDims[1]].mean(axis=0), marker='o', s=300, alpha=alpha/1.5, c=col)
         Xvar = xy[ind,:][:, plotDims]
         if len(ind) > 2 and plotElipse:
-            plot_point_cov(Xvar, ax=axh, color=col, alpha=0.2)
+            plot_point_cov(Xvar, ax=axh, color=colors[labi], alpha=0.2)
     arrowParams = dict(arrowstyle='<-',
                         connectionstyle='Arc3',
                         color='black',
