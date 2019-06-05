@@ -123,6 +123,7 @@ def _dimReduce(df, method='pca', n_components=2, labels=None, standardize=False,
         lda.fit(normed, labels.values)
         lda.explained_variance_ratio_ = np.abs(lda.explained_variance_ratio_) / np.abs(lda.explained_variance_ratio_).sum()
         xy = lda.transform(normed)
+        return xy, lda
     elif method == 'pls':
         if labels is None:
             raise ValueError('labels needed to perform PLS')
