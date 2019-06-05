@@ -155,7 +155,7 @@ def screeplot(df, method='pca', n_components=10, standardize=False, smatFunc=Non
     axh2 = figh.add_subplot(2, 1, 2)
     for compi in range(n_components):
         bottom = 0
-        for dimi, col in zip(list(range(df.shape[1])), itertools.cycle(cm.Set3.colors)):
+        for dimi, col in zip(list(range(df.shape[1])), itertools.cycle(mpl.cm.Set3.colors)):
             height = pca.components_[compi, dimi]**2 / (pca.components_[compi,:]**2).sum()
             if height > 0.01:
                 axh2.bar(left=compi, bottom=bottom, height=height, align='center', color=col)
@@ -228,7 +228,7 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
     xy, pca = _dimReduce(df, method=method, n_components=n_components, standardize=standardize, smatFunc=smatFunc, labels=labels, ldaShrinkage=ldaShrinkage)
 
     if colors is None:
-        colors = cm.Set3.colors
+        colors = mpl.cm.Set3.colors
     axh = plt.gca()
     axh.axis('on')
     # figh.set_facecolor('white')
