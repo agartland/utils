@@ -10,6 +10,8 @@ def plot_point_cov(points, nstd=2, ax=None, **kwargs):
     Plots an `nstd` sigma ellipse based on the mean and covariance of a point
     "cloud" (points, an Nx2 array).
 
+    Credit: https://github.com/joferkington/oost_paper_code/blob/master/error_ellipse.py
+
     Parameters
     ----------
         points : An Nx2 array of the data points.

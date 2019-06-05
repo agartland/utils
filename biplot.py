@@ -3,8 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-import palettable
-from plot_ellipse import plot_point_cov
+from matplotlib.patches import Ellipse
 from sklearn.decomposition import KernelPCA, PCA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from kernel_regression import kernel2dist, dist2kernel
@@ -156,7 +155,7 @@ def screeplot(df, method='pca', n_components=10, standardize=False, smatFunc=Non
     axh2 = figh.add_subplot(2, 1, 2)
     for compi in range(n_components):
         bottom = 0
-        for dimi, col in zip(list(range(df.shape[1])), itertools.cycle(palettable.colorbrewer.qualitative.Set3_12.mpl_colors)):
+        for dimi, col in zip(list(range(df.shape[1])), itertools.cycle(cm.Set3.colors)):
             height = pca.components_[compi, dimi]**2 / (pca.components_[compi,:]**2).sum()
             if height > 0.01:
                 axh2.bar(left=compi, bottom=bottom, height=height, align='center', color=col)
@@ -229,7 +228,7 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
     xy, pca = _dimReduce(df, method=method, n_components=n_components, standardize=standardize, smatFunc=smatFunc, labels=labels, ldaShrinkage=ldaShrinkage)
 
     if colors is None:
-        colors = palettable.colorbrewer.get_map('Set1', 'qualitative', min(12, max(3, len(uLabels)))).mpl_colors
+        colors = cm.Set3.colors
     axh = plt.gca()
     axh.axis('on')
     # figh.set_facecolor('white')
@@ -290,6 +289,69 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
     plt.ylim((yl[0] - dy*padding, yl[1] + dy*padding))
     if len(uLabels) > 1:
         plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
+
+def plot_point_cov(points, nstd=2, ax=None, **kwargs):
+    """
+    Plots an `nstd` sigma ellipse based on the mean and covariance of a point
+    "cloud" (points, an Nx2 array).
+
+    Credit: https://github.com/joferkington/oost_paper_code/blob/master/error_ellipse.py
+
+    Parameters
+    ----------
+        points : An Nx2 array of the data points.
+        nstd : The radius of the ellipse in numbers of standard deviations.
+            Defaults to 2 standard deviations.
+        ax : The axis that the ellipse will be plotted on. Defaults to the 
+            current axis.
+        Additional keyword arguments are pass on to the ellipse patch.
+
+    Returns
+    -------
+        A matplotlib ellipse artist
+    """
+    pos = points.mean(axis=0)
+    cov = np.cov(points, rowvar=False)
+    return plot_cov_ellipse(cov, pos, nstd, ax, **kwargs)
+
+def plot_cov_ellipse(cov, pos, nstd=2, ax=None, **kwargs):
+    """
+    Plots an `nstd` sigma error ellipse based on the specified covariance
+    matrix (`cov`). Additional keyword arguments are passed on to the 
+    ellipse patch artist.
+
+    Parameters
+    ----------
+        cov : The 2x2 covariance matrix to base the ellipse on
+        pos : The location of the center of the ellipse. Expects a 2-element
+            sequence of [x0, y0].
+        nstd : The radius of the ellipse in numbers of standard deviations.
+            Defaults to 2 standard deviations.
+        ax : The axis that the ellipse will be plotted on. Defaults to the 
+            current axis.
+        Additional keyword arguments are pass on to the ellipse patch.
+
+    Returns
+    -------
+        A matplotlib ellipse artist
+    """
+    def eigsorted(cov):
+        vals, vecs = np.linalg.eigh(cov)
+        order = vals.argsort()[::-1]
+        return vals[order], vecs[:, order]
+
+    if ax is None:
+        ax = plt.gca()
+
+    vals, vecs = eigsorted(cov)
+    theta = np.degrees(np.arctan2(*vecs[:, 0][::-1]))
+
+    # Width and height are "full" widths, not radius
+    width, height = 2 * nstd * np.sqrt(vals)
+    ellip = Ellipse(xy=pos, width=width, height=height, angle=theta, **kwargs)
+
+    ax.add_artist(ellip)
+    return ellip
 
 def _test_iris():
     """Import the iris dataset from sklearn, and return as a result"""
