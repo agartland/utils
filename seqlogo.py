@@ -8,6 +8,10 @@ import skbio
 import io
 import warnings
 
+import parasail
+
+from svg_logo import svg_logo as SVGMotif
+
 try:
     from muscle import *
 except ImportError:
@@ -18,6 +22,8 @@ __all__ = ['computeMotif',
            'reduceGaps']
 
 _shapely_colors = 'Amino Acids,Color Name,RGB Values,Hexadecimal\nD|E,bright red,"[230,10,10]",E60A0A\nC|M,yellow,"[230,230,0]",E6E600\nK|R,blue,"[20,90,255]",145AFF\nS|T,orange,"[250,150,0]",FA9600\nF|Y,mid blue,"[50,50,170]",3232AA\nN|Q,cyan,"[0,220,220]",00DCDC\nG,light grey,"[235,235,235]",EBEBEB\nL|V|I,green,"[15,130,15]",0F820F\nA,dark grey,"[200,200,200]",C8C8C8\nW,pink,"[180,90,180]",B45AB4\nH,pale blue,"[130,130,210]",8282D2\nP,flesh,"[220,150,130]",DC9682'
+
+__all__ = ['computeMotif', 'computePALMotif', 'plotMotif', 'reduceGaps', 'SVGMotif']
 
 class Scale(matplotlib.patheffects.RendererBase):
     def __init__(self, sx=1., sy=1.):
@@ -277,5 +283,65 @@ def reduceGaps(align, thresh=0.7):
             removePos.append(pos)
     for pos in removePos:
         align = align.loc[align.map(lambda seq: seq[pos] == '-')]
-
     return align.map(lambda seq: ''.join([aa for pos, aa in enumerate(seq) if not pos in removePos]))
+
+def pairwise_alignment_frequencies(centroid, seqs, gopen=3, gextend=3, matrix=parasail.blosum62):
+    alphabet = sorted([aa for aa in skbio.sequence.Protein.alphabet if not aa in '*.'])
+    centroid_query = parasail.profile_create_stats_sat(centroid, matrix=matrix)
+    
+    seq_algn = np.zeros((len(centroid), len(alphabet)))
+    for s in seqs:
+        # a = parasail.nw_trace(centroid, s, open=3, extend=3, matrix=parasail.blosum62)
+        a = parasail.nw_trace_scan_profile_sat(centroid_query, s, open=gopen, extend=gextend)
+        
+        pos = 0
+        for ref_aa, q_aa in zip(a.traceback.ref, a.traceback.query):
+            if not q_aa == '-':
+                seq_algn[pos, alphabet.index(ref_aa)] = seq_algn[pos, alphabet.index(ref_aa)] + 1
+                pos += 1
+    return pd.DataFrame(seq_algn, index=list(centroid), columns=alphabet)
+
+def computePALMotif(centroid, seqs, refs, gopen=3, gextend=3, matrix=parasail.blosum62):
+    """Compute pairwise alignments between the centroid and all sequences in seqs and refs. The motif
+    will have the same length as the centroid with log-OR scores indicating how likely it was to see the AA
+    in the seqs vs. the refs.
+
+    Parameters
+    ----------
+    centroid : str
+        Amino-acid sequence that is also among the seqs
+    seqs : list
+        List of AA sequences that are all similar to each other and the centroid
+    refs : list
+        List of all other sequences in the experiment as a reference.
+    gopen : int
+        Gap open penalty for parasail
+    gextend : int
+        Gap extend penalty for parasail
+    matrix : substitution matrix
+        Matrix from parasail for the alignment
+
+    Returns
+    -------
+    A : pd.DataFrame [AA alphabet x position]
+        A matrix of log-OR scores that can be used directly with the plotPALLogo function"""
+
+    seq_algn = pairwise_alignment_frequencies(centroid, seqs, gopen=gopen, gextend=gextend, matrix=matrix)
+    ref_algn = pairwise_alignment_frequencies(centroid, refs, gopen=gopen, gextend=gextend, matrix=matrix)
+
+    """
+    p_i is reference
+    q_i is observed
+
+    A = q * np.log2(q / p) - c(N)
+
+    """
+
+    p = (ref_algn.values + 1) / (ref_algn.values + 1).sum(axis=1, keepdims=True)
+    q = seq_algn.values / seq_algn.values.sum(axis=1, keepdims=True)
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        A = q * np.log2(q / p)
+    A[np.isnan(A)] = 0
+    A = pd.DataFrame(A, index=ref_algn.index, columns=ref_algn.columns)
+    return A.T
