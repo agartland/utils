@@ -229,7 +229,7 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
         colors = palettable.colorbrewer.get_map('Set1', 'qualitative', min(12, max(3, len(uLabels)))).mpl_colors
     axh = plt.gca()
     axh.axis('on')
-    figh.set_facecolor('white')
+    # plt.gcf().set_facecolor('white')
     annotationParams = dict(xytext=(0, 5), textcoords='offset points', size='medium')
     alpha = 0.8
     for i, obs in enumerate(df.index):
