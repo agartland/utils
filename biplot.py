@@ -3,8 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-import palettable
-from plot_ellipse import plot_point_cov
+from matplotlib.patches import Ellipse
 from sklearn.decomposition import KernelPCA, PCA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from kernel_regression import kernel2dist, dist2kernel
@@ -124,6 +123,7 @@ def _dimReduce(df, method='pca', n_components=2, labels=None, standardize=False,
         lda.fit(normed, labels.values)
         lda.explained_variance_ratio_ = np.abs(lda.explained_variance_ratio_) / np.abs(lda.explained_variance_ratio_).sum()
         xy = lda.transform(normed)
+        return xy, lda
     elif method == 'pls':
         if labels is None:
             raise ValueError('labels needed to perform PLS')
@@ -156,7 +156,7 @@ def screeplot(df, method='pca', n_components=10, standardize=False, smatFunc=Non
     axh2 = figh.add_subplot(2, 1, 2)
     for compi in range(n_components):
         bottom = 0
-        for dimi, col in zip(list(range(df.shape[1])), itertools.cycle(palettable.colorbrewer.qualitative.Set3_12.mpl_colors)):
+        for dimi, col in zip(list(range(df.shape[1])), itertools.cycle(mpl.cm.Set3.colors)):
             height = pca.components_[compi, dimi]**2 / (pca.components_[compi,:]**2).sum()
             if height > 0.01:
                 axh2.bar(left=compi, bottom=bottom, height=height, align='center', color=col)
@@ -171,7 +171,7 @@ def screeplot(df, method='pca', n_components=10, standardize=False, smatFunc=Non
     plt.ylabel('Fraction of\ncomponent variance')
 
 def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
-           plotVars='all', standardize=False, smatFunc=None, varThresh=0.1,
+           plotVars='all', label_order=None, standardize=False, smatFunc=None, varThresh=0.1,
            ldaShrinkage='auto', dropna=False, plotElipse=True, colors=None):
     """Perform dimensionality reduction on columns of df using PCA, KPCA or LDA,
     then produce a biplot in two-dimensions.
@@ -210,6 +210,7 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
 
     if labels is None:
         labels = pd.Series(np.zeros(df.index.shape[0]), index=df.index)
+
     if plotVars == 'all':
         plotVars = df.columns
 
@@ -220,16 +221,19 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
         keepInd = (~df.isnull()).all(axis=1)
         df = df.loc[keepInd]
         labels = labels.loc[keepInd]
-
-    uLabels = np.unique(labels).tolist()
+    if label_order is None:
+        uLabels = np.unique(labels).tolist()
+    else:
+        uLabels = label_order
     n_components = max(plotDims) + 1
     xy, pca = _dimReduce(df, method=method, n_components=n_components, standardize=standardize, smatFunc=smatFunc, labels=labels, ldaShrinkage=ldaShrinkage)
 
     if colors is None:
-        colors = palettable.colorbrewer.get_map('Set1', 'qualitative', min(12, max(3, len(uLabels)))).mpl_colors
+        colors = mpl.cm.Set3.colors
     axh = plt.gca()
     axh.axis('on')
     # plt.gcf().set_facecolor('white')
+
     annotationParams = dict(xytext=(0, 5), textcoords='offset points', size='medium')
     alpha = 0.8
     for i, obs in enumerate(df.index):
@@ -239,11 +243,11 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
     for labi, lab in enumerate(uLabels):
         colorArray[0, :] = colors[labi]
         ind = np.where(labels==lab)[0]
-        axh.scatter(xy[ind, plotDims[0]], xy[ind, plotDims[1]], marker='o', s=50, alpha=alpha, c=colorArray, label=lab + '(N = %d)' % len(ind))
+        axh.scatter(xy[ind, plotDims[0]], xy[ind, plotDims[1]], marker='o', s=50, alpha=alpha, c=colorArray, label=str(lab) + '(N = %d)' % len(ind))
         #axh.scatter(xy[ind, plotDims[0]].mean(axis=0), xy[ind, plotDims[1]].mean(axis=0), marker='o', s=300, alpha=alpha/1.5, c=col)
         Xvar = xy[ind,:][:, plotDims]
         if len(ind) > 2 and plotElipse:
-            plot_point_cov(Xvar, ax=axh, color=col, alpha=0.2)
+            plot_point_cov(Xvar, ax=axh, color=colors[labi], alpha=0.2)
     arrowParams = dict(arrowstyle='<-',
                         connectionstyle='Arc3',
                         color='black',
@@ -287,6 +291,69 @@ def biplot(df, labels=None, method='pca', plotLabels=True, plotDims=[0, 1],
     plt.ylim((yl[0] - dy*padding, yl[1] + dy*padding))
     if len(uLabels) > 1:
         plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
+
+def plot_point_cov(points, nstd=2, ax=None, **kwargs):
+    """
+    Plots an `nstd` sigma ellipse based on the mean and covariance of a point
+    "cloud" (points, an Nx2 array).
+
+    Credit: https://github.com/joferkington/oost_paper_code/blob/master/error_ellipse.py
+
+    Parameters
+    ----------
+        points : An Nx2 array of the data points.
+        nstd : The radius of the ellipse in numbers of standard deviations.
+            Defaults to 2 standard deviations.
+        ax : The axis that the ellipse will be plotted on. Defaults to the 
+            current axis.
+        Additional keyword arguments are pass on to the ellipse patch.
+
+    Returns
+    -------
+        A matplotlib ellipse artist
+    """
+    pos = points.mean(axis=0)
+    cov = np.cov(points, rowvar=False)
+    return plot_cov_ellipse(cov, pos, nstd, ax, **kwargs)
+
+def plot_cov_ellipse(cov, pos, nstd=2, ax=None, **kwargs):
+    """
+    Plots an `nstd` sigma error ellipse based on the specified covariance
+    matrix (`cov`). Additional keyword arguments are passed on to the 
+    ellipse patch artist.
+
+    Parameters
+    ----------
+        cov : The 2x2 covariance matrix to base the ellipse on
+        pos : The location of the center of the ellipse. Expects a 2-element
+            sequence of [x0, y0].
+        nstd : The radius of the ellipse in numbers of standard deviations.
+            Defaults to 2 standard deviations.
+        ax : The axis that the ellipse will be plotted on. Defaults to the 
+            current axis.
+        Additional keyword arguments are pass on to the ellipse patch.
+
+    Returns
+    -------
+        A matplotlib ellipse artist
+    """
+    def eigsorted(cov):
+        vals, vecs = np.linalg.eigh(cov)
+        order = vals.argsort()[::-1]
+        return vals[order], vecs[:, order]
+
+    if ax is None:
+        ax = plt.gca()
+
+    vals, vecs = eigsorted(cov)
+    theta = np.degrees(np.arctan2(*vecs[:, 0][::-1]))
+
+    # Width and height are "full" widths, not radius
+    width, height = 2 * nstd * np.sqrt(vals)
+    ellip = Ellipse(xy=pos, width=width, height=height, angle=theta, **kwargs)
+
+    ax.add_artist(ellip)
+    return ellip
 
 def _test_iris():
     """Import the iris dataset from sklearn, and return as a result"""
