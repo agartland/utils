@@ -19,11 +19,11 @@ except ImportError:
 
 __all__ = ['computeMotif',
            'plotMotif',
-           'reduceGaps']
+           'reduceGaps',
+           'computePALMotif',
+           'SVGMotif']
 
 _shapely_colors = 'Amino Acids,Color Name,RGB Values,Hexadecimal\nD|E,bright red,"[230,10,10]",E60A0A\nC|M,yellow,"[230,230,0]",E6E600\nK|R,blue,"[20,90,255]",145AFF\nS|T,orange,"[250,150,0]",FA9600\nF|Y,mid blue,"[50,50,170]",3232AA\nN|Q,cyan,"[0,220,220]",00DCDC\nG,light grey,"[235,235,235]",EBEBEB\nL|V|I,green,"[15,130,15]",0F820F\nA,dark grey,"[200,200,200]",C8C8C8\nW,pink,"[180,90,180]",B45AB4\nH,pale blue,"[130,130,210]",8282D2\nP,flesh,"[220,150,130]",DC9682'
-
-__all__ = ['computeMotif', 'computePALMotif', 'plotMotif', 'reduceGaps', 'SVGMotif']
 
 class Scale(matplotlib.patheffects.RendererBase):
     def __init__(self, sx=1., sy=1.):
@@ -338,12 +338,14 @@ def computePALMotif(centroid, seqs, refs, gopen=3, gextend=3, matrix=parasail.bl
     A = q * np.log2(q / p) - c(N)
 
     """
-
+    """Adding 1 to avoid inf's, but this should be studied more carefully"""
     p = (ref_algn.values + 1) / (ref_algn.values + 1).sum(axis=1, keepdims=True)
-    q = seq_algn.values / seq_algn.values.sum(axis=1, keepdims=True)
+    q = (seq_algn.values) / (seq_algn.values).sum(axis=1, keepdims=True)
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
-        A = q * np.log2(q / p)
+        A = q * np.log2(q/p)
     A[np.isnan(A)] = 0
     A = pd.DataFrame(A, index=ref_algn.index, columns=ref_algn.columns)
+    #pdf = pd.DataFrame(p, index=ref_algn.index, columns=ref_algn.columns)
+    #qdf = pd.DataFrame(q, index=ref_algn.index, columns=ref_algn.columns)
     return A.T

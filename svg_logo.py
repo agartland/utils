@@ -50,7 +50,7 @@ def svg_logo(motif, filename, aa_colors='black', highlightAAs=None, highlightCol
     H,W = 30, motif.shape[0] * X / 2
     Z = H/2
     
-    dwg = svgwrite.Drawing(filename=filename, height=H*cm, width=W*cm)# % int(a.shape[1]*1))
+    dwg = svgwrite.Drawing(filename=filename, height='100%', width='100%')#, viewBox='0 0 100 100')# % int(a.shape[1]*1))
 
     if highlightAAs is None:
         highlightAAs = ['' for i in range(motif.shape[1])]

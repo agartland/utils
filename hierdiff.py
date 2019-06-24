@@ -131,7 +131,7 @@ def getClusterMembers(Z):
     members = {i:_getIndices(clusters, i) for i in range(Z.shape[0] + 1, max(clusters.keys()) + 1)}
     return members
 
-def plotHClustProportions(figh, Z, resDf, alpha_col='pvalue', alpha=0.05, colors=None, ann='N', xLim=None, maxY=None):
+def plotHClustProportions(figh, Z, resDf, alpha_col='pvalue', alpha=0.05, colors=None, ann='N', xLim=None, maxY=None, min_count=20):
     """Plot tree of linkage-based hierarchical clustering, with nodes colored with stacked bars
     representing proportion of cluster members associated with specific conditions. Nodes also optionally
     annotated with pvalue, number of members or cluster ID.
@@ -174,7 +174,9 @@ def plotHClustProportions(figh, Z, resDf, alpha_col='pvalue', alpha=0.05, colors
         cid = int(hex_cid, 16)
         xx = np.array(xx) / 10
         axh.plot(xx, yy, zorder=1, lw=0.5, color='k', alpha=1)
-        if resDf.loc[cid, alpha_col] <= alpha:
+
+        N = np.sum(resDf.loc[cid, 'observed'])
+        if alpha is None or resDf.loc[cid, alpha_col] <= alpha and N > min_count:
             obs = np.asarray(resDf.loc[cid, 'observed_prop'])
             obs = obs / np.sum(obs)
             L = (xx[2] - xx[1])
@@ -189,7 +191,7 @@ def plotHClustProportions(figh, Z, resDf, alpha_col='pvalue', alpha=0.05, colors
                          solid_capstyle='butt')
                 curX += L*obs[i]
             if ann == 'N':
-                s = '%1.0f' % np.sum(resDf.loc[cid, 'observed'])
+                s = '%1.0f' % N
             elif ann == 'CID':
                 s = cid
             elif ann == 'alpha':
@@ -203,7 +205,7 @@ def plotHClustProportions(figh, Z, resDf, alpha_col='pvalue', alpha=0.05, colors
                 annotateCount += 1
                 axh.annotate(s,
                              xy=xy,
-                             size='xx-small',
+                             size='x-small',
                              horizontalalignment='center',
                              verticalalignment='center')
             if lowestY is None or yy[1] < lowestY:
