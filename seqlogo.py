@@ -283,9 +283,7 @@ def reduceGaps(align, thresh=0.7):
             removePos.append(pos)
     for pos in removePos:
         align = align.loc[align.map(lambda seq: seq[pos] == '-')]
-
     return align.map(lambda seq: ''.join([aa for pos, aa in enumerate(seq) if not pos in removePos]))
-
 
 def pairwise_alignment_frequencies(centroid, seqs, gopen=3, gextend=3, matrix=parasail.blosum62):
     alphabet = sorted([aa for aa in skbio.sequence.Protein.alphabet if not aa in '*.'])
