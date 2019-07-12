@@ -1,4 +1,5 @@
 import numpy as np
+from scipy import stats
 
 __all__ = ['unique_rows',
             'argrank',
@@ -64,15 +65,16 @@ def untangle(y_orig, y_tangled, rtol=0.001):
     # assert newy == yo
     return untanglei
 
-def argrank(vec):
+def argrank(vec, method='average'):
     """Return the rank (0 based) of the elements in vec"""
-    sorti = np.argsort(vec)
+    return stats.rankdata(vec, method=method)
+    '''sorti = np.argsort(vec)
     ranks = np.empty(len(vec), int)
     try:
         ranks[sorti] = np.arange(len(vec))
     except IndexError:
         ranks[sorti.values] = np.arange(len(vec))
-    return ranks
+    return ranks'''
 def mnmx(arr):
     """Shortcut to return both the min and the max of arr"""
     return (np.min(arr), np.max(arr))
