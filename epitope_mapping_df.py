@@ -679,7 +679,7 @@ def plotEpitopeMap(respDf, groupDf, uRespCol, groupCol, startCol, endCol, groupO
 
     """Plot map of epitope responses by PTID"""
     plt.clf()
-    axh = plt.axes([0.05, 0.1, 0.9, 0.9])
+    axh = plt.axes([0.05, 0.1, 0.9, 0.8])
     np.random.seed(110820)
     lasty = 0
     yt = []
@@ -746,7 +746,7 @@ def plotEpitopeMap(respDf, groupDf, uRespCol, groupCol, startCol, endCol, groupO
     #plt.legend(handles, uArms, loc='upper left', fontsize=15, bbox_to_anchor=[1.02, 1.05])
     #plt.legend(handles, uArms, loc='upper right', fontsize=15)
 
-def plotEpitopeChiclets(respDf, groupDf, uRespCol, groupCol, startCol, endCol, uPTIDs=None, groupOrder=None, groupColors=None, epColorCol=None, chiclet_height=0.6):
+def plotEpitopeChiclets(respDf, groupDf, uRespCol, groupCol, startCol, endCol, uPTIDs=None, groupOrder=None, groupColors=None, epColorCol=None, chiclet_height=0.6, xtick_width=50, fontsize=16):
     if uPTIDs is None:
         uPTIDs = groupDf.ptid.unique().tolist()
         nPTIDs = len(uPTIDs)
@@ -776,7 +776,7 @@ def plotEpitopeChiclets(respDf, groupDf, uRespCol, groupCol, startCol, endCol, u
 
     """Plot map of epitope responses by PTID"""
     plt.clf()
-    axh = plt.axes([0.05, 0.1, 0.85, 0.9])
+    axh = plt.axes([0.05, 0.1, 0.85, 0.8])
     lasty = 0
     yt = []
     for a, color in zip(uArms[::-1], groupColors[::-1]):
@@ -813,7 +813,7 @@ def plotEpitopeChiclets(respDf, groupDf, uRespCol, groupCol, startCol, endCol, u
                      ha='right',
                      va='center',
                      rotation=90,
-                     size=16, weight='heavy',
+                     size=fontsize, weight='heavy',
                      color='black')
         lasty += y + 3
     if (respDf.protein.str.lower().isin(['env', 'gp120', 'gp160'])).all():
@@ -831,18 +831,18 @@ def plotEpitopeChiclets(respDf, groupDf, uRespCol, groupCol, startCol, endCol, u
                          xytext=(0, 10),
                          ha='center',
                          va='bottom',
-                         size='x-large',
+                         size=fontsize,
                          color='black')
 
     # plt.ylabel('Participants', fontsize=16)
     # plt.yticks(yt, ['' for i in range(nPTIDs)])
     plt.yticks(())
     plt.ylim((-1, nPTIDs + 10))
-    plt.xlabel('HIV %s HXB2 Position' % respDf.protein.unique()[0])
+    plt.xlabel('HIV %s HXB2 Position' % respDf.protein.unique()[0], size=fontsize)
     
-    xt = np.arange(0, lims[1] + 50, 50)
+    xt = np.arange(0, lims[1] + xtick_width, xtick_width)
     xt[0] += 1
-    plt.xticks(xt, xt.astype(int), size=12)
+    plt.xticks(xt, xt.astype(int), size=fontsize)
     plt.xlim((-10, lims[1] + 50))
     for s in ['right', 'top', 'left']:
         axh.spines[s].set_visible(False)
