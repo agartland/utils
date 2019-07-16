@@ -831,7 +831,7 @@ def plotEpitopeChiclets(respDf, groupDf, uRespCol, groupCol, startCol, endCol, u
                          xytext=(0, 10),
                          ha='center',
                          va='bottom',
-                         size='medium',
+                         size='x-large',
                          color='black')
 
     # plt.ylabel('Participants', fontsize=16)
