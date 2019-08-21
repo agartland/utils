@@ -3,6 +3,8 @@ from scipy import stats
 import numba
 from numba import jit
 
+__all__ = ['bootstrap_roc', 'bootstrap_twobytwo', 'bootstrap_auc']
+
 @jit(nopython=True, parallel=True, error_model='numpy')
 def bootstrap_twobytwo_jit(pred, obs, nstraps):
     n = pred.shape[0]
@@ -54,6 +56,44 @@ def jackknife_twobytwo_jit(pred, obs):
     return bca_accel_d
 
 def bootstrap_twobytwo(pred, obs, alpha=0.05, n_samples=10000, method='bca'):
+    """Compute stats for a 2x2 table derived from
+    observed and predicted data vectors.
+    
+    Returns two dict of parameters below: one contains point-estimates and one
+    contains upper and lower confidence bounds estimated from bootstrap samples.
+
+    Parameters
+    ----------
+    obs,pred : np.ndarray or pd.Series of shape (n,)
+    alpha : float [0, 1]
+        Specify CI: [alpha/2, 1-alpha/2]
+    n_samples : int
+        Number of bootstrap samples.
+    method : str
+        Specify bias-corrected and accelerated ("bca") or percentile ("pi")
+        bootstrap.
+    
+
+    Returns
+    -------
+    sens : float
+        Sensitivity (1 - false-negative rate)
+    spec : float
+        Specificity (1 - false-positive rate)
+    ppv : float
+        Positive predictive value (1 - false-discovery rate)
+    npv : float
+        Negative predictive value
+    acc : float
+        Accuracy
+    OR : float
+        Odds-ratio of the observed event in the two predicted groups.
+    rr : float
+        Relative rate of the observed event in the two predicted groups.
+    nnt : float
+        Number needed to treat, to prevent one case.
+        (assuming all predicted positives were "treated")"""
+
     alphas = np.array([alpha/2, 1-alpha/2])
     stat_d = bootstrap_twobytwo_jit(pred, obs, nstraps=n_samples)
 
@@ -85,7 +125,7 @@ def bootstrap_twobytwo(pred, obs, alpha=0.05, n_samples=10000, method='bca'):
     
         if np.any(nvals < 10) or np.any(nvals > n_samples-10):
             print('Extreme samples used for %s, results unstable' % k)
-    return ci_d
+    return ostat_d, ci_d
 
 @jit(nopython=True, parallel=True, error_model='numpy')
 def bootstrap_twobytwo_roc_jit(pred_continuous, obs, thresholds, nstraps):
@@ -151,6 +191,43 @@ def jackknife_twobytwo_roc_jit(pred_continuous, obs, thresholds):
     return bca_accel_d
 
 def bootstrap_roc(pred_continuous, obs, n_thresholds=50, alpha=0.05, n_samples=10000, method='bca'):
+    """Compute ROC stats for a continuous predictor using n_thresholds
+    from min(pred_continuous) to max(pred_continuous).
+    
+    Returns two dicts of the parameters below computed at every threshold:
+        (1) point-estimates [n_thrsholds, 1]
+        (2) upper and lower CL from bootstrap samples [n_thresholds, 2]
+
+    Parameters
+    ----------
+    obs,pred : np.ndarray or pd.Series of shape (n,)
+    alpha : float [0, 1]
+        Specify CI: [alpha/2, 1-alpha/2]
+    n_samples : int
+        Number of bootstrap samples.
+    method : str
+        Specify bias-corrected and accelerated ("bca") or percentile ("pi")
+        bootstrap.
+    
+    Returns
+    -------
+    sens : float
+        Sensitivity (1 - false-negative rate)
+    spec : float
+        Specificity (1 - false-positive rate)
+    ppv : float
+        Positive predictive value (1 - false-discovery rate)
+    npv : float
+        Negative predictive value
+    acc : float
+        Accuracy
+    OR : float
+        Odds-ratio of the observed event in the two predicted groups.
+    rr : float
+        Relative rate of the observed event in the two predicted groups.
+    nnt : float
+        Number needed to treat, to prevent one case.
+        (assuming all predicted positives were "treated")"""
     mn, mx = np.min(pred_continuous), np.max(pred_continuous)
     rng = mx - mn
     delta = rng / n_thresholds
@@ -198,14 +275,12 @@ def bootstrap_roc(pred_continuous, obs, n_thresholds=50, alpha=0.05, n_samples=1
     
                 if np.any(nvals < 10) or np.any(nvals > n_samples-10):
                     print('Extreme samples used for %s : %f, results unstable' % (k, thresholds[threshi]))
-    return ci_d
-
+    return ostat_d, ci_d
 
 
 @jit(nopython=True, parallel=True, error_model='numpy')
 def bootstrap_auc_jit(pred_continuous, obs, nstraps):
     n = pred.shape[0]
-
     auc = np.zeros(nstraps)
     for booti in range(nstraps):
         rind = np.random.choice(np.arange(n), n)
@@ -229,6 +304,30 @@ def jackknife_auc_jit(pred_continuous, obs):
     return bca_accel
 
 def bootstrap_auc(pred_continuous, obs, alpha=0.05, n_samples=10000, method='bca'):
+    """Computes ROC AUC for a continuous predictor and provides bootstrap CI.
+    
+    Returns two dicts of the parameters below computed at every threshold:
+        (1) point-estimates [n_thrsholds, 1]
+        (2) upper and lower CL from bootstrap samples [n_thresholds, 2]
+
+    Parameters
+    ----------
+    obs,pred : np.ndarray or pd.Series of shape (n,)
+    alpha : float [0, 1]
+        Specify CI: [alpha/2, 1-alpha/2]
+    n_samples : int
+        Number of bootstrap samples.
+    method : str
+        Specify bias-corrected and accelerated ("bca") or percentile ("pi")
+        bootstrap.
+    
+    Returns
+    -------
+    auc : float
+        Area under the receiver operator curve (AUC-ROC)
+    ci : np.ndarray
+        Lower and upper confidence limit obtained from the bootstrap samples."""
+
     alphas = np.array([alpha/2, 1-alpha/2])
     stat = bootstrap_auc_jit(pred_continuous, obs, nstraps=n_samples)
 
@@ -245,7 +344,6 @@ def bootstrap_auc(pred_continuous, obs, alpha=0.05, n_samples=10000, method='bca
         z0 = stats.distributions.norm.ppf( (np.sum(stat < ostat)) / np.sum(~np.isnan(stat)) )
         zs = z0 + stats.distributions.norm.ppf(alphas).reshape(alphas.shape + (1,) * z0.ndim)
         avals = stats.distributions.norm.cdf(z0 + zs / (1 - bca_accel * zs))
-
 
     non_nan_ind = ~np.isnan(stat)
     nvals = np.round((non_nan_ind.sum() - 1) * avals).astype(int)

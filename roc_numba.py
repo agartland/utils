@@ -3,6 +3,10 @@ import pandas as pd
 from numba import jit, types
 from numba.typed import Dict
 
+__all__ = ['predictor_stats',
+            'roc_stats',
+            'twobytwo_stats']
+
 @jit(nopython=True)
 def twobytwo_jit(pred, obs):
     """Compute stats for a 2x2 table derived from
@@ -135,7 +139,8 @@ def roc_auc(y_true, y_prob):
 
 def predictor_stats(pred, obs):
     """Compute stats for a 2x2 table derived from
-    observed and predicted data vectors
+    observed and predicted data vectors.
+    Returns a dict of parameters below.
 
     Parameters
     ----------
@@ -173,7 +178,6 @@ def roc_stats(pred_continuous, obs, n_thresholds=50):
     """Compute ROC stats for a continuous predictor
     using n_thresholds from min(pred_continuous)
     to max(pred_continuous)
-
 
     Parameters
     ----------
@@ -266,6 +270,7 @@ def _test_2x2():
     pred = np.random.randint(2, size=n)
     obs = np.random.randint(2, size=n)
     print(predictor_stats(pred, obs))
+
 def _test_2x2_stats():
     out = twobytwo_stats_jit(45, 70, 30, 1000)
     print(out)
@@ -282,9 +287,3 @@ def _test_roc():
     out, auc = roc_stats(pred_continuous, obs, n_thresholds=50)
     sk_auc = roc_auc_score(obs, pred_continuous)
     print(out)
-
-"""
-_test_2x2()
-_test_2x2_stats()
-_test_2x2_stats_arr()
-"""
