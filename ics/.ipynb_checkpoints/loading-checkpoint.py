@@ -12,7 +12,10 @@ __all__ = ['parseProcessed',
            'vec2subset',
            'itersubsets',
            'subset2label',
-           'subsetdf']
+           'subsetdf',
+           'applyResponseCriteria',
+           'computeMarginals',
+           'generateGzAPerfExceptions']
 
 def unstackIR(df, uVars):
     """Return a response and magnitude df with one row per ptid
@@ -41,7 +44,7 @@ def _parsePTID(v):
 
 def _parseIR(fn, uVars, mag, subset={}, printUnique=False, sep=','):
     raw = pd.read_csv(fn, dtype={'ptid':str, 'Ptid':str}, skipinitialspace=True, sep=sep)
-    raw = raw.rename_axis({'Ptid':'ptid'}, axis=1)
+    raw = raw.rename({'Ptid':'ptid'}, axis=1)
     raw.loc[:, 'ptid'] = raw.loc[:, 'ptid'].map(_parsePTID)
     allCols = raw.columns.tolist()
     if uVars is None:
@@ -123,7 +126,81 @@ def parseRaw(fn):
     df = pdf['mag'].reset_index().join(ndf['bg'], on=ctrlCols)
     return df
 
-def compressSubsets(df, subset=['IFNg', '2', 'TNFa'], indexCols=['sample', 'visitno', 'testdt', 'tcellsub', 'nsub', 'antigen', 'nrepl'], groups=None, magCol='cytnum'):
+def generateGzAPerfExceptions(cytokines):
+    """Exclude subsets as positive if they include only GrzA or Perf and no other cytokines"""
+    exceptions = []
+    symLookup = {True:'+', False:'-'}
+    for cys in itertools.product(*((True, False),)*len(cytokines)):
+        """Loop over all combinations of +/- cytokines"""
+        name = ''.join([cy + symLookup[include] for cy, include in zip(cytokines, cys)])
+        if 'GzA-' in name and 'Perf+' in name and name.count('+') == 1:
+            exceptions.append(name)
+        elif 'GzA+' in name and 'Perf-' in name and name.count('+') == 1:
+            exceptions.append(name)
+        elif 'GzA+' in name and 'Perf+' in name and name.count('+') == 2:
+            exceptions.append(name)
+    return exceptions
+
+
+def applyResponseCriteria(df, subset=['IFNg', 'IL2'], ANY=1, indexCols=None, magCols=['cytnum'], nsubCols=['nsub'], exceptions=[]):
+    """Compress cytokine subsets into binary subsets (ie positive/negative)
+    based on criteria such as ANY 1 of IFNg or IL2 (ie IFNg and/or IL2)
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Raw stacked ICS data such that each row is a single data point defined by the columns in indexCols
+    subset : list
+        Cytokines considered for positivity.
+    ANY : int
+        Number of cytokines from subset required to be positive.
+    magCols : list
+        Columns that will be summed in the summary.
+    nsubCols : list
+        Columns that will be median'ed over in the compression.
+        (they should all be identical though, since nsub is same for all cytokine subsets)
+
+    Returns
+    -------
+    aggDf : pd.DataFrame
+        A stacked dataset that has fewer unique cytokine subsets after marginalizing over cytokines not in subset."""
+    
+    """First compress to the relevant cytokines"""
+    cdf = compressSubsets(df, subset=subset, indexCols=indexCols, groups=None, magCols=magCols, nsubCols=nsubCols)
+
+    cytokineSubsets = cdf.cytokine.unique()
+    cytokines = cytokineSubsets[0].replace('-', '+').split('+')[:-1]
+    L = np.array([len(c) for c in cytokines])
+    boolSubsets = np.array([[x[sum(L[:i+1])+i] == '+' for i in range(len(L))] for x in cytokineSubsets], dtype=bool)
+    symLookup = {True:'+', False:'-'}
+
+    
+    base = '{} of {}'.format(ANY, len(subset)) + ' (' + '/'.join([subset2label(ss) for ss in subset]) + ')'
+    pos = base
+    neg = 'NOT ' + base
+    convertLookup = {}
+    for cys in itertools.product(*((True, False),)*len(subset)):
+        """Loop over all combinations of +/- cytokines for the selected subset"""
+        name = ''.join([cy + symLookup[include] for cy, include in zip(subset, cys)])
+        if np.sum(cys) >= ANY and not name in exceptions:
+            convertLookup[name] = pos
+        else:
+            convertLookup[name] = neg
+
+    cdf['cytokine'] = cdf.cytokine.map(convertLookup.get)
+    """Only keep the positive subset"""
+    cdf = cdf.loc[cdf['cytokine'] == pos]
+    """Groupby unique columns and agg-sum across cytokine subsets, then reset index"""
+    out = cdf[indexCols + magCols + ['cytokine']].groupby(indexCols + ['cytokine']).agg(np.sum)
+
+    if not nsubCols is None:
+        nsubDf = cdf[indexCols + nsubCols + ['cytokine']].groupby(indexCols + ['cytokine']).agg(np.median)
+        out = out.join(nsubDf)
+   
+    out = out.reset_index()
+    return out
+
+def compressSubsets(df, subset=['IFNg', '2', 'TNFa'], markerCol='cytokine', indexCols=None, groups=None, magCols=['cytnum'], nsubCols=['nsub']):
     """Combine cell subsets into a smaller number of subsets before performing the analysis.
     Data will be summed-over cytokines not included in the subset list.
 
@@ -138,13 +215,21 @@ def compressSubsets(df, subset=['IFNg', '2', 'TNFa'], indexCols=['sample', 'visi
     groups : dict of lists
         Alternatively, use groups of cytokine subsets to compress (e.g. ANY 1 marker)
         New column names will be the keys in groups.
+    magCols : list
+        Columns that will be summed over in the compression.
+    nsubCols : list
+        Columns that will be median'ed over in the compression.
+        (they should all be identical though, since nsub is same for all cytokine subsets)
 
     Returns
     -------
     aggDf : pd.DataFrame
         A stacked dataset that has fewer unique cytokine subsets after marginalizing over cytokines not in subset."""
+
+    if indexCols is None:
+        indexCols = ['sample', 'visitno', 'testdt', 'tcellsub', 'nsub', 'antigen', 'nrepl']
         
-    cytokineSubsets = df.cytokine.unique()
+    cytokineSubsets = df[markerCol].unique()
     cytokines = cytokineSubsets[0].replace('-', '+').split('+')[:-1]
     L = np.array([len(c) for c in cytokines])
     boolSubsets = np.array([[x[sum(L[:i+1])+i] == '+' for i in range(len(L))] for x in cytokineSubsets], dtype=bool)
@@ -169,15 +254,46 @@ def compressSubsets(df, subset=['IFNg', '2', 'TNFa'], indexCols=['sample', 'visi
         for g in groups:
             convertLookup.update({v:g for v in groups[g]})
     else:
-        print("Need to specify cytokine subsets!")
+        print("Need to specify cytokine/marker subsets!")
         return df
 
-    aggDf = df.copy()
-    aggDf['cytokine'] = aggDf.cytokine.map(convertLookup.get)
+    preDf = df.copy()
+    preDf[markerCol] = preDf[markerCol].map(convertLookup.get)
     """Groupby unique columns and agg-sum across cytokine subsets, then reset index"""
-    aggDf = aggDf[indexCols + [magCol, 'cytokine']].groupby(indexCols + ['cytokine']).agg(sum)
+    aggDf = preDf[indexCols + magCols + [markerCol]].groupby(indexCols + [markerCol]).agg(np.sum)
+    if not nsubCols is None:
+        nsubDf = preDf[indexCols + nsubCols + [markerCol]].groupby(indexCols + [markerCol]).agg(np.median)
+        aggDf = aggDf.join(nsubDf)
     aggDf = aggDf.reset_index()
     return aggDf
+
+def computeMarginals(df, indexCols, markerCol='cytokine', magCols=['cytnum'], nsubCols=['nsub']):
+    """Compress df cytokine subsets to a single subset for each cytokine.
+
+    Parameters
+    ----------
+    df : pd.DataFrame no index
+        Raw or background subtracted ICS data
+    indexCols : list
+        Columns that make each sample unique
+    magCol : str
+        Typically "mag" or "bg"
+
+    Returns
+    -------
+    df : pd.DataFrame
+        Rows for each of the samples that were indexed,
+        and for each cytokine"""
+
+    cytokines = df[markerCol].iloc[0].replace('-', '+').split('+')[:-1]
+    out = []
+    for cy in cytokines:
+        marg = compressSubsets(df, indexCols=indexCols, subset=[cy], magCols=magCols, markerCol=markerCol, nsubCols=nsubCols)
+        marg = marg.loc[marg[markerCol] == cy + '+']
+        out.append(marg)
+    out = pd.concat(out, axis=0)
+    #out.loc[:, magCols] = out
+    return out
 
 def subset2vec(cy):
     vec = np.array([1 if i == '+' else 0 for i in re.findall(r'[\+-]', cy)])
@@ -191,19 +307,38 @@ def vec2subset(vec, cytokines=['IFNg', 'IL2', 'TNFa', 'IL4']):
     return s
 
 def subset2label(s, excludeNeg=False):
-    lookup = {'154': r'CD$154$',
-              '2':r' IL$2$',
-              '4':r' IL$4$',
-              '17':r'IL$17$',
-              'IFNg':r'IFN$\gamma$',
-              'TNFa':r'TNF$\alpha$'}
+    def _convertGreek(s):
+        
+        conv = {'a':r'$\alpha$',
+                'b': r'$\beta$',
+                'g': r'$\gamma$'}
+        return s[:-1] + conv.get(s[-1], s[-1])
+        return s
+    lookup = {'154': 'CD154',
+              'Th2': 'IL4/IL13+',
+              'DR': 'HLA-DR',
+              'GzA+Perf+':'Granzyme A+\nPerforin+',
+              '2':'IL2',
+              '4':'IL4',
+              '17':'IL17',
+              '22':'IL22',
+              'IFNg':'IFNg',
+              'TNFa':'TNFa',
+              'TN':'TNFa',
+              'IF':'IFNg'}
+
     vec = re.findall(r'\w*[\+-]', s)
-    out = ''
-    for cyt in vec:
-        if not excludeNeg or cyt[-1] == '+':
-            cy = lookup.get(cyt[:-1], cyt[:-1])
-            out += '{:<5s}{}\n'.format(cy, cyt[-1])
-    out = out[:-1]
+    if len(vec) == 0:
+        out = _convertGreek(lookup.get(s, s))
+    else:
+        out = ''
+        for cyt in vec:
+            if not excludeNeg or cyt[-1] == '+':
+                cy = lookup.get(cyt[:-1], cyt[:-1])
+                # print(len(cy), '"{:>5s}"'.format(cy))
+                tmp = _convertGreek('{:>5s}'.format(cy)) + '{}\n'.format(cyt[-1])
+                out += tmp
+        out = out[:-1]
     return out
 
 def itersubsets(cytokines):
