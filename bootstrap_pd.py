@@ -2,9 +2,10 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-__all__ = ['bootstrap_pd']
+__all__ = ['bootci_pd',
+           'permtest_pd']
 
-def bootstrap_pd(df, statfunction, alpha=0.05, n_samples=10000, method='bca'):
+def bootci_pd(df, statfunction, alpha=0.05, n_samples=10000, method='bca'):
     """Estimate bootstrap CIs for a statfunction that operates along the rows of
     a pandas.DataFrame and return a dict of results
 
@@ -86,7 +87,68 @@ def bootstrap_pd(df, statfunction, alpha=0.05, n_samples=10000, method='bca'):
 
     return cis
 
-def _test_simple(n_samples=10000, method='bca'):
+def permtest_pd(df, statfunction, perm_cols, n_samples=9999, alternative='two-sided'):
+    """Estimate a p-value for the statfunction against the permutation null.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Observed data required as sole input for statfunction.
+    statfunction : function
+        Operates on df and returns a scalar statistic.
+    perm_cols : list of str
+        Columns that need to be permuted in df to generate a null dataset
+    n_samples : int
+        Number of permutations to test
+    alternative : str
+        Specify a "two-sided" test or one that tests that the observed data is "less" than
+        or "greater" than the null statistics.
+
+    Returns
+    -------
+    pvalue : float"""
+
+    n_samples = int(n_samples)
+    
+    tmp = df.copy()
+    samples = np.zeros(n_samples)
+    for sampi in range(n_samples):
+        rind = np.random.permutation(df.shape[0])
+        tmp.loc[:, perm_cols] = tmp.loc[:, perm_cols].values[rind, :]
+        samples[sampi] = statfunction(tmp)
+    
+    if alternative == 'two-sided':
+        pvalue = ((np.abs(samples) > np.abs(statfunction(df))).sum() + 1) / (n_samples + 1)
+    elif alternative == 'greater':
+        pvalue = ((samples > statfunction(df)).sum() + 1) / (n_samples + 1)
+    elif alternative == 'less':
+        pvalue = ((samples < statfunction(df)).sum() + 1) / (n_samples + 1)
+
+    return pvalue
+
+
+def _test_permtest_pd(effect=0.5, n_samples=9999):
+    from scipy import stats
+    import time
+
+    df = pd.DataFrame(np.random.randn(100, 5))
+    df.loc[:, 0] = np.random.randint(2, size=df.shape[0])
+
+    df.loc[df[0] == 0, 1] = df.loc[df[0] == 0, 1] + effect
+
+    def func(d):
+        return np.mean(d.loc[d[0] == 0, 1]) - np.mean(d.loc[d[0] == 1, 1])
+
+    st = time.time()
+    res = permtest_pd(df, func, perm_cols=[0], n_samples=n_samples)
+    et = (time.time() - st)
+    print(res)
+    print('Time: %1.2f sec' % et)
+
+    print(stats.ttest_ind(df.loc[df[0] == 0, 1], df.loc[df[0] == 1, 1]))
+
+
+def _test_bootci_pd(n_samples=10000, method='bca'):
     import scikits.bootstrap as boot
     import time
 
@@ -96,7 +158,7 @@ def _test_simple(n_samples=10000, method='bca'):
     def func2(d):
         return d.mean()
     st = time.time()
-    res = bootstrap_pd(df, func, alpha=0.05, n_samples=n_samples, method=method)
+    res = bootci_pd(df, func, alpha=0.05, n_samples=n_samples, method=method)
     et = (time.time() - st)
     print(res)
     print('Time: %1.2f sec' % et)
