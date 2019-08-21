@@ -746,7 +746,9 @@ def plotEpitopeMap(respDf, groupDf, uRespCol, groupCol, startCol, endCol, groupO
     #plt.legend(handles, uArms, loc='upper left', fontsize=15, bbox_to_anchor=[1.02, 1.05])
     #plt.legend(handles, uArms, loc='upper right', fontsize=15)
 
-def plotEpitopeChiclets(respDf, groupDf, uRespCol, groupCol, startCol, endCol, uPTIDs=None, groupOrder=None, groupColors=None, epColorCol=None, chiclet_height=0.6, xtick_width=50, fontsize=16):
+def plotEpitopeChiclets(respDf, groupDf, uRespCol, groupCol, startCol, endCol,
+                        uPTIDs=None, groupOrder=None, groupColors=None, epColorCol=None,
+                        chiclet_height=0.6, xtick_width=50, fontsize=16, dropNonresponders=False):
     if uPTIDs is None:
         uPTIDs = groupDf.ptid.unique().tolist()
         nPTIDs = len(uPTIDs)
@@ -771,8 +773,12 @@ def plotEpitopeChiclets(respDf, groupDf, uRespCol, groupCol, startCol, endCol, u
 
     tmp = respDf.drop_duplicates(['ptid', uRespCol])[['ptid', uRespCol]]
     breadthDf = tmp.groupby('ptid')[[uRespCol]].count().reset_index()
-    breadthDf = pd.merge(groupDf[['ptid', groupCol]].drop_duplicates(), breadthDf,
-                         left_on='ptid', right_on='ptid', how='left').fillna(0)
+    if dropNonresponders:
+        breadthDf = pd.merge(groupDf[['ptid', groupCol]].drop_duplicates(), breadthDf,
+                             left_on='ptid', right_on='ptid', how='right').fillna(0)
+    else:
+        breadthDf = pd.merge(groupDf[['ptid', groupCol]].drop_duplicates(), breadthDf,
+                             left_on='ptid', right_on='ptid', how='left').fillna(0)
 
     """Plot map of epitope responses by PTID"""
     plt.clf()

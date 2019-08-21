@@ -5,7 +5,7 @@ import os
 
 __all__ = ['runRscript']
 
-def runRscript(Rcmd, inDf=None, outputFiles=0, removeTempFiles=None):
+def runRscript(Rcmd, inDf=None, outputFiles=0, removeTempFiles=None, Rpath=None):
     """Runs an R cmd with option to provide a DataFrame as input and file
     as output.
 
@@ -24,6 +24,8 @@ def runRscript(Rcmd, inDf=None, outputFiles=0, removeTempFiles=None):
         For debugging. If True then the temporary script and data files will
         always be removed. If None then they will be removed if there is not an error.
         If False they will not be removed.
+    Rpath : str
+        Optionally provide path to Rscript if not on PATH
 
     Returns
     -------
@@ -67,7 +69,10 @@ def runRscript(Rcmd, inDf=None, outputFiles=0, removeTempFiles=None):
 
     """Run the R script and collect output"""
     try:
-        cmdList = ['Rscript', '--vanilla', scriptFn]
+        if Rpath is None:
+            cmdList = ['Rscript', '--vanilla', scriptFn]
+        else:
+            cmdList = [Rpath, '--vanilla', scriptFn]
         res = subprocess.check_output(cmdList, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
         res = bytes('STDOUT:\n%s\nSTDERR:\n%s' % (e.stdout, e.stderr), 'utf-8')
