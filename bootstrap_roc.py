@@ -223,6 +223,7 @@ def jackknife_auc_jit(pred_continuous, obs):
     for i in range(n):
         jind[i] = False
         jstats[i] = roc_auc(obs[jind], pred_continuous[jind])
+        jind[i] = True
     jmean = np.nanmean(jstats)
     bca_accel = np.nansum((jmean - jstats)**3) / (6.0 * np.nansum((jmean - jstats)**2)**1.5)
     return bca_accel
