@@ -192,7 +192,7 @@ def applyResponseCriteria(df, subset=['IFNg', 'IL2'], ANY=1, indexCols=None, mag
     """Groupby unique columns and agg-sum across cytokine subsets, then reset index"""
     out = cdf[indexCols + magCols + ['cytokine']].groupby(indexCols + ['cytokine']).agg(np.sum)
 
-    if not nsubCols is None:
+    if not nsubCols is None and len(nsubCols) > 0:
         nsubDf = cdf[indexCols + nsubCols + ['cytokine']].groupby(indexCols + ['cytokine']).agg(np.median)
         out = out.join(nsubDf)
    
