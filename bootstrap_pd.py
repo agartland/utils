@@ -6,7 +6,8 @@ __all__ = ['bootstrap_pd']
 
 def bootstrap_pd(df, statfunction, alpha=0.05, n_samples=10000, method='bca'):
     """Estimate bootstrap CIs for a statfunction that operates along the rows of
-    a pandas.DataFrame and return a dict of results
+    a pandas.DataFrame and return a dict or pd.Series of results. Returning
+    a dict is typically faster.
 
     This is about 10x slower than using scikits.bootstrap.ci for a statistic
     doesn't require resampling the whole DataFrame. However, if the statistic
