@@ -10,8 +10,10 @@ try:
 except ModuleNotFoundError:
     print('Module "lifelines" could not be imported.')
 
-
-__all__ = ['estCumTE',
+__all__ = [ 'na_est',
+            'CIR_est',
+            'estimate_cumulative_incidence',
+            'estimate_cumulative_incidence_ratio',
             'estCoxPHTE',
             'scoreci',
             'AgrestiScoreVE',
@@ -19,8 +21,115 @@ __all__ = ['estCumTE',
             'diffscoreci',
             'riskscoreci']
 
-def estCumTE(df, treatment_col='treated', duration_col='dx', event_col='disease', followupT=None, alpha=0.05, H1=0, bootstraps=None):
+"""Cumulative incidence estimates/CIs and CIR estimates/CIs match
+those obtained using R code from Michal Juraska, Erika Rudnicki and Doug Grove"""
+
+@numba.jit(nopython=True, parallel=True, error_model='numpy')
+def na_est(T, event, times):
+    """Results match R survit with
+    "fleming-harrington" estimator and "tsiatis" variance"""
+    # sorti = np.argsort(T)
+    # T = T[sorti]
+    # event = event[sorti]
+
+    N = T.shape[0]
+    # uT = np.unique(T)
+    uT = np.sort(np.unique(np.concatenate((T, times))))
+
+    T_count = np.zeros(len(uT))
+    event_count = np.zeros(len(uT))
+    for i in range(len(uT)):
+        ind = T == uT[i]
+        T_count[i] = np.sum(ind)
+        event_count[i] = np.sum(event[ind])
+    at_risk = N - np.cumsum(T_count) + T_count
+
+    cumhaz = np.cumsum(event_count / at_risk)
+    """Variance estimator recommended in Ornulf Borgan paper on NA"""
+    #ch_var = np.cumsum(((at_risk - event_count) * event_count) / ((at_risk - 1) * at_risk**2))
+    
+    """Used by SAS LIFETEST and matches R survfit"""
+    ch_var = np.cumsum(event_count / at_risk**2)
+
+    """Only return at requested times"""
+    cumhaz_out = np.zeros(len(times))
+    var_out = np.zeros(len(times))
+    for i in range(len(times)):
+        ix = np.where(uT == times[i])[0][0]
+        cumhaz_out[i] = cumhaz[ix]
+        var_out[i] = ch_var[ix]
+    return times, cumhaz_out, var_out
+
+@numba.jit(nopython=True, parallel=True)
+def CIR_est(treatment, T, event):
+    tvec = np.unique(T)
+
+    ind = treatment == 1
+    t_cmp, cumhaz_cmp, chvar_cmp = na_est(T[ind], event[ind], tvec)
+    t_ref, cumhaz_ref, chvar_ref = na_est(T[~ind], event[~ind], tvec)
+
+    cuminc_cmp = 1 - np.exp(-cumhaz_cmp)
+    cuminc_ref = 1 - np.exp(-cumhaz_ref)
+
+    se_cuminc_cmp = np.sqrt(chvar_cmp) * np.exp(-cumhaz_cmp)
+    se_cuminc_ref = np.sqrt(chvar_ref) * np.exp(-cumhaz_ref)
+
+    logCIR = np.log( cuminc_cmp ) - np.log( cuminc_ref )
+    se_logCIR = np.sqrt( (se_cuminc_cmp / cuminc_cmp)**2 + (se_cuminc_ref / cuminc_ref)**2 )
+    # se_logCIR = np.sqrt( se_cuminc_cmp / cuminc_cmp**2 + se_cuminc_ref / cuminc_ref**2 )
+
+    """Replace NaN caused by zeros in above step"""
+    cuminc0 = (cuminc_cmp == 0) | (cuminc_ref == 0)  
+    logCIR[cuminc0] = np.nan
+    se_logCIR[cuminc0] = np.nan
+
+    return tvec, logCIR, se_logCIR
+
+def estimate_cumulative_incidence(durations, events, times=None, alpha=0.05):
+    if times is None:
+        times = np.unique(durations)
+    tvec, ch, ch_var = na_est(np.asarray(durations), np.asarray(events), np.asarray(times))
+    criticalz = -stats.norm.ppf(alpha / 2)
+
+    """Match R survfit"""
+    lcl = ch - criticalz * np.sqrt(ch_var)
+    ucl = ch + criticalz * np.sqrt(ch_var)
+
+    """Reccomendation was to compute CI on the log-scale"""
+    #lcl = ch2 * np.exp(-criticalz * (np.sqrt(ch_var) / ch2))
+    #ucl = ch2 * np.exp(criticalz * (np.sqrt(ch_var) / ch2))
+
+    out = pd.DataFrame(dict(cumhaz = ch,
+                            se_cumhz = np.sqrt(ch_var),
+                            cumhaz_lcl = lcl,
+                            cumhaz_ucl = ucl,
+                            cuminc = 1 - np.exp(-ch),
+                            se_cuminc = np.sqrt(ch_var) * np.exp(-ch),
+                            cuminc_lcl = 1 - np.exp(-lcl),
+                            cuminc_ucl = 1 - np.exp(-ucl)), index=tvec)
+    return out
+
+def estimate_cumulative_incidence_ratio(treatment, durations, events, alpha=0.05):
+    criticalz = -stats.norm.ppf(alpha / 2)
+
+    tvec, logCIR, se_logCIR = CIR_est(np.asarray(treatment), np.asarray(durations), np.asarray(events))
+    logCIR_lcl = logCIR - criticalz * se_logCIR
+    logCIR_ucl = logCIR + criticalz * se_logCIR
+    
+    out = pd.DataFrame(dict(CIR = np.exp(logCIR),
+                            se_logCIR = se_logCIR,
+                            CIR_lcl = np.exp(logCIR_lcl),
+                            CIR_ucl = np.exp(logCIR_ucl),
+                            TE = 1 - np.exp(logCIR),
+                            TE_lcl = 1 - np.exp(logCIR_ucl),
+                            TE_ucl = 1 - np.exp(logCIR_lcl), index=tvec))
+    return out
+
+
+def _estCumTE(df, treatment_col='treated', duration_col='dx', event_col='disease', followupT=None, alpha=0.05, H1=0, bootstraps=None):
     """Estimates treatment efficacy using cumulative incidence (CI) Nelson-Aalen (NA) estimators.
+
+    REPLACED BY THE FUNCTIONS ABOVE
 
     TODO:
         (1) Base the p-value and confidence intervals on the NA variance estimator (instead of KM)
