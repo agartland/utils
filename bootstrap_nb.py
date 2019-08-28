@@ -10,7 +10,6 @@ def bootci_nb(dat, statfunction, alpha=0.05, n_samples=10000, method='bca'):
     """Estimate bootstrap CIs for a statfunction that operates along the rows of
     a np.ndarray matrix and returns a np.ndarray vector of results.
 
-
     Parameters
     ----------
     dat : np.ndarray
@@ -59,42 +58,44 @@ def bootci_nb(dat, statfunction, alpha=0.05, n_samples=10000, method='bca'):
         return bca_accel
 
     ostat = statfunction(dat)
+    nstats = len(ostat)
 
     alphas = np.array([alpha/2, 1-alpha/2])
-    boot_res = _bootstrap_jit(dat, statfunction, nstraps=n_samples, nstats=len(ostat))
-
-    # Percentile Interval Method
+    
+    """boot_res.shape --> (n_samples, nstats)"""
+    boot_res = _bootstrap_jit(dat, statfunction, nstraps=n_samples, nstats=nstats)
+    
     if method == 'pi':
+        """Percentile Interval Method
+        avals.shape --> (2, nstats)"""
         avals = np.tile(alphas, (boot_res.shape[1], 1)).T
-    # Bias-Corrected Accelerated Method
     elif method == 'bca':
-        # The value of the statistic function applied just to the actual data.
-        ostat = statfunction(dat)
-        bca_accel = _jackknife_jit(dat, statfunction, len(ostat))
+        """Bias-Corrected Accelerated Method
+        bca_accel.shape --> (nstats, )"""
+        bca_accel = _jackknife_jit(dat, statfunction, nstats)
 
-        """The bias correction value"""
         z0 = stats.distributions.norm.ppf( (np.sum(boot_res < ostat[None, :], axis=0)) / np.sum(~np.isnan(boot_res), axis=0) )
-        zs = z0 + stats.distributions.norm.ppf(alphas).reshape(alphas.shape + (1,) * z0.ndim)
-        avals = stats.distributions.norm.cdf(z0 + zs / (1 - bca_accel * zs))
+        zs = z0[None, :] + stats.distributions.norm.ppf(alphas).reshape(alphas.shape + (1,) * z0.ndim)
+        avals = stats.distributions.norm.cdf(z0[None, :] + zs / (1 - bca_accel[None, :] * zs))
 
     non_nan_ind = ~np.isnan(boot_res)
     nvals = np.round((np.sum(non_nan_ind, axis=0) - 1) * avals).astype(int)
 
     if np.any(np.isnan(nvals)):
         print('Nan values for some stats suggest there is no bootstrap variation.')
-        print(ostat[:10, :])
+        print(boot_res[:10, :])
     
+    """cis.shape --> (nstats, 3)"""
     cis = np.zeros((boot_res.shape[1], len(avals) + 1))
     for i in range(boot_res.shape[1]):
         cis[i, 0] = ostat[i]
-        cis[i, 1:1+len(alphas)] = boot_res[nvals[i], i]
+        cis[i, 1:1+len(alphas)] = boot_res[nvals[:, i], i]
 
     if np.any(nvals < 10) or np.any(nvals > n_samples-10):
         print('Extreme samples used: results unstable')
         print(nvals)
 
-    return ostat, cis
-
+    return cis
 
 def permtest_nb(dat, statfunction, perm_cols, n_samples=9999, alternative='two-sided'):
     """Estimate a p-value for the statfunction against the permutation null.
@@ -167,7 +168,7 @@ def _test_bootci(n_samples=10000, method='bca'):
     
     @jit(nopython=True)
     def func(d):
-        return np.array([np.mean(d[:, 0]), np.median(d[:, 1])])
+        return np.array([np.mean(d[:, 0]), np.median(d[:, 1]), np.max(d[:, 2])])
 
     st = time.time()
     res = bootci_nb(dat, func, alpha=0.05, n_samples=n_samples, method=method)
@@ -178,8 +179,10 @@ def _test_bootci(n_samples=10000, method='bca'):
     st = time.time()
     a = boot.ci(dat[:, 0], statfunction=np.mean, n_samples=n_samples, method=method)
     b = boot.ci(dat[:, 1], statfunction=np.median, n_samples=n_samples, method=method)
+    c = boot.ci(dat[:, 2], statfunction=np.max, n_samples=n_samples, method=method)
     et = (time.time() - st)
 
-    print('MeanA', a)
-    print('MedianB', b)
+    print('Mean_0', a)
+    print('Median_1', b)
+    print('Median_2', c)
     print('Time: %1.2f sec' % et)

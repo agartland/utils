@@ -3,6 +3,8 @@ from scipy import stats
 import numba
 from numba import jit
 
+from roc_numba import roc_auc
+
 __all__ = ['bootstrap_roc', 'bootstrap_twobytwo', 'bootstrap_auc']
 
 @jit(nopython=True, parallel=True, error_model='numpy')
