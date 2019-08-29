@@ -108,7 +108,6 @@ def twobytwo_stats_arr_jit(a, b, c, d):
 
 @jit(nopython=True, parallel=True)
 def roc_stats_jit(pred_continuous, obs, thresholds):
-    """TODO: compute AUC using all values in pred_continuous as thresholds"""
     nthresh = len(thresholds)
     a = np.zeros(nthresh)
     b = np.zeros(nthresh)

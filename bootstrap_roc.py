@@ -1,9 +1,9 @@
 import numpy as np
 from scipy import stats
 import numba
-from numba import jit
+from numba import jit, prange
 
-from roc_numba import roc_auc, twobytwo_jit, twobytwo_stats_arr_jit
+from roc_numba import roc_auc, twobytwo_jit, twobytwo_stats_arr_jit, twobytwo_stats_jit, predictor_stats
 
 __all__ = ['bootstrap_roc', 'bootstrap_twobytwo', 'bootstrap_auc']
 
@@ -15,7 +15,7 @@ def bootstrap_twobytwo_jit(pred, obs, nstraps):
     b = np.zeros(nstraps)
     c = np.zeros(nstraps)
     d = np.zeros(nstraps)
-    for booti in range(nstraps):
+    for booti in prange(nstraps):
         rind = np.random.choice(np.arange(n), n)
         a[booti], b[booti], c[booti], d[booti] = twobytwo_jit(pred[rind], obs[rind])
     out = twobytwo_stats_arr_jit(a, b, c, d)
@@ -129,6 +129,7 @@ def bootstrap_twobytwo(pred, obs, alpha=0.05, n_samples=10000, method='bca'):
             else:
                 nvals = np.round((non_nan_ind.sum() - 1) * avals[k]).astype(int)
                 if np.any(nvals < 10) or np.any(nvals > n_samples-10):
+                    pass
                     print('Extreme samples (%s) used for %s, results unstable' % (nvals, k))
                 ci_d[k] = stat_d[k][non_nan_ind][nvals]
         
@@ -145,9 +146,10 @@ def bootstrap_twobytwo_roc_jit(pred_continuous, obs, thresholds, nstraps):
     d = np.zeros(nstraps)
     
     out = dict()
-    for i, t in enumerate(thresholds):
+    for i in range(len(thresholds)):
+        t = thresholds[i]
         pred = (pred_continuous >= t).astype(np.int_)
-        for booti in range(nstraps):
+        for booti in prange(nstraps):
             rind = np.random.choice(np.arange(n), n)
             a[booti], b[booti], c[booti], d[booti] = twobytwo_jit(pred[rind], obs[rind])
         tmp = twobytwo_stats_arr_jit(a, b, c, d)
@@ -166,7 +168,8 @@ def jackknife_twobytwo_roc_jit(pred_continuous, obs, thresholds):
     nthresh = len(thresholds)
 
     bca_accel_d = dict()
-    for threshi, t in enumerate(thresholds):
+    for threshi in range(thresholds):
+        t = thresholds[threshi]
         pred = (pred_continuous >= t).astype(np.int_)
         a, b, c, d = twobytwo_jit(pred, obs)
         ostat_d = twobytwo_stats_jit(a, b, c, d)
@@ -266,11 +269,12 @@ def bootstrap_roc(pred_continuous, obs, n_thresholds=50, alpha=0.05, n_samples=1
 
     ci_d = dict()
     for k in ostat_d.keys():
-        if k == 'N':
-            ci_d[k] = ostat_d[k][:, None] * np.ones((len(thresholds), len(alphas)))
-        else:
-            ci_d[k] = np.zeros((len(thresholds), len(alphas)))
-            for threshi in range(len(thresholds)):
+        ci_d[k] = ostat_d[k][:, None] * np.ones((len(thresholds), len(alphas)))    
+
+        for threshi in range(len(thresholds)):
+            if np.all(np.isnan(avals[k][threshi, :])):
+                print('No variation in stat %s, thresh %d (%1.2g): LCL = UCL = observed stat' % (k, threshi, thresholds[threshi]))
+            else:
                 non_nan_ind = ~np.isnan(stat_d[k][threshi, :])
                 nvals = np.round((non_nan_ind.sum() - 1) * avals[k][threshi, :])
 
@@ -279,7 +283,7 @@ def bootstrap_roc(pred_continuous, obs, n_thresholds=50, alpha=0.05, n_samples=1
                     ci_d[k][threshi, :] = np.nan
                 else:    
                     ci_d[k][threshi, :] = stat_d[k][threshi, non_nan_ind][nvals.astype(int)]
-    
+
                 if np.any(nvals < 10) or np.any(nvals > n_samples-10):
                     print('Extreme samples used for %s : %f, results unstable' % (k, thresholds[threshi]))
     return ostat_d, ci_d
@@ -289,7 +293,7 @@ def bootstrap_roc(pred_continuous, obs, n_thresholds=50, alpha=0.05, n_samples=1
 def bootstrap_auc_jit(pred_continuous, obs, nstraps):
     n = pred.shape[0]
     auc = np.zeros(nstraps)
-    for booti in range(nstraps):
+    for booti in prange(nstraps):
         rind = np.random.choice(np.arange(n), n)
         auc[booti] = roc_auc(obs[rind], pred_continuous[rind])
     auc.sort()        
@@ -301,11 +305,12 @@ def jackknife_auc_jit(pred_continuous, obs):
     n = pred.shape[0]
 
     jstats = np.zeros(n)
-    jind = np.ones(n, dtype=np.bool_)
-    for i in range(n):
+    #jind = np.ones(n, dtype=np.bool_)
+    for i in prange(n):
+        jind = np.ones(n, dtype=np.bool_)
         jind[i] = False
         jstats[i] = roc_auc(obs[jind], pred_continuous[jind])
-        jind[i] = True
+        #jind[i] = True
     jmean = np.nanmean(jstats)
     bca_accel = np.nansum((jmean - jstats)**3) / (6.0 * np.nansum((jmean - jstats)**2)**1.5)
     return bca_accel
@@ -363,7 +368,9 @@ def bootstrap_auc(pred_continuous, obs, alpha=0.05, n_samples=10000, method='bca
 
 def _test_bca():
     from scikits.bootstrap import ci
-    n = int(100)
+
+    n = int(1000)
+    np.random.seed(110820)
     pred = np.random.randint(2, size=n)
     obs = np.random.randint(2, size=n)
 

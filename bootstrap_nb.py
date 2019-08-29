@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from scipy import stats
-from numba import jit
+from numba import jit, prange
 
 __all__ = ['bootci_nb',
            'permtest_nb']
@@ -17,7 +17,24 @@ def _bootstrap_jit(dat, statfunction, nstraps, nstats):
     for stati in range(nstats):
         res[:, stati].sort()
     return res
-
+'''
+@jit(nopython=True, parallel=True, error_model='numpy')
+def _jackknife_jit(dat, statfunction, nstats):
+    n = dat.shape[0]
+    jstats = np.zeros((n, nstats))
+    #jind = np.ones(n, dtype=np.bool_)
+    for i in prange(n):
+        jind = np.ones(n, dtype=np.bool_)
+        jind[i] = False
+        jstats[i, :] = statfunction(dat[jind, :])
+        #jind[i] = True
+    
+    bca_accel = np.zeros(nstats)
+    for coli in range(nstats):
+        jmean = np.nanmean(jstats[:, coli])
+        bca_accel[coli] = np.nansum((jmean - jstats[:, coli])**3) / (6.0 * np.nansum((jmean - jstats[:, coli])**2)**1.5)
+    return bca_accel
+'''
 @jit(nopython=True, parallel=True, error_model='numpy')
 def _jackknife_jit(dat, statfunction, nstats):
     n = dat.shape[0]
@@ -33,6 +50,8 @@ def _jackknife_jit(dat, statfunction, nstats):
         jmean = np.nanmean(jstats[:, coli])
         bca_accel[coli] = np.nansum((jmean - jstats[:, coli])**3) / (6.0 * np.nansum((jmean - jstats[:, coli])**2)**1.5)
     return bca_accel
+
+
 
 def bootci_nb(dat, statfunction, alpha=0.05, n_samples=10000, method='bca'):
     """Estimate bootstrap CIs for a statfunction that operates along the rows of
@@ -94,12 +113,17 @@ def bootci_nb(dat, statfunction, alpha=0.05, n_samples=10000, method='bca'):
                 print('Extreme samples used for stat %d: [%d, %d]. Results unstable.' % (i, nvals[0,i], nvals[1,i]))
     return cis
 
-@jit(nopython=True, parallel=True)
-def _perm_jit(d_copy, sf, pcs, n):
-    res = sf(d_copy)
+
+@jit(nopython=True, parallel=True, error_model='numpy')
+def _perm_jit(d, sf, pcs, n):
+    res = sf(d)
     samples = np.zeros((len(res), n))
-    for sampi in range(n):
-        rind = np.random.permutation(dat.shape[0])
+    """Using prange here means we have to make a copy of d inside each loop
+    Cost is memory, but this should be fine with reasonably sized matrices.
+    Speed up is about 10x"""
+    for sampi in prange(n):
+        d_copy = d.copy()
+        rind = np.random.permutation(d_copy.shape[0])
         for coli in pcs:
             d_copy[:, coli] = d_copy[rind, coli]
         samples[:, sampi] = sf(d_copy)
@@ -126,7 +150,7 @@ def permtest_nb(dat, statfunction, perm_cols, n_samples=9999, alternative='two-s
     -------
     pvalue : float"""
     
-    samples = _perm_jit(dat.copy(), statfunction, np.array(perm_cols, dtype=int), int(n_samples))    
+    samples = _perm_jit(dat.copy(), statfunction, np.array(perm_cols, dtype=np.int), int(n_samples))    
     if alternative == 'two-sided':
         pvalues = ((np.abs(samples) > np.abs(statfunction(dat)[None, :])).sum(axis=1) + 1) / (n_samples + 1)
     elif alternative == 'greater':
@@ -139,7 +163,7 @@ def _test_permtest(effect=0.5, n_samples=9999):
     from scipy import stats
     import time
 
-    dat = np.random.randn(100, 5)
+    dat = np.random.randn(1000, 5)
     dat[:, 0] = np.random.randint(2, size=dat.shape[0])
 
     dat[dat[:, 0] == 0, 1] = dat[dat[:, 0] == 0, 1] + effect
@@ -148,6 +172,7 @@ def _test_permtest(effect=0.5, n_samples=9999):
     def func(d):
         return np.array([np.mean(d[d[:, 0] == 0, 1]) - np.mean(d[d[:, 0] == 1, 1])])
 
+    res = func(dat)
     st = time.time()
     res = permtest_nb(dat, func, perm_cols=[0], n_samples=n_samples)
     et = (time.time() - st)
@@ -162,7 +187,7 @@ def _test_bootci(n_samples=10000, method='bca'):
     import time
 
     np.random.seed(110820)
-    dat = np.random.randn(100, 5)
+    dat = np.random.randn(1000, 5)
     
     @jit(nopython=True)
     def func(d):
