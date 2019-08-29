@@ -3,6 +3,8 @@ import numpy as np
 from myfisher import *
 from scipy import stats
 
+import numba
+
 try:
     from lifelines import KaplanMeierFitter, NelsonAalenFitter
     from lifelines.statistics import logrank_test
@@ -60,7 +62,7 @@ def na_est(T, event, times):
         var_out[i] = ch_var[ix]
     return times, cumhaz_out, var_out
 
-@numba.jit(nopython=True, parallel=True)
+@numba.jit(nopython=True, parallel=True, error_model='numpy')
 def CIR_est(treatment, T, event):
     tvec = np.unique(T)
 

@@ -3,7 +3,7 @@ from scipy import stats
 import numba
 from numba import jit
 
-from roc_numba import roc_auc
+from roc_numba import roc_auc, twobytwo_jit, twobytwo_stats_arr_jit
 
 __all__ = ['bootstrap_roc', 'bootstrap_twobytwo', 'bootstrap_auc']
 
@@ -118,15 +118,20 @@ def bootstrap_twobytwo(pred, obs, alpha=0.05, n_samples=10000, method='bca'):
 
     ci_d = dict()
     for k in ostat_d.keys():
-        if k == 'N':
+        if np.all(np.isnan(avals[k])):
+            print('No bootstrap variation in %s: LCL = UCL = observed stat' % (k))
             ci_d[k] = ostat_d[k] * np.ones(len(alphas))
         else:
             non_nan_ind = ~np.isnan(stat_d[k])
-            nvals = np.round((non_nan_ind.sum() - 1) * avals[k]).astype(int)
-            ci_d[k] = stat_d[k][non_nan_ind][nvals]
-    
-        if np.any(nvals < 10) or np.any(nvals > n_samples-10):
-            print('Extreme samples used for %s, results unstable' % k)
+            if np.any(np.isnan(avals[k])):
+                print('Unhandled NaNs for %s, results also NaN' % (k))
+                ci_d[k] = np.ones(len(avals[k])) * np.nan
+            else:
+                nvals = np.round((non_nan_ind.sum() - 1) * avals[k]).astype(int)
+                if np.any(nvals < 10) or np.any(nvals > n_samples-10):
+                    print('Extreme samples (%s) used for %s, results unstable' % (nvals, k))
+                ci_d[k] = stat_d[k][non_nan_ind][nvals]
+        
     return ostat_d, ci_d
 
 @jit(nopython=True, parallel=True, error_model='numpy')
