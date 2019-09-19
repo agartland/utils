@@ -85,7 +85,7 @@ def CIR_est(treatment, T, event):
     logCIR[cuminc0] = np.nan
     se_logCIR[cuminc0] = np.nan
 
-    return tvec, logCIR, se_logCIR
+    return tvec, logCIR, se_logCIR, cumhaz_ref, chvar_ref, cumhaz_cmp, chvar_cmp
 
 def estimate_cumulative_incidence(durations, events, times=None, alpha=0.05):
     if times is None:
@@ -114,9 +114,15 @@ def estimate_cumulative_incidence(durations, events, times=None, alpha=0.05):
 def estimate_cumulative_incidence_ratio(treatment, durations, events, alpha=0.05):
     criticalz = -stats.norm.ppf(alpha / 2)
 
-    tvec, logCIR, se_logCIR = CIR_est(np.asarray(treatment), np.asarray(durations), np.asarray(events))
+    tvec, logCIR, se_logCIR, cumhaz_ref, chvar_ref, cumhaz_cmp, chvar_cmp = CIR_est(np.asarray(treatment), 
+                                                                                            np.asarray(durations),
+                                                                                            np.asarray(events))
     logCIR_lcl = logCIR - criticalz * se_logCIR
     logCIR_ucl = logCIR + criticalz * se_logCIR
+
+    """Compute Wald statistic on log-cumulative hazards"""
+    wald_stat = (np.log(cumhaz_cmp) - np.log(cumhaz_ref)) / np.sqrt(np.log(np.sqrt(chvar_ref))**2 + np.log(np.sqrt(chvar_cmp))**2)
+    wald_pvalue = 2 * stats.norm.cdf(-np.abs(wald_stat))
     
     out = pd.DataFrame(dict(CIR = np.exp(logCIR),
                             se_logCIR = se_logCIR,
@@ -124,7 +130,8 @@ def estimate_cumulative_incidence_ratio(treatment, durations, events, alpha=0.05
                             CIR_ucl = np.exp(logCIR_ucl),
                             TE = 1 - np.exp(logCIR),
                             TE_lcl = 1 - np.exp(logCIR_ucl),
-                            TE_ucl = 1 - np.exp(logCIR_lcl), index=tvec))
+                            TE_ucl = 1 - np.exp(logCIR_lcl),
+                            pvalue = wald_pvalue), index=tvec)
     return out
 
 

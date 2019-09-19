@@ -6,10 +6,25 @@ import seaborn as sns
 
 from vectools import untangle
 
+try:
+    import numba as nb
+    from bootstrap_nb import bootci_nb
+    NUMBA = True
+
+    @nb.njit()
+    def _keepdims_mean(dat):
+        return np.array([np.mean(dat[:, 0])])
+
+except ImportError:
+    from scikits.bootstrap import ci
+    NUMBA = False
+
+
 __all__ = ['scatterdots',
            'myboxplot',
            'manyboxplots',
-           'swarmbox']
+           'swarmbox',
+           'discrete_boxplot']
 
 def scatterdots(data, x, axh=None, width=0.8, returnx=False, rseed=820, **kwargs):
     """Dots plotted with random x-coordinates and y-coordinates from data array.
@@ -259,3 +274,71 @@ def swarmbox(x, y, data, hue=None, palette=None, order=None, hue_order=None, con
         plt.legend([plt.Circle(1, color=c, alpha=1) for c in palette], hue_order, title=hue, loc=legend_loc, bbox_to_anchor=legend_bbox)
     if legend_loc is None:
         plt.gca().legend_.remove()
+
+def _xspacing(v, mxWidth=0.3, idealNumPoints=4):
+    xlim = min(mxWidth, (len(v)/idealNumPoints)*mxWidth/2)
+    x = np.linspace(-xlim, xlim, len(v))
+    x = np.random.permutation(x)
+    """Use v*0 so that it has the right labels for apply"""
+    return v*0 + x
+
+def _yjitter(v, jitter=0.3):
+    y = np.linspace(-jitter/2, jitter/2, len(v))
+    y = np.random.permutation(y)
+    return y + v
+
+def discrete_boxplot(x, y, hue, data, palette=None, order=None, hue_order=None, IQR=True):
+    if order is None:
+        order = data[x].unique()
+    if len(order) == 1:
+        xspacing = 2
+    else:
+        xspacing = 1
+    if hue_order is None:
+        hue_order = data[hue].unique()
+    if palette is None:
+        palette = sns.color_palette('Set1', n_colors=len(hue_order))
+    
+    plotx = 0
+    xt = []
+    xtl = []
+    for xval in order:
+        xcoords = []
+        for hueval, color in zip(hue_order, palette):
+            tmp = data.loc[(data[hue] == hueval) & (data[x] == xval), y]
+            if IQR:
+                lcl, mu, ucl = np.percentile(tmp.values, [25, 50, 75])
+            else:
+                if NUMBA:
+                    """bootci_nb requires a 2D matrix and will operate along rows. statfunction needs to return a vector"""
+                    mu, lcl, ucl = bootci_nb(tmp.values[:, None], statfunction=_keepdims_mean, alpha=0.05, n_samples=10000, method='bca')
+                else:
+                    lcl, ucl = ci(tmp.values, statfunction=np.mean, n_samples=10000, method='bca')
+                    mu = np.mean(tmp.values)
+            plt.errorbar(x=plotx,
+                         y=mu,
+                         yerr=np.array([mu - lcl, ucl - mu])[:, None],
+                         fmt='s-',
+                         color=color,
+                         lw=2)
+            yvec = _yjitter(tmp.values)
+            xvec = _xspacing(tmp.values)
+            plt.scatter(xvec + plotx, yvec, s=20, alpha=0.4, color=color, edgecolor='black', linewidth=1)
+            xcoords.append(plotx)
+            plotx += xspacing
+        xt.append(np.median(xcoords))
+        xtl.append(xval)
+        plotx += xspacing
+    
+    plt.ylabel(y)
+    if len(order) > 1:
+        plt.xticks(xt, xtl)
+        plt.xlabel(x)
+    else:
+        plt.xticks(xcoords, hue_order, rotation=45)
+    plt.xlim((-1, np.max(xcoords) + 1))
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.legend([plt.Rectangle((0,0), 1, 1, color=c) for c in palette],
+               hue_order,
+               loc='upper left', bbox_to_anchor=(1,1))
