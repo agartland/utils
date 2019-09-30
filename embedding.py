@@ -101,7 +101,7 @@ def embedDistanceMatrix(dmatDf, method='kpca', n_components=2, **kwargs):
         tsneObj = TSNE(n_components=n_components, metric='precomputed', random_state=0, perplexity=kwargs['perplexity'])
         xy = tsneObj.fit_transform(dmat)
     elif method == 'umap':
-        umapObj = umap.UMAP(n_components=n_components, metric='precomputed', **kwargs)
+        umapObj = umap.UMAP(n_components=n_components, metric='precomputed', random_state=110820, **kwargs)
         xy = umapObj.fit_transform(dmat)
     else:
         print('Method unknown: %s' % method)
