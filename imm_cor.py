@@ -122,6 +122,11 @@ def estimate_cumulative_incidence_ratio(treatment, durations, events, alpha=0.05
     # wald_pvalue = 2 * stats.norm.cdf(-np.abs(wald_stat))
     # print('Wald, no log: %1.3f, p = %1.3f' % (wald_stat[3], wald_pvalue[3]))
 
+    """Compared to computing p-value for logCIR = 0"""
+    # wald_stat = logCIR / se_logCIR
+    # wald_pvalue = 2 * stats.norm.cdf(-np.abs(wald_stat))
+    # print('Wald, log-CIR scale: %1.3g, p = %1.3g' % (wald_stat[3], wald_pvalue[3]))    
+
     """Compute Wald statistic on log-cumulative hazards"""
     """Variance of the log-CH function, by the delta method"""
     log_cumhaz_var_ref = cumhaz_var_ref / cumhaz_ref**2
@@ -129,11 +134,6 @@ def estimate_cumulative_incidence_ratio(treatment, durations, events, alpha=0.05
     wald_stat = (np.log(cumhaz_cmp) - np.log(cumhaz_ref)) / np.sqrt(log_cumhaz_var_ref + log_cumhaz_var_cmp)
     wald_pvalue = 2 * stats.norm.cdf(-np.abs(wald_stat))
     # print('Wald, log-scale: %1.3g, p = %1.3g' % (wald_stat[3], wald_pvalue[3]))
-
-    """Compared to computing p-value for logCIR = 1"""
-    # wald_stat = (logCIR - 1) / se_logCIR
-    # wald_pvalue = 2 * stats.norm.cdf(-np.abs(wald_stat))
-    # print('Wald, log-CIR scale: %1.3g, p = %1.3g' % (wald_stat[3], wald_pvalue[3]))    
     
     out = pd.DataFrame(dict(CIR = np.exp(logCIR),
                             se_logCIR = se_logCIR,
