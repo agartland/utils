@@ -48,10 +48,10 @@ def na_est(T, event, times):
 
     cumhaz = np.cumsum(event_count / at_risk)
     """Variance estimator recommended in Ornulf Borgan paper on NA"""
-    #ch_var = np.cumsum(((at_risk - event_count) * event_count) / ((at_risk - 1) * at_risk**2))
+    #cumhaz_var = np.cumsum(((at_risk - event_count) * event_count) / ((at_risk - 1) * at_risk**2))
     
-    """Used by SAS LIFETEST and matches R survfit"""
-    ch_var = np.cumsum(event_count / at_risk**2)
+    """Used by SAS LIFETEST and matches R survfit error='tsiatis' """
+    cumhaz_var = np.cumsum(event_count / at_risk**2)
 
     """Only return at requested times"""
     cumhaz_out = np.zeros(len(times))
@@ -59,7 +59,7 @@ def na_est(T, event, times):
     for i in range(len(times)):
         ix = np.where(uT == times[i])[0][0]
         cumhaz_out[i] = cumhaz[ix]
-        var_out[i] = ch_var[ix]
+        var_out[i] = cumhaz_var[ix]
     return times, cumhaz_out, var_out
 
 @numba.jit(nopython=True, parallel=True, error_model='numpy')
@@ -67,46 +67,43 @@ def CIR_est(treatment, T, event):
     tvec = np.unique(T)
 
     ind = treatment == 1
-    t_cmp, cumhaz_cmp, chvar_cmp = na_est(T[ind], event[ind], tvec)
-    t_ref, cumhaz_ref, chvar_ref = na_est(T[~ind], event[~ind], tvec)
+    t_cmp, cumhaz_cmp, cumhaz_var_cmp = na_est(T[ind], event[ind], tvec)
+    t_ref, cumhaz_ref, cumhaz_var_ref = na_est(T[~ind], event[~ind], tvec)
 
     cuminc_cmp = 1 - np.exp(-cumhaz_cmp)
     cuminc_ref = 1 - np.exp(-cumhaz_ref)
 
-    se_cuminc_cmp = np.sqrt(chvar_cmp) * np.exp(-cumhaz_cmp)
-    se_cuminc_ref = np.sqrt(chvar_ref) * np.exp(-cumhaz_ref)
+    se_cuminc_cmp = np.sqrt(cumhaz_var_cmp) * np.exp(-cumhaz_cmp)
+    se_cuminc_ref = np.sqrt(cumhaz_var_ref) * np.exp(-cumhaz_ref)
 
     logCIR = np.log( cuminc_cmp ) - np.log( cuminc_ref )
+    """Matches Juraska code"""
     se_logCIR = np.sqrt( (se_cuminc_cmp / cuminc_cmp)**2 + (se_cuminc_ref / cuminc_ref)**2 )
-    # se_logCIR = np.sqrt( se_cuminc_cmp / cuminc_cmp**2 + se_cuminc_ref / cuminc_ref**2 )
+
 
     """Replace NaN caused by zeros in above step"""
     cuminc0 = (cuminc_cmp == 0) | (cuminc_ref == 0)  
     logCIR[cuminc0] = np.nan
     se_logCIR[cuminc0] = np.nan
 
-    return tvec, logCIR, se_logCIR, cumhaz_ref, chvar_ref, cumhaz_cmp, chvar_cmp
+    return tvec, logCIR, se_logCIR, cumhaz_ref, cumhaz_var_ref, cumhaz_cmp, cumhaz_var_cmp
 
 def estimate_cumulative_incidence(durations, events, times=None, alpha=0.05):
     if times is None:
         times = np.unique(durations)
-    tvec, ch, ch_var = na_est(np.asarray(durations), np.asarray(events), np.asarray(times))
+    tvec, ch, cumhaz_var = na_est(np.asarray(durations), np.asarray(events), np.asarray(times))
     criticalz = -stats.norm.ppf(alpha / 2)
 
-    """Match R survfit"""
-    lcl = ch - criticalz * np.sqrt(ch_var)
-    ucl = ch + criticalz * np.sqrt(ch_var)
-
-    """Reccomendation was to compute CI on the log-scale"""
-    #lcl = ch2 * np.exp(-criticalz * (np.sqrt(ch_var) / ch2))
-    #ucl = ch2 * np.exp(criticalz * (np.sqrt(ch_var) / ch2))
+    """Matches R survfit"""
+    lcl = ch - criticalz * np.sqrt(cumhaz_var)
+    ucl = ch + criticalz * np.sqrt(cumhaz_var)
 
     out = pd.DataFrame(dict(cumhaz = ch,
-                            se_cumhz = np.sqrt(ch_var),
+                            se_cumhz = np.sqrt(cumhaz_var),
                             cumhaz_lcl = lcl,
                             cumhaz_ucl = ucl,
                             cuminc = 1 - np.exp(-ch),
-                            se_cuminc = np.sqrt(ch_var) * np.exp(-ch),
+                            se_cuminc = np.sqrt(cumhaz_var) * np.exp(-ch),
                             cuminc_lcl = 1 - np.exp(-lcl),
                             cuminc_ucl = 1 - np.exp(-ucl)), index=tvec)
     return out
@@ -114,15 +111,29 @@ def estimate_cumulative_incidence(durations, events, times=None, alpha=0.05):
 def estimate_cumulative_incidence_ratio(treatment, durations, events, alpha=0.05):
     criticalz = -stats.norm.ppf(alpha / 2)
 
-    tvec, logCIR, se_logCIR, cumhaz_ref, chvar_ref, cumhaz_cmp, chvar_cmp = CIR_est(np.asarray(treatment), 
+    tvec, logCIR, se_logCIR, cumhaz_ref, cumhaz_var_ref, cumhaz_cmp, cumhaz_var_cmp = CIR_est(np.asarray(treatment), 
                                                                                             np.asarray(durations),
                                                                                             np.asarray(events))
     logCIR_lcl = logCIR - criticalz * se_logCIR
     logCIR_ucl = logCIR + criticalz * se_logCIR
 
+    """Compute Wald statistic without log transformation"""
+    # wald_stat = (cumhaz_cmp - cumhaz_ref) / np.sqrt(cumhaz_var_ref + cumhaz_var_cmp)
+    # wald_pvalue = 2 * stats.norm.cdf(-np.abs(wald_stat))
+    # print('Wald, no log: %1.3f, p = %1.3f' % (wald_stat[3], wald_pvalue[3]))
+
     """Compute Wald statistic on log-cumulative hazards"""
-    wald_stat = (np.log(cumhaz_cmp) - np.log(cumhaz_ref)) / np.sqrt(np.log(np.sqrt(chvar_ref))**2 + np.log(np.sqrt(chvar_cmp))**2)
+    """Variance of the log-CH function, by the delta method"""
+    log_cumhaz_var_ref = cumhaz_var_ref / cumhaz_ref**2
+    log_cumhaz_var_cmp = cumhaz_var_cmp / cumhaz_cmp**2
+    wald_stat = (np.log(cumhaz_cmp) - np.log(cumhaz_ref)) / np.sqrt(log_cumhaz_var_ref + log_cumhaz_var_cmp)
     wald_pvalue = 2 * stats.norm.cdf(-np.abs(wald_stat))
+    # print('Wald, log-scale: %1.3g, p = %1.3g' % (wald_stat[3], wald_pvalue[3]))
+
+    """Compared to computing p-value for logCIR = 1"""
+    # wald_stat = (logCIR - 1) / se_logCIR
+    # wald_pvalue = 2 * stats.norm.cdf(-np.abs(wald_stat))
+    # print('Wald, log-CIR scale: %1.3g, p = %1.3g' % (wald_stat[3], wald_pvalue[3]))    
     
     out = pd.DataFrame(dict(CIR = np.exp(logCIR),
                             se_logCIR = se_logCIR,
