@@ -110,7 +110,7 @@ def estimate_cumulative_incidence(durations, events, times=None, alpha=0.05):
                             cuminc_ucl = 1 - np.exp(-ucl)), index=tvec)
     return out
 
-def estimate_cumulative_incidence_ratio(treatment, durations, events, alpha=0.05):
+def estimate_cumulative_incidence_ratio(treatment, durations, events, alpha=0.05, cir0=1):
     criticalz = -stats.norm.ppf(alpha / 2)
 
     tvec, logCIR, se_logCIR, cumhaz_ref, cumhaz_var_ref, cumhaz_cmp, cumhaz_var_cmp = CIR_est(np.asarray(treatment), 
@@ -119,21 +119,22 @@ def estimate_cumulative_incidence_ratio(treatment, durations, events, alpha=0.05
     logCIR_lcl = logCIR - criticalz * se_logCIR
     logCIR_ucl = logCIR + criticalz * se_logCIR
 
-    """Compute Wald statistic without log transformation"""
+    """Compute Wald statistic without log transformation:
+    this is actually testing the difference of cumulative hazard functions"""
     # wald_stat = (cumhaz_cmp - cumhaz_ref) / np.sqrt(cumhaz_var_ref + cumhaz_var_cmp)
     # wald_pvalue = 2 * stats.norm.cdf(-np.abs(wald_stat))
     # print('Wald, no log: %1.3f, p = %1.3f' % (wald_stat[3], wald_pvalue[3]))
 
     """Compared to computing p-value for logCIR = 0"""
-    # wald_stat = logCIR / se_logCIR
-    # wald_pvalue = 2 * stats.norm.cdf(-np.abs(wald_stat))
-    # print('Wald, log-CIR scale: %1.3g, p = %1.3g' % (wald_stat[3], wald_pvalue[3]))    
+    wald_stat = (logCIR - np.log(cir0)) / se_logCIR
+    wald_pvalue_cir = 2 * stats.norm.cdf(-np.abs(wald_stat))
+    #print('Wald, log-CIR scale: %1.3g, p = %1.3g' % (wald_stat[3], wald_pvalue[3]))    
 
     """Compute Wald statistic on log-cumulative hazards"""
     """Variance of the log-CH function, by the delta method"""
     log_cumhaz_var_ref = cumhaz_var_ref / cumhaz_ref**2
     log_cumhaz_var_cmp = cumhaz_var_cmp / cumhaz_cmp**2
-    wald_stat = (np.log(cumhaz_cmp) - np.log(cumhaz_ref)) / np.sqrt(log_cumhaz_var_ref + log_cumhaz_var_cmp)
+    wald_stat = (np.log(cumhaz_cmp) - np.log(cumhaz_ref) - np.log(cir0)) / np.sqrt(log_cumhaz_var_ref + log_cumhaz_var_cmp)
     wald_pvalue = 2 * stats.norm.cdf(-np.abs(wald_stat))
     # print('Wald, log-scale: %1.3g, p = %1.3g' % (wald_stat[3], wald_pvalue[3]))
     
@@ -144,7 +145,8 @@ def estimate_cumulative_incidence_ratio(treatment, durations, events, alpha=0.05
                             TE = 1 - np.exp(logCIR),
                             TE_lcl = 1 - np.exp(logCIR_ucl),
                             TE_ucl = 1 - np.exp(logCIR_lcl),
-                            pvalue = wald_pvalue), index=tvec)
+                            CIR_pvalue = wald_pvalue,
+                            CIR_pvalue_alt = wald_pvalue_cir), index=tvec)
     return out
 
 
@@ -491,7 +493,7 @@ def binpropci_katz(x1, n1, x2, n2, alpha=0.05):
     ucl = np.exp(np.log(rr) + z*se_logrr)
     return np.array([lcl, ucl])
 
-def riskscoreci(x1, n1, x2, n2, alpha=0.05):
+def riskscoreci(x1, n1, x2, n2, alpha=0.05, correction=True):
     """Compute CI for the ratio of two binomial rates.
     Implements the non-iterative method of Nam (1995).
     It has better properties than Wald/Katz intervals,
@@ -522,11 +524,19 @@ def riskscoreci(x1, n1, x2, n2, alpha=0.05):
         Number of trials/subjects in group i
     alpha : float
         Specifies coverage of the confidence interval
+    correction : bool
+        A corrected estimate of RR can be returned by adding 0.5 to each cell
+        of the contingency table.
 
     Returns
     -------
     ci : array
-        Confidence interval array [LL, UL]"""
+        Confidence interval array [LL, UL, RR_est]"""
+
+    if correction:
+        rr_est = ((x1+0.5) / (n1+1)) / ((x2+0.5) / (n2+1))
+    else:
+        rr_est = (x1 / n1) / (x2 / n2)
 
     z =  np.abs(stats.norm.ppf(alpha/2))
     if x2==0 and x1 == 0:
@@ -622,7 +632,7 @@ def riskscoreci(x1, n1, x2, n2, alpha=0.05):
         else:
             ul = (1-(n1-x1)*(1-p0up)/(x2+n1-(n2+n1)*p0up))/p0up
             ll = (1-(n1-x1)*(1-p0low)/(x2+n1-(n2+n1)*p0low))/p0low
-    return np.array([ll, ul])
+    return np.array([ll, ul, rr_est])
 
 def diffscoreci(x1,n1,x2,n2,conf_level):
     """Score interval for difference in proportions
