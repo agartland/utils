@@ -1,4 +1,5 @@
 from shapely.ops import cascaded_union, polygonize
+import shapely.geometry as geometry
 from scipy.spatial import Delaunay
 import numpy as np
 import math
