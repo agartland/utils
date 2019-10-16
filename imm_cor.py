@@ -21,7 +21,9 @@ __all__ = [ 'na_est',
             'AgrestiScoreVE',
             'unconditionalVE',
             'diffscoreci',
-            'riskscoreci']
+            'riskscoreci',
+            'binpropci_katz',
+            'binprop_pvalue']
 
 """Cumulative incidence estimates/CIs and CIR estimates/CIs match
 those obtained using R code from Michal Juraska, Erika Rudnicki and Doug Grove"""
@@ -48,10 +50,10 @@ def na_est(T, event, times):
 
     cumhaz = np.cumsum(event_count / at_risk)
     """Variance estimator recommended in Ornulf Borgan paper on NA"""
-    #ch_var = np.cumsum(((at_risk - event_count) * event_count) / ((at_risk - 1) * at_risk**2))
+    #cumhaz_var = np.cumsum(((at_risk - event_count) * event_count) / ((at_risk - 1) * at_risk**2))
     
-    """Used by SAS LIFETEST and matches R survfit"""
-    ch_var = np.cumsum(event_count / at_risk**2)
+    """Used by SAS LIFETEST and matches R survfit error='tsiatis' """
+    cumhaz_var = np.cumsum(event_count / at_risk**2)
 
     """Only return at requested times"""
     cumhaz_out = np.zeros(len(times))
@@ -59,7 +61,7 @@ def na_est(T, event, times):
     for i in range(len(times)):
         ix = np.where(uT == times[i])[0][0]
         cumhaz_out[i] = cumhaz[ix]
-        var_out[i] = ch_var[ix]
+        var_out[i] = cumhaz_var[ix]
     return times, cumhaz_out, var_out
 
 @numba.jit(nopython=True, parallel=True, error_model='numpy')
@@ -67,46 +69,43 @@ def CIR_est(treatment, T, event):
     tvec = np.unique(T)
 
     ind = treatment == 1
-    t_cmp, cumhaz_cmp, chvar_cmp = na_est(T[ind], event[ind], tvec)
-    t_ref, cumhaz_ref, chvar_ref = na_est(T[~ind], event[~ind], tvec)
+    t_cmp, cumhaz_cmp, cumhaz_var_cmp = na_est(T[ind], event[ind], tvec)
+    t_ref, cumhaz_ref, cumhaz_var_ref = na_est(T[~ind], event[~ind], tvec)
 
     cuminc_cmp = 1 - np.exp(-cumhaz_cmp)
     cuminc_ref = 1 - np.exp(-cumhaz_ref)
 
-    se_cuminc_cmp = np.sqrt(chvar_cmp) * np.exp(-cumhaz_cmp)
-    se_cuminc_ref = np.sqrt(chvar_ref) * np.exp(-cumhaz_ref)
+    se_cuminc_cmp = np.sqrt(cumhaz_var_cmp) * np.exp(-cumhaz_cmp)
+    se_cuminc_ref = np.sqrt(cumhaz_var_ref) * np.exp(-cumhaz_ref)
 
     logCIR = np.log( cuminc_cmp ) - np.log( cuminc_ref )
+    """Matches Juraska code"""
     se_logCIR = np.sqrt( (se_cuminc_cmp / cuminc_cmp)**2 + (se_cuminc_ref / cuminc_ref)**2 )
-    # se_logCIR = np.sqrt( se_cuminc_cmp / cuminc_cmp**2 + se_cuminc_ref / cuminc_ref**2 )
+
 
     """Replace NaN caused by zeros in above step"""
     cuminc0 = (cuminc_cmp == 0) | (cuminc_ref == 0)  
     logCIR[cuminc0] = np.nan
     se_logCIR[cuminc0] = np.nan
 
-    return tvec, logCIR, se_logCIR, cumhaz_ref, chvar_ref, cumhaz_cmp, chvar_cmp
+    return tvec, logCIR, se_logCIR, cumhaz_ref, cumhaz_var_ref, cumhaz_cmp, cumhaz_var_cmp
 
 def estimate_cumulative_incidence(durations, events, times=None, alpha=0.05):
     if times is None:
         times = np.unique(durations)
-    tvec, ch, ch_var = na_est(np.asarray(durations), np.asarray(events), np.asarray(times))
+    tvec, ch, cumhaz_var = na_est(np.asarray(durations), np.asarray(events), np.asarray(times))
     criticalz = -stats.norm.ppf(alpha / 2)
 
-    """Match R survfit"""
-    lcl = ch - criticalz * np.sqrt(ch_var)
-    ucl = ch + criticalz * np.sqrt(ch_var)
-
-    """Reccomendation was to compute CI on the log-scale"""
-    #lcl = ch2 * np.exp(-criticalz * (np.sqrt(ch_var) / ch2))
-    #ucl = ch2 * np.exp(criticalz * (np.sqrt(ch_var) / ch2))
+    """Matches R survfit"""
+    lcl = ch - criticalz * np.sqrt(cumhaz_var)
+    ucl = ch + criticalz * np.sqrt(cumhaz_var)
 
     out = pd.DataFrame(dict(cumhaz = ch,
-                            se_cumhz = np.sqrt(ch_var),
+                            se_cumhz = np.sqrt(cumhaz_var),
                             cumhaz_lcl = lcl,
                             cumhaz_ucl = ucl,
                             cuminc = 1 - np.exp(-ch),
-                            se_cuminc = np.sqrt(ch_var) * np.exp(-ch),
+                            se_cuminc = np.sqrt(cumhaz_var) * np.exp(-ch),
                             cuminc_lcl = 1 - np.exp(-lcl),
                             cuminc_ucl = 1 - np.exp(-ucl)), index=tvec)
     return out
@@ -114,15 +113,29 @@ def estimate_cumulative_incidence(durations, events, times=None, alpha=0.05):
 def estimate_cumulative_incidence_ratio(treatment, durations, events, alpha=0.05):
     criticalz = -stats.norm.ppf(alpha / 2)
 
-    tvec, logCIR, se_logCIR, cumhaz_ref, chvar_ref, cumhaz_cmp, chvar_cmp = CIR_est(np.asarray(treatment), 
+    tvec, logCIR, se_logCIR, cumhaz_ref, cumhaz_var_ref, cumhaz_cmp, cumhaz_var_cmp = CIR_est(np.asarray(treatment), 
                                                                                             np.asarray(durations),
                                                                                             np.asarray(events))
     logCIR_lcl = logCIR - criticalz * se_logCIR
     logCIR_ucl = logCIR + criticalz * se_logCIR
 
+    """Compute Wald statistic without log transformation"""
+    # wald_stat = (cumhaz_cmp - cumhaz_ref) / np.sqrt(cumhaz_var_ref + cumhaz_var_cmp)
+    # wald_pvalue = 2 * stats.norm.cdf(-np.abs(wald_stat))
+    # print('Wald, no log: %1.3f, p = %1.3f' % (wald_stat[3], wald_pvalue[3]))
+
+    """Compared to computing p-value for logCIR = 0"""
+    # wald_stat = logCIR / se_logCIR
+    # wald_pvalue = 2 * stats.norm.cdf(-np.abs(wald_stat))
+    # print('Wald, log-CIR scale: %1.3g, p = %1.3g' % (wald_stat[3], wald_pvalue[3]))    
+
     """Compute Wald statistic on log-cumulative hazards"""
-    wald_stat = (np.log(cumhaz_cmp) - np.log(cumhaz_ref)) / np.sqrt(np.log(np.sqrt(chvar_ref))**2 + np.log(np.sqrt(chvar_cmp))**2)
+    """Variance of the log-CH function, by the delta method"""
+    log_cumhaz_var_ref = cumhaz_var_ref / cumhaz_ref**2
+    log_cumhaz_var_cmp = cumhaz_var_cmp / cumhaz_cmp**2
+    wald_stat = (np.log(cumhaz_cmp) - np.log(cumhaz_ref)) / np.sqrt(log_cumhaz_var_ref + log_cumhaz_var_cmp)
     wald_pvalue = 2 * stats.norm.cdf(-np.abs(wald_stat))
+    # print('Wald, log-scale: %1.3g, p = %1.3g' % (wald_stat[3], wald_pvalue[3]))
     
     out = pd.DataFrame(dict(CIR = np.exp(logCIR),
                             se_logCIR = se_logCIR,
@@ -373,7 +386,7 @@ def estCoxPHTE(df, treatment_col='treated', duration_col='dx', event_col='diseas
     index = ['TE', 'UB', 'LB', 'pvalue', 'logrank_pvalue', 'model']
     return pd.Series([te, ci['upper-bound'], ci['lower-bound'], pvalue, results.p_value, coxphf], index=index)
 
-def scoreci(x, n, conf_level=0.95):
+def scoreci(x, n, alpha=0.05):
     """Wilson's confidence interval for a single proportion.
     Score CI based on inverting the asymptotic normal test
     using the null standard error
@@ -395,7 +408,7 @@ def scoreci(x, n, conf_level=0.95):
     ci : array
         Confidence interval array [LL, UL]"""
 
-    zalpha = abs(stats.norm.ppf((1-conf_level)/2))
+    zalpha = np.abs(stats.norm.ppf(alpha/2))
     phat = x/n
     bound = (zalpha*((phat*(1-phat)+(zalpha**2)/(4*n))/n)**(1/2))/(1+(zalpha**2)/n)
     midpnt = (phat+(zalpha**2)/(2*n))/(1+(zalpha**2)/n)
@@ -403,7 +416,7 @@ def scoreci(x, n, conf_level=0.95):
     uplim = midpnt + bound
     lowlim = midpnt - bound
 
-    return array([lowlim, uplim])
+    return np.array([lowlim, uplim])
 
 def unconditionalVE(nv,Nv, np, Np, alpha=0.025):
     """VE point-estimate, CI and p-value, without conditioning on the total number of events"""
@@ -421,15 +434,17 @@ def unconditionalVE(nv,Nv, np, Np, alpha=0.025):
 
     return  pd.Series([ve, ci[0], ci[1], pvalue], index=['VE', 'LL', 'UL', 'p'])
 
-def AgrestiScoreVE(nv,Nv, np, Np, alpha=0.025):
+def AgrestiScoreVE(nv,Nv, np, Np, alpha=0.05):
     """Conditional test based on a fixed number of events,
     n = nv + np
     phat = nv/n"""
-    def scoreCIbinProp(pHat, n, alpha):
+
+    def scoreci_binprop(pHat, n, alpha):
         """Score confidence interval for binomial proportion following Agresti and Coull (Am Statistician, 1998)"""
-        z = stats.norm.ppf(1-alpha)
-        return ((pHat + z**2/(2*n) + z*sqrt((pHat*(1-pHat)+z**2/(4*n))/n))/(1+z**2/n),
-                (pHat + z**2/(2*n) - z*sqrt((pHat*(1-pHat)+z**2/(4*n))/n))/(1+z**2/n))
+        z = stats.norm.ppf(1-alpha/2)
+        lcl = (pHat + z**2/(2*n) + z*np.sqrt((pHat*(1-pHat)+z**2/(4*n))/n))/(1+z**2/n)
+        ucl = (pHat + z**2/(2*n) - z*np.sqrt((pHat*(1-pHat)+z**2/(4*n))/n))/(1+z**2/n)
+        return lcl, ucl
 
     veFunc = lambda pvhat, Nv, Np: 1 - (Np/Nv)*(pvhat/(1-pvhat))
     rr = (nv/Nv)/(np/Np)
@@ -437,8 +452,7 @@ def AgrestiScoreVE(nv,Nv, np, Np, alpha=0.025):
     n = nv + np
     pvhat = nv/n
 
-    ll, ul = scoreCIbinProp(pvhat, n, alpha=alpha)
-    
+    ll, ul = scoreci_binprop(pvhat, n, alpha=alpha)
     
     ve = veFunc(pvhat, Nv, Np)
     ci = veFunc(ll, Nv, Np), veFunc(ul, Nv, Np)
@@ -446,9 +460,42 @@ def AgrestiScoreVE(nv,Nv, np, Np, alpha=0.025):
     
     return  pd.Series([ve, ci[0], ci[1], p], index=['VE', 'LL', 'UL', 'p'])
 
-
-def riskscoreci(x1,n1,x2,n2,conf_level=0.95):
+def binpropci_katz(x1, n1, x2, n2, alpha=0.05):
     """Compute CI for the ratio of two binomial rates.
+    Implements Katz method on the log-RR scale.
+
+    Parameters
+    ----------
+    xi : int
+        Number of events in group i
+    ni : int
+        Number of trials/subjects in group i
+    alpha : float
+        Specifies coverage of the confidence interval
+
+    Returns
+    -------
+    ci : array
+        Confidence interval array [LL, UL]"""
+    z =  np.abs(stats.norm.ppf(alpha/2))
+    a = x1
+    b = n1 - x1
+    c = x2
+    d = n2 - x2
+    
+    rr = (x1 / n1) / (x2 / n2)
+
+    se_logrr = np.sqrt(1/a + 1/c - 1/(a+b) - 1/(c+d))
+
+    lcl = np.exp(np.log(rr) - z*se_logrr)
+    ucl = np.exp(np.log(rr) + z*se_logrr)
+    return np.array([lcl, ucl])
+
+def riskscoreci(x1, n1, x2, n2, alpha=0.05):
+    """Compute CI for the ratio of two binomial rates.
+    Implements the non-iterative method of Nam (1995).
+    It has better properties than Wald/Katz intervals,
+    especially with small samples and rare events.
     
     Translated from R-package 'PropCIs':
     https://github.com/shearer/PropCIs
@@ -456,7 +503,7 @@ def riskscoreci(x1,n1,x2,n2,conf_level=0.95):
     Nam, J. M. (1995) Confidence limits for the ratio of two binomial proportions based on likelihood
     scores: Non-iterative method. Biom. J. 37 (3), 375-379.
     
-    Koopman PAR. (1985) Confidence limits for the ratio of two binomial proportions. Biometrics 40,
+    Koopman PAR. (1984) Confidence limits for the ratio of two binomial proportions. Biometrics 40,
     513-517.
     
     Miettinen OS, Nurminen M. (1985) Comparative analysis of two rates. Statistics in Medicine 4,
@@ -473,15 +520,15 @@ def riskscoreci(x1,n1,x2,n2,conf_level=0.95):
         Number of events in group i
     ni : int
         Number of trials/subjects in group i
-    conf_level : float
-        Specifies coverage of the confidence interval (1 - alpha)
+    alpha : float
+        Specifies coverage of the confidence interval
 
     Returns
     -------
     ci : array
         Confidence interval array [LL, UL]"""
 
-    z =  abs(stats.norm.ppf((1-conf_level)/2))
+    z =  np.abs(stats.norm.ppf(alpha/2))
     if x2==0 and x1 == 0:
         ul = np.inf
         ll = 0
@@ -503,8 +550,8 @@ def riskscoreci(x1,n1,x2,n2,conf_level=0.95):
         p02 = t2-b1/3
         p03 = t3-b1/3
         p0sum = p01+p02+p03
-        p0up = min(p01,p02,p03)
-        p0low = p0sum-p0up-max(p01,p02,p03)
+        p0up = np.min([p01,p02,p03])
+        p0low = p0sum-p0up-np.max([p01,p02,p03])
 
         if x2 == 0 and x1 != 0:
             ll = (1-(n1-x1)*(1-p0low)/(x2+n1-(n2+n1)*p0low))/p0low
@@ -620,7 +667,7 @@ def diffscoreci(x1,n1,x2,n2,conf_level):
         if score < z:
             proot = up2
         niter = niter + 1
-        if dp<0.0000001 or abs(z-score) < 0.000001:
+        if dp<0.0000001 or np.abs(z-score) < 0.000001:
             niter = 51
             ul = up2
     proot = px - py
@@ -633,7 +680,7 @@ def diffscoreci(x1,n1,x2,n2,conf_level):
         if score < z:
             proot = low2
         niter = niter+1
-        if dp<0.0000001 or abs(z-score)<0.000001:
+        if dp<0.0000001 or np.abs(z-score)<0.000001:
             ll = low2
             niter = 51
     return np.array([ll, ul])
@@ -641,7 +688,7 @@ def diffscoreci(x1,n1,x2,n2,conf_level):
 def _z2stat(p1x,nx,p1y,ny,dif):
     """Private function used by diffscoreci"""
     difference = p1x-p1y-dif
-    if abs(difference) == 0:
+    if np.abs(difference) == 0:
         fmdifference = 0
     else:
         t = ny/nx
@@ -662,3 +709,118 @@ def _z2stat(p1x,nx,p1y,ny,dif):
         var = (p1d*(1-p1d)/nx + p2d*(1-p2d)/ny) * nxy / (nxy - 1) ## added: * nxy / (nxy - 1)
         fmdifference = difference**2/var
     return fmdifference
+
+def binomci(x, N, alpha=0.05, method='score'):
+    """Return confidence interval on observing number of events in x
+    given N trials (Agresti and Coull  2 sided 95% CI)
+    Returns lower and upper confidence limits (lcl,ucl)
+
+    Code has been checked against R binom package. "Score" was derived
+    from the Agresti paper and is equivalent to Wilson (copied from the R package).
+    From the paper this seems to be the best in most situations.
+
+    A. Agresti, B. A. Coull, T. A. Statistician, N. May,
+    Approximate Is Better than "Exact" for Interval Estimation of Binomial Proportions,
+    52, 119–126 (2007)."""
+
+    x = np.asarray(x)
+    if isinstance(N, list):
+        N = np.asarray(N)
+    p = x/N
+    z = stats.norm.ppf(1.-alpha/2.)
+    if method == 'score':
+        lcl = (p + (z**2)/(2*N) - z*np.sqrt((p*(1-p)+z**2/(4*N))/N)) / (1 + (z**2)/N)
+        ucl = (p + (z**2)/(2*N) + z*np.sqrt((p*(1-p)+z**2/(4*N))/N)) / (1 + (z**2)/N)
+    elif method == 'wilson':
+        """p1 <- p + 0.5 * z2/n
+            p2 <- z * sqrt((p * (1 - p) + 0.25 * z2/n)/n)
+            p3 <- 1 + z2/n
+            lcl <- (p1 - p2)/p3
+            ucl <- (p1 + p2)/p3"""
+        p1 = p + 0.5 * (z**2 / N)
+        p2 = z * np.sqrt((p * (1 - p) + 0.25 * z**2/N)/N)
+        p3 = 1 + z**2 / N
+        lcl = (p1 - p2)/p3
+        ucl = (p1 + p2)/p3
+    elif method == 'agresti-coull':
+        """.x <- x + 0.5 * z2
+        .n <- n + z2
+        .p <- .x/.n
+        lcl <- .p - z * sqrt(.p * (1 - .p)/.n)
+        ucl <- .p + z * sqrt(.p * (1 - .p)/.n)"""
+        xtmp = x + 0.5 * z**2
+        ntmp = N + z**2
+        ptmp = xtmp / ntmp
+        se = np.sqrt(ptmp * (1 - ptmp)/ntmp)
+        lcl = ptmp - z * se
+        ucl = ptmp + z * se
+    elif method == 'exact':
+        """Clopper-Pearson (1934)"""
+        """ x1 <- x == 0
+            x2 <- x == n
+            lb <- ub <- x
+            lb[x1] <- 1
+            ub[x2] <- n[x2] - 1
+            lcl <- 1 - qbeta(1 - alpha2, n + 1 - x, lb)
+            ucl <- 1 - qbeta(alpha2, n - ub, x + 1)
+            if(any(x1)) lcl[x1] <- rep(0, sum(x1))
+            if(any(x2)) ucl[x2] <- rep(1, sum(x2))"""
+        lb = x.copy()
+        ub = x.copy()
+        lb[x == 0] = 1
+        ub[x == N] = N - 1
+
+        lcl = 1 - stats.beta.ppf(1 - alpha/2, N + 1 - x, lb)
+        ucl = 1 - stats.beta.ppf(alpha/2, N - ub, x + 1)
+
+        lcl[x == 0] = 0
+        ucl[x == N] = 1
+    elif method == 'wald':
+        se = np.sqrt(p*(1-p)/N)
+        ucl = p + z * se
+        lcl = p - z * se
+    return lcl, ucl
+
+def binprop_pvalue(x1, n1, x2, n2, rr0=1):
+    """Use chi2 test which is consistent with the riskscore
+    derived confidence interval of Nam and Koopman.
+    Produces a two-sided p-value in that it is equally and symetrically
+    sensitive to deviations from rr0 in either direction.
+    
+    Parameters
+    ----------
+    xi : int
+        Number of events in group i
+    ni : int
+        Number of trials/subjects in group i
+    rr0 : float
+        Null-hypothesis of RR = (x1 / n1) / (x2 / n2)
+
+    Returns
+    -------
+    pvalue : float"""
+
+    obs = np.array([x1, n1 - x1, x2, n2 - x2])
+
+    """Under the null-hypothesis, n1 and n2 remain constant,
+    as do the total number of events (x1 + x2) and overall p
+    x1_prime and x2_prime are the distribution of events under the null,
+    as a function of these constants n1, n2, and x1 + x2 = x1_prime + x2_prime"""
+    x1_prime = (n1 * (x1 + x2)) / (n2 / rr0 + n1)
+    x2_prime = x1 + x2 - x1_prime
+    ex = np.array([x1_prime, n1-x1_prime, x2_prime, n2-x2_prime])
+
+    """Expression for the case when RR0 = 1: it matches"""
+    # ex = np.array([exp_p*n1, n1 - exp_p*n1, exp_p*n2, n2 - exp_p*n2])
+
+    chi2 = np.sum((obs - ex)**2 / ex)
+
+    num_obs = 4
+    ddof = 2
+    dof = num_obs - 1 - ddof
+    pvalue = stats.chi2.sf(chi2, dof)
+    
+    """These are all consistent, except that only stats.chisquare allows for different RR0"""
+    # chi2, pvalue = stats.chisquare(obs, f_exp=ex, ddof=ddof)
+    # chi2, pvalue, dof, ex = stats.chi2_contingency([[x1, n1 - x1], [x2, n2 - x2]], correction=False)
+    return chi2, pvalue, dof, ex

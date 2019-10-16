@@ -18,7 +18,7 @@ def alpha_shape(points, alpha):
     if len(points) < 4:
         # When you have a triangle, there is no sense
         # in computing an alpha shape.
-        return geometry.MultiPoint(list(points)).convex_hull
+        return geometry.MultiPoint(list(points)).convex_hull, geometry.MultiPoint(list(points))
 
     def add_edge(edges, edge_points, coords, i, j):
         """Add a line between the i-th and j-th points,
