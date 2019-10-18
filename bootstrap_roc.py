@@ -3,7 +3,7 @@ from scipy import stats
 import numba
 from numba import jit, prange
 
-from roc_numba import roc_auc, twobytwo_jit, twobytwo_stats_arr_jit, twobytwo_stats_jit, predictor_stats
+from roc_numba import roc_auc, twobytwo_jit, twobytwo_stats_arr_jit, twobytwo_stats_jit, predictor_stats, roc_stats_jit
 
 __all__ = ['bootstrap_roc', 'bootstrap_twobytwo', 'bootstrap_auc']
 
@@ -168,7 +168,7 @@ def jackknife_twobytwo_roc_jit(pred_continuous, obs, thresholds):
     nthresh = len(thresholds)
 
     bca_accel_d = dict()
-    for threshi in range(thresholds):
+    for threshi in range(nthresh):
         t = thresholds[threshi]
         pred = (pred_continuous >= t).astype(np.int_)
         a, b, c, d = twobytwo_jit(pred, obs)
@@ -286,12 +286,12 @@ def bootstrap_roc(pred_continuous, obs, n_thresholds=50, alpha=0.05, n_samples=1
 
                 if np.any(nvals < 10) or np.any(nvals > n_samples-10):
                     print('Extreme samples used for %s : %f, results unstable' % (k, thresholds[threshi]))
-    return ostat_d, ci_d
+    return dict(ostat_d), ci_d
 
 
 @jit(nopython=True, parallel=True, error_model='numpy')
 def bootstrap_auc_jit(pred_continuous, obs, nstraps):
-    n = pred.shape[0]
+    n = pred_continuous.shape[0]
     auc = np.zeros(nstraps)
     for booti in prange(nstraps):
         rind = np.random.choice(np.arange(n), n)
@@ -302,7 +302,7 @@ def bootstrap_auc_jit(pred_continuous, obs, nstraps):
 @jit(nopython=True, parallel=True, error_model='numpy')
 def jackknife_auc_jit(pred_continuous, obs):
     oauc = roc_auc(obs, pred_continuous)
-    n = pred.shape[0]
+    n = pred_continuous.shape[0]
 
     jstats = np.zeros(n)
     #jind = np.ones(n, dtype=np.bool_)
