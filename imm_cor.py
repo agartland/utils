@@ -82,7 +82,6 @@ def CIR_est(treatment, T, event):
     """Matches Juraska code"""
     se_logCIR = np.sqrt( (se_cuminc_cmp / cuminc_cmp)**2 + (se_cuminc_ref / cuminc_ref)**2 )
 
-
     """Replace NaN caused by zeros in above step"""
     cuminc0 = (cuminc_cmp == 0) | (cuminc_ref == 0)  
     logCIR[cuminc0] = np.nan
@@ -100,13 +99,19 @@ def estimate_cumulative_incidence(durations, events, times=None, alpha=0.05):
     lcl = ch - criticalz * np.sqrt(cumhaz_var)
     ucl = ch + criticalz * np.sqrt(cumhaz_var)
 
+    cuminc_lcl = 1 - np.exp(-lcl)
+
+    """Enforce positive LCL"""
+    lcl[lcl < 0] = 0
+    cuminc_lcl[cuminc_lcl < 0] = 0
+
     out = pd.DataFrame(dict(cumhaz = ch,
                             se_cumhz = np.sqrt(cumhaz_var),
                             cumhaz_lcl = lcl,
                             cumhaz_ucl = ucl,
                             cuminc = 1 - np.exp(-ch),
                             se_cuminc = np.sqrt(cumhaz_var) * np.exp(-ch),
-                            cuminc_lcl = 1 - np.exp(-lcl),
+                            cuminc_lcl = cuminc_lcl,
                             cuminc_ucl = 1 - np.exp(-ucl)), index=tvec)
     return out
 
@@ -145,8 +150,8 @@ def estimate_cumulative_incidence_ratio(treatment, durations, events, alpha=0.05
                             TE = 1 - np.exp(logCIR),
                             TE_lcl = 1 - np.exp(logCIR_ucl),
                             TE_ucl = 1 - np.exp(logCIR_lcl),
-                            CIR_pvalue = wald_pvalue,
-                            CIR_pvalue_alt = wald_pvalue_cir), index=tvec)
+                            CIR_pvalue = wald_pvalue_cir,
+                            CIR_pvalue_alt = wald_pvalue), index=tvec)
     return out
 
 
