@@ -84,7 +84,7 @@ try:
         elif alternative == 'greater':
             return (OR, res[1])
 
-    print("Using Cython-powered Fisher's exact test")
+    # print("Using Cython-powered Fisher's exact test")
 
 except ImportError:
     from scipy import stats

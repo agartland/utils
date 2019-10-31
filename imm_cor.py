@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-from myfisher import *
 from scipy import stats
 
 import numba
@@ -58,19 +57,23 @@ def na_est(T, event, times):
     """Only return at requested times"""
     cumhaz_out = np.zeros(len(times))
     var_out = np.zeros(len(times))
+    atrisk_out = np.zeros(len(times))
+    events_out = np.zeros(len(times))
     for i in range(len(times)):
         ix = np.where(uT == times[i])[0][0]
         cumhaz_out[i] = cumhaz[ix]
         var_out[i] = cumhaz_var[ix]
-    return times, cumhaz_out, var_out
+        atrisk_out[i] = at_risk[ix]
+        events_out[i] = event_count[ix]
+    return times, cumhaz_out, var_out, atrisk_out, events_out
 
 @numba.jit(nopython=True, parallel=True, error_model='numpy')
 def CIR_est(treatment, T, event):
     tvec = np.unique(T)
 
     ind = treatment == 1
-    t_cmp, cumhaz_cmp, cumhaz_var_cmp = na_est(T[ind], event[ind], tvec)
-    t_ref, cumhaz_ref, cumhaz_var_ref = na_est(T[~ind], event[~ind], tvec)
+    t_cmp, cumhaz_cmp, cumhaz_var_cmp, atrisk_cmp, events_cmp = na_est(T[ind], event[ind], tvec)
+    t_ref, cumhaz_ref, cumhaz_var_ref, atrisk_ref, events_ref = na_est(T[~ind], event[~ind], tvec)
 
     cuminc_cmp = 1 - np.exp(-cumhaz_cmp)
     cuminc_ref = 1 - np.exp(-cumhaz_ref)
@@ -92,7 +95,7 @@ def CIR_est(treatment, T, event):
 def estimate_cumulative_incidence(durations, events, times=None, alpha=0.05):
     if times is None:
         times = np.unique(durations)
-    tvec, ch, cumhaz_var = na_est(np.asarray(durations), np.asarray(events), np.asarray(times))
+    tvec, ch, cumhaz_var, atrisk, events_vec = na_est(np.asarray(durations), np.asarray(events), np.asarray(times))
     criticalz = -stats.norm.ppf(alpha / 2)
 
     """Matches R survfit"""
@@ -105,7 +108,9 @@ def estimate_cumulative_incidence(durations, events, times=None, alpha=0.05):
     lcl[lcl < 0] = 0
     cuminc_lcl[cuminc_lcl < 0] = 0
 
-    out = pd.DataFrame(dict(cumhaz = ch,
+    out = pd.DataFrame(dict(atrisk=atrisk,
+                            events=events_vec,
+                            cumhaz = ch,
                             se_cumhz = np.sqrt(cumhaz_var),
                             cumhaz_lcl = lcl,
                             cumhaz_ucl = ucl,
