@@ -61,6 +61,7 @@ def twobytwo_stats_jit(a, b, c, d):
     out['OR'] = (a/c) / (b/d)
     out['PrevObs'] = (a + c) / n
     out['PrevPred'] = (a + b) / n
+    out['RR_corrected'] = ((a + 0.5) / (a + b + 1)) / ((c + 0.5) / (c + d + 1))
 
     out['N'] = n
     out['A'] = a
@@ -70,7 +71,7 @@ def twobytwo_stats_jit(a, b, c, d):
     return out
 
 @jit(nopython=True, error_model='numpy', parallel=True)
-def twobytwo_stats_arr_jit(a, b, c, d):
+def twobytwo_stats_arr_jit(a, b, c, d, correction=False):
     """
             OUTCOME
              +   -
@@ -93,11 +94,12 @@ def twobytwo_stats_arr_jit(a, b, c, d):
     out['PPV'] = a / (ab)
     out['NPV'] = d / (cd)
     out['NNT'] = 1 / (a/(ab) - c/(cd))
-    out['RR'] = (a / (ab)) / (c / (cd))
     out['OR'] = (a/c) / (b/d)
     out['ACC'] = (a + d)/n
+    out['RR'] = (a / (ab)) / (c / (cd))
     out['PrevObs'] = (ac) / n
     out['PrevPred'] = (ab) / n
+    out['RR_corrected'] = ((a + 0.5) / (ab + 1)) / ((c + 0.5) / (cd + 1))
 
     out['N'] = n.astype(np.float64)
     out['A'] = a.astype(np.float64)

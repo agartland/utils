@@ -12,9 +12,10 @@ except ModuleNotFoundError:
     print('Module "lifelines" could not be imported.')
 
 __all__ = [ 'na_est',
-            'CIR_est',
             'estimate_cumulative_incidence',
             'estimate_cumulative_incidence_ratio',
+            'estimate_cumulative_incidence_difference',
+            'cumulative_contrast',
             'estCoxPHTE',
             'scoreci',
             'AgrestiScoreVE',
@@ -68,8 +69,11 @@ def na_est(T, event, times):
     return times, cumhaz_out, var_out, atrisk_out, events_out
 
 @numba.jit(nopython=True, parallel=True, error_model='numpy')
-def CIR_est(treatment, T, event):
+def _CIR_est(treatment, T, event, add_times):
+    """Replaced by cumuative contrast"""
     tvec = np.unique(T)
+    if len(add_times) > 0:
+        tvec = np.unique(np.concatenate((tvec, add_times)))
 
     ind = treatment == 1
     t_cmp, cumhaz_cmp, cumhaz_var_cmp, atrisk_cmp, events_cmp = na_est(T[ind], event[ind], tvec)
@@ -91,6 +95,129 @@ def CIR_est(treatment, T, event):
     se_logCIR[cuminc0] = np.nan
 
     return tvec, logCIR, se_logCIR, cumhaz_ref, cumhaz_var_ref, cumhaz_cmp, cumhaz_var_cmp
+
+@numba.jit(nopython=True, parallel=True, error_model='numpy')
+def _CID_est(treatment, T, event, add_times):
+    """Replaced by cumuative contrast"""
+    """Cumulative incidence difference estimation"""
+    tvec = np.unique(T)
+    if len(add_times) > 0:
+        tvec = np.unique(np.concatenate((tvec, add_times)))
+
+    ind = treatment == 1
+    t_cmp, cumhaz_cmp, cumhaz_var_cmp, atrisk_cmp, events_cmp = na_est(T[ind], event[ind], tvec)
+    t_ref, cumhaz_ref, cumhaz_var_ref, atrisk_ref, events_ref = na_est(T[~ind], event[~ind], tvec)
+
+    cuminc_cmp = 1 - np.exp(-cumhaz_cmp)
+    cuminc_ref = 1 - np.exp(-cumhaz_ref)
+
+    se_cuminc_cmp = np.sqrt(cumhaz_var_cmp) * np.exp(-cumhaz_cmp)
+    se_cuminc_ref = np.sqrt(cumhaz_var_ref) * np.exp(-cumhaz_ref)
+
+    cid = cuminc_cmp - cuminc_ref
+    se_cid = np.sqrt( se_cuminc_cmp**2 + se_cuminc_ref**2 )
+
+    chd = cumhaz_cmp - cumhaz_ref
+    se_chd = np.sqrt( cumhaz_var_cmp + cumhaz_var_ref )
+
+    return tvec, cid, se_cid, chd, se_chd, cumhaz_ref, cumhaz_var_ref, cumhaz_cmp, cumhaz_var_cmp
+
+@numba.jit(nopython=True, parallel=True, error_model='numpy')
+def cumulative_contrast(treatment, T, event, add_times, weights, log_ratio=True, cuminc=True):
+    """Compute contrast between two groups using either cumulative incidence (cuminc=1, default)
+    or cumulative hazard (cuminc=0).
+
+    Contrast can be either a ratio returned on the log-scale (log_ratio=1):
+        log[Pr(T<t | treatment=1) / Pr(T<t | treatment=0)]
+    or a difference on the additive scale:
+        Pr(T<t | treatment=1) - Pr(T<t | treatment=0)
+
+    Parameters
+    ----------
+    treatment : np.ndarray shape(n)
+        Vector of binary treatment assignments
+    T : np.ndarray shape(n)
+        Vector of event times/durations
+    event : np.ndarray shape(n)
+        Vector of binary event indicators
+    add_times : np.ndarray
+        Vector of additional times at which the contrast should be computed
+    weights : np.ndarray shape(n)
+        Vector of weights for each subject. Sets of unique weights indicate
+        strata for a stratafied analysis. Unique weights must sum to 1.
+        Pass vector of ones to perform an nonstratified analysis.
+    log_ratio : int (1 or 0)
+        Indicator of whether the contrast should be a ratio returned on a log-scale or
+        a difference on the additive scale.
+    cuminc : int (1 or 0)
+        Indicator of whether the contrast should be compmuted on cumulative incidences
+
+    Returns
+    -------
+    tvec : np.ndarray shape(n)
+        Vector of times at which the contrast was estimated.
+        May be longer than input data if add_times are specified.
+    contrast : np.ndarray shape(n)
+        Vector of estimated contrasts at each time
+    se_contrast : np.ndarray shape(n)
+        Vector of estimated contrast SE at each time
+    cumx : np.ndarray shape(n, 2)
+        Matrix of cumulative incidences/hazards for the reference [:, 0] and
+        the comparator [:, 1] groups.
+    se_cumx : np.ndarray shape(n, 2)
+        Matrix of cumulative incidence/hazard SEs for the reference [:, 0] and
+        the comparator [:, 1] groups.
+
+    """
+    tvec = np.unique(T)
+    if len(add_times) > 0:
+        tvec = np.unique(np.concatenate((tvec, add_times)))
+
+    uw = np.unique(weights)
+    if not np.abs(np.sum(uw) - 1) < 0.00001:
+        """Check that the unique weights sum to 1"""
+        raise ValueError('Weights do not sum to 1')
+    shp = (len(tvec), 2, len(uw))
+    t = np.zeros(shp)
+    s_cumhaz = np.zeros(shp)
+    s_cumhaz_var = np.zeros(shp)
+    s_atrisk = np.zeros(shp)
+    s_events = np.zeros(shp)
+    for i,w in enumerate(uw):
+        """Split the NA estimates by strata and group indicators.
+        Strata levels are indicated by a unique weight."""
+        ind_cmp = (treatment == 1) & (weights == w)
+        ind_ref = (treatment == 0) & (weights == w)
+        t[:, 0, i], s_cumhaz[:, 0, i], s_cumhaz_var[:, 0, i], s_atrisk[:, 0, i], s_events[:, 0, i] = na_est(T[ind_ref], event[ind_ref], tvec)
+        t[:, 1, i], s_cumhaz[:, 1, i], s_cumhaz_var[:, 1, i], s_atrisk[:, 1, i], s_events[:, 1, i] = na_est(T[ind_cmp], event[ind_cmp], tvec)
+
+    """Take strata-weighted sums of the cumulative hazard and the SE"""
+    cumhaz = np.sum(s_cumhaz * np.reshape(uw, (1, 1, len(uw))), axis=2)
+    cumhaz_var = np.sum((np.sqrt(s_cumhaz_var) * np.reshape(uw, (1, 1, len(uw))))**2, axis=2)
+
+    if cuminc:
+        """Translate form cumhaz to cuminc scale"""
+        cumx = 1 - np.exp(-cumhaz)
+        se_cumx = np.sqrt(cumhaz_var) * np.exp(-cumhaz)
+    else:
+        cumx = cumhaz
+        se_cumx = np.sqrt(cumhaz_var)
+        
+    if log_ratio:
+        """Compute ratio, returning contrast and SE on the log-scale"""
+        contrast = np.log( cumx[:, 1] ) - np.log( cumx[:, 0] )
+        se_contrast = np.sqrt( (se_cumx[:, 1] / cumx[:, 1])**2 + (se_cumx[:, 0] / cumx[:, 0])**2 )
+
+        """Replace NaN caused by zeros in above step"""
+        cumx0 = (cumx[:, 1] == 0) | (cumx[:, 0] == 0)  
+        contrast[cumx0] = np.nan
+        se_contrast[cumx0] = np.nan
+    else:
+        """Compute difference, returning on the original scale"""
+        contrast = cumx[:, 1] - cumx[:, 0]
+        se_contrast = np.sqrt(np.sum(se_cumx**2, axis=1))
+
+    return tvec, contrast, se_contrast, cumx, se_cumx
 
 def estimate_cumulative_incidence(durations, events, times=None, alpha=0.05):
     if times is None:
@@ -120,12 +247,18 @@ def estimate_cumulative_incidence(durations, events, times=None, alpha=0.05):
                             cuminc_ucl = 1 - np.exp(-ucl)), index=tvec)
     return out
 
-def estimate_cumulative_incidence_ratio(treatment, durations, events, alpha=0.05, cir0=1):
+def estimate_cumulative_incidence_ratio(treatment, durations, events, weights=None, alpha=0.05, cir0=1, add_times=[]):
     criticalz = -stats.norm.ppf(alpha / 2)
 
-    tvec, logCIR, se_logCIR, cumhaz_ref, cumhaz_var_ref, cumhaz_cmp, cumhaz_var_cmp = CIR_est(np.asarray(treatment), 
-                                                                                            np.asarray(durations),
-                                                                                            np.asarray(events))
+    if weights is None:
+        weights = np.ones(len(events))
+
+    tvec, logCIR, se_logCIR, cuminc, se_cuminc = cumulative_contrast(np.asarray(treatment), 
+                                                                      np.asarray(durations),
+                                                                      np.asarray(events),
+                                                                      np.asarray(add_times),
+                                                                      np.asarray(weights), log_ratio=True, cuminc=True)
+
     logCIR_lcl = logCIR - criticalz * se_logCIR
     logCIR_ucl = logCIR + criticalz * se_logCIR
 
@@ -142,10 +275,10 @@ def estimate_cumulative_incidence_ratio(treatment, durations, events, alpha=0.05
 
     """Compute Wald statistic on log-cumulative hazards"""
     """Variance of the log-CH function, by the delta method"""
-    log_cumhaz_var_ref = cumhaz_var_ref / cumhaz_ref**2
-    log_cumhaz_var_cmp = cumhaz_var_cmp / cumhaz_cmp**2
-    wald_stat = (np.log(cumhaz_cmp) - np.log(cumhaz_ref) - np.log(cir0)) / np.sqrt(log_cumhaz_var_ref + log_cumhaz_var_cmp)
-    wald_pvalue = 2 * stats.norm.cdf(-np.abs(wald_stat))
+    # log_cumhaz_var_ref = cumhaz_var_ref / cumhaz_ref**2
+    # log_cumhaz_var_cmp = cumhaz_var_cmp / cumhaz_cmp**2
+    # wald_stat = (np.log(cumhaz_cmp) - np.log(cumhaz_ref) - np.log(cir0)) / np.sqrt(log_cumhaz_var_ref + log_cumhaz_var_cmp)
+    # wald_pvalue = 2 * stats.norm.cdf(-np.abs(wald_stat))
     # print('Wald, log-scale: %1.3g, p = %1.3g' % (wald_stat[3], wald_pvalue[3]))
     
     out = pd.DataFrame(dict(CIR = np.exp(logCIR),
@@ -155,10 +288,32 @@ def estimate_cumulative_incidence_ratio(treatment, durations, events, alpha=0.05
                             TE = 1 - np.exp(logCIR),
                             TE_lcl = 1 - np.exp(logCIR_ucl),
                             TE_ucl = 1 - np.exp(logCIR_lcl),
-                            CIR_pvalue = wald_pvalue_cir,
-                            CIR_pvalue_alt = wald_pvalue), index=tvec)
+                            CIR_pvalue = wald_pvalue_cir), index=tvec)
     return out
 
+def estimate_cumulative_incidence_difference(treatment, durations, events, weights=None, alpha=0.05, cid0=0, add_times=[]):
+    criticalz = -stats.norm.ppf(alpha / 2)
+
+    if weights is None:
+        weights = np.ones(len(events))
+
+    tvec, cid, se_cid, cuminc, se_cuminc = cumulative_contrast(np.asarray(treatment), 
+                                                               np.asarray(durations),
+                                                               np.asarray(events),
+                                                               np.asarray(add_times),
+                                                               np.asarray(weights), log_ratio=False, cuminc=True)
+    cid_lcl = cid - criticalz * se_cid
+    cid_ucl = cid + criticalz * se_cid
+
+    wald_stat = (cid - cid0) / se_cid
+    wald_pvalue_cid = 2 * stats.norm.cdf(-np.abs(wald_stat))
+
+    out = pd.DataFrame(dict(cid = cid,
+                            se_cid = se_cid,
+                            cid_lcl = cid_lcl,
+                            cid_ucl = cid_ucl,
+                            cid_pvalue = wald_pvalue_cid), index=tvec)
+    return out
 
 def _estCumTE(df, treatment_col='treated', duration_col='dx', event_col='disease', followupT=None, alpha=0.05, H1=0, bootstraps=None):
     """Estimates treatment efficacy using cumulative incidence (CI) Nelson-Aalen (NA) estimators.
@@ -644,7 +799,7 @@ def riskscoreci(x1, n1, x2, n2, alpha=0.05, correction=True):
             ll = (1-(n1-x1)*(1-p0low)/(x2+n1-(n2+n1)*p0low))/p0low
     return np.array([ll, ul, rr_est])
 
-def diffscoreci(x1,n1,x2,n2,conf_level):
+def diffscoreci(x1, n1, x2, n2, alpha):
     """Score interval for difference in proportions
     
     Method of Mee 1984 with Miettinen and Nurminen modification nxy / (nxy - 1), see Newcombe 1998
@@ -666,7 +821,7 @@ def diffscoreci(x1,n1,x2,n2,conf_level):
         Number of events in group i
     ni : int
         Number of trials/subjects in group i
-    conf_level : float
+    alpha : float
         Specifies coverage of the confidence interval (1 - alpha)
 
     Returns
@@ -676,7 +831,7 @@ def diffscoreci(x1,n1,x2,n2,conf_level):
    
     px = x1/n1
     py = x2/n2
-    z = stats.chi2.ppf(conf_level,1)
+    z = stats.chi2.ppf(1 - alpha,1)
     proot = px - py
     dp = 1 - proot
     niter = 1
