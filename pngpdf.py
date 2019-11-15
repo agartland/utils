@@ -21,8 +21,9 @@ class PngPdfPages(PdfPages):
         plt.scatter([1, 2, 3, 4, 5], [2, 5, 4, 1, 7])
         pdf.savefig(figh)
     """
-    def __init__(self, filename, create_pngs=True, **kwargs):
+    def __init__(self, filename, create_pngs=True, add_format='png', **kwargs):
         self.create_pngs = create_pngs
+        self.add_format = add_format
         if create_pngs:
             folder, fn = os.path.split(filename)
             self.base_name = fn.replace('.pdf', '')
@@ -44,8 +45,8 @@ class PngPdfPages(PdfPages):
                 figh = manager.canvas.figure
             else:
                 figh = figure
-            figh.savefig(opj(self.png_folder, '%s_%d.png' % (self.base_name, self.page_num)),
-                         format='png',
+            figh.savefig(opj(self.png_folder, '%s_%d.%s' % (self.base_name, self.page_num, self.add_format)),
+                         format=self.add_format,
                          dpi=200)
             self.page_num += 1
         super().savefig(figure=figure, **kwargs)

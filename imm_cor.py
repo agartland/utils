@@ -176,14 +176,19 @@ def cumulative_contrast(treatment, T, event, add_times, weights, log_ratio=True,
     uw = np.unique(weights)
     if not np.abs(np.sum(uw) - 1) < 0.00001:
         """Check that the unique weights sum to 1"""
-        raise ValueError('Weights do not sum to 1')
+        # raise ValueError('Weights do not sum to 1')
+        new_uw = uw / np.sum(uw)
+        for i in range(len(uw)):
+            weights[weights == uw[i]] = new_uw[i]
+        uw = new_uw
+
     shp = (len(tvec), 2, len(uw))
     t = np.zeros(shp)
     s_cumhaz = np.zeros(shp)
     s_cumhaz_var = np.zeros(shp)
     s_atrisk = np.zeros(shp)
     s_events = np.zeros(shp)
-    for i,w in enumerate(uw):
+    for i, w in enumerate(uw):
         """Split the NA estimates by strata and group indicators.
         Strata levels are indicated by a unique weight."""
         ind_cmp = (treatment == 1) & (weights == w)
@@ -219,12 +224,41 @@ def cumulative_contrast(treatment, T, event, add_times, weights, log_ratio=True,
 
     return tvec, contrast, se_contrast, cumx, se_cumx
 
-def estimate_cumulative_incidence(durations, events, times=None, alpha=0.05):
+def estimate_cumulative_incidence(durations, events, times=None, weights=None, alpha=0.05):
     if times is None:
         times = np.unique(durations)
-    tvec, ch, cumhaz_var, atrisk, events_vec = na_est(np.asarray(durations), np.asarray(events), np.asarray(times))
+    if not weights is None:
+        uw = np.unique(weights)
+        if not np.abs(np.sum(uw) - 1) < 0.00001:
+            """Check that the unique weights sum to 1"""
+            # raise ValueError('Weights do not sum to 1')
+            new_uw = uw / np.sum(uw)
+            for i in range(len(uw)):
+                weights[weights == uw[i]] = new_uw[i]
+            uw = new_uw
+        
+        shp = (len(times), len(uw))
+        t = np.zeros(shp)
+        s_cumhaz = np.zeros(shp)
+        s_cumhaz_var = np.zeros(shp)
+        s_atrisk = np.zeros(shp)
+        s_events = np.zeros(shp)
+        for i,w in enumerate(uw):
+            """Split the NA estimates by strata 
+            Strata levels are indicated by a unique weight"""
+            ind = weights == w
+            t[:, i], s_cumhaz[:, i], s_cumhaz_var[:, i], s_atrisk[:, i], s_events[:, i] = na_est(np.asarray(durations)[ind],
+                                                                                                 np.asarray(events)[ind],
+                                                                                                 np.asarray(times))
+        """Take strata-weighted sums of the cumulative hazard and the SE"""
+        ch = np.sum(s_cumhaz * np.reshape(uw, (1, len(uw))), axis=1)
+        cumhaz_var = np.sum((np.sqrt(s_cumhaz_var) * np.reshape(uw, (1, len(uw))))**2, axis=1)
+        """Get the atrisk and events_vec from unweighted na_est"""
+        tvec, _, _, atrisk, events_vec = na_est(np.asarray(durations), np.asarray(events), np.asarray(times))
+    else:
+        tvec, ch, cumhaz_var, atrisk, events_vec = na_est(np.asarray(durations), np.asarray(events), np.asarray(times))
+    
     criticalz = -stats.norm.ppf(alpha / 2)
-
     """Matches R survfit"""
     lcl = ch - criticalz * np.sqrt(cumhaz_var)
     ucl = ch + criticalz * np.sqrt(cumhaz_var)

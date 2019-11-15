@@ -412,8 +412,8 @@ def clusteredScatter(xyDf,
             if ind.sum() > 2 and plotElipse:
                 Xvar = xyDf[plotDims].loc[ind].values
                 plot_point_cov(Xvar, ax=axh, color=colors[vi % len(colors)], alpha=0.2)
-    axh.set_xticks(())
-    axh.set_yticks(())
+    # axh.set_xticks(())
+    # axh.set_yticks(())
     """Set a 3% padding around the edge of all the data"""
     lim = lambda v,pad: [np.min(v) - pad*(np.max(v) - np.min(v)), np.max(v) + pad*(np.max(v) - np.min(v))]
     axh.set_xlim(lim(xyDf[plotDims[0]], 0.03))
