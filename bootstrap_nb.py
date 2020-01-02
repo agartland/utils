@@ -138,7 +138,7 @@ def permtest_nb(dat, statfunction, perm_cols, n_samples=9999, alternative='two-s
         Observed data required as sole input for statfunction.
     statfunction : function
         Operates on dat and returns a vector of statistics.
-    perm_cols : list of str
+    perm_cols : array of indices
         Columns that need to be permuted in dat to generate a null dataset
     n_samples : int
         Number of permutations to test
@@ -152,7 +152,8 @@ def permtest_nb(dat, statfunction, perm_cols, n_samples=9999, alternative='two-s
     
     samples = _perm_jit(dat.copy(), statfunction, np.array(perm_cols, dtype=np.int), int(n_samples))    
     if alternative == 'two-sided':
-        pvalues = ((np.abs(samples) > np.abs(statfunction(dat)[None, :])).sum(axis=1) + 1) / (n_samples + 1)
+        #pvalues = ((np.abs(samples) > np.abs(statfunction(dat)[None, :])).sum(axis=1) + 1) / (n_samples + 1)
+        pvalues = ((np.abs(samples) > np.abs(statfunction(dat)[:, None])).sum(axis=1) + 1) / (n_samples + 1)
     elif alternative == 'greater':
         pvalues = ((samples > statfunction(dat)[None, :]).sum(axis=1) + 1) / (n_samples + 1)
     elif alternative == 'less':
