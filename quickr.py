@@ -38,6 +38,7 @@ def runRscript(Rcmd, inDf=None, outputFiles=0, removeTempFiles=None, Rpath=None)
     if not inDf is None:
         if not type(inDf) is list:
             inputH, inputFn = tempfile.mkstemp(suffix='.csv', prefix='tmp-Rinput-', text=True)
+            inputFn = inputFn.replace('\\', '/')
             readCmd = 'INPUTDF <- read.csv("%s")\n' % inputFn
             Rcmd = readCmd + Rcmd
             os.close(inputH)
@@ -46,6 +47,7 @@ def runRscript(Rcmd, inDf=None, outputFiles=0, removeTempFiles=None, Rpath=None)
             inputFilenames = []
             for i, idf in enumerate(inDf):
                 inputH, inputFn = tempfile.mkstemp(suffix='.csv', prefix='tmp-Rinput%d-' % i, text=True)
+                inputFn = inputFn.replace('\\', '/')
                 readCmd = 'INPUTDF%d <- read.csv("%s")\n' % (i, inputFn)
                 Rcmd = readCmd + Rcmd
                 os.close(inputH)
@@ -56,6 +58,7 @@ def runRscript(Rcmd, inDf=None, outputFiles=0, removeTempFiles=None, Rpath=None)
     outFn = []
     for outi in range(outputFiles):
         outputH, outputFn = tempfile.mkstemp(suffix='.txt', prefix='tmp-Routput-', text=True)
+        outputFn = outputFn.replace('\\', '/')
         outCmd = 'OUTPUTFN%d <- "%s"\n' % (outi, outputFn)
         Rcmd = outCmd + Rcmd
         outFn.append(outputFn)
