@@ -70,7 +70,7 @@ def na_est(T, event, times):
 
 @numba.jit(nopython=True, parallel=True, error_model='numpy')
 def _CIR_est(treatment, T, event, add_times):
-    """Replaced by cumuative contrast"""
+    """Replaced by cumulative contrast"""
     tvec = np.unique(T)
     if len(add_times) > 0:
         tvec = np.unique(np.concatenate((tvec, add_times)))
@@ -98,7 +98,7 @@ def _CIR_est(treatment, T, event, add_times):
 
 @numba.jit(nopython=True, parallel=True, error_model='numpy')
 def _CID_est(treatment, T, event, add_times):
-    """Replaced by cumuative contrast"""
+    """Replaced by cumulative contrast"""
     """Cumulative incidence difference estimation"""
     tvec = np.unique(T)
     if len(add_times) > 0:

@@ -43,6 +43,7 @@ def runRscript(Rcmd, inDf=None, outputFiles=0, removeTempFiles=None, Rpath=None)
             Rcmd = readCmd + Rcmd
             os.close(inputH)
             inDf.to_csv(inputFn)
+            inputFilenames = [inputFn]
         else:
             inputFilenames = []
             for i, idf in enumerate(inDf):
@@ -77,16 +78,28 @@ def runRscript(Rcmd, inDf=None, outputFiles=0, removeTempFiles=None, Rpath=None)
         else:
             cmdList = [Rpath, '--vanilla', scriptFn]
         res = subprocess.check_output(cmdList, stderr=subprocess.STDOUT)
+        try:
+            res = res.decode('utf-8')
+        except AttributeError:
+            pass
     except subprocess.CalledProcessError as e:
-        res = bytes('STDOUT:\n%s\nSTDERR:\n%s' % (e.stdout, e.stderr), 'utf-8')
         print('R process returned an error')
-        print(res.decode('utf-8'))
-        
+        try:
+            res = 'STDOUT:\n%s\n' % (e.stdout.decode('utf-8'))
+        except AttributeError:
+            res = 'STDOUT:\nNone\n'
+        print(res)
+        try:
+            res = 'STDERR:\n%s\n' % (e.stderr.decode('utf-8'))
+        except AttributeError:
+            res = 'STDERR:\nNone\n'
+        print(res)
+
         if removeTempFiles is None:
             print('Leaving tempfiles for debugging.')
             print(' '.join(cmdList))
             if not inDf is None:
-                print(inputFn)
+                print(inputFilenames)
             for outputFn in outFn:
                 print(outputFn)
             removeTempFiles = False
@@ -130,9 +143,9 @@ def runRscript(Rcmd, inDf=None, outputFiles=0, removeTempFiles=None, Rpath=None)
             print(outputFn)
 
     if outputFiles == 0:
-        return res.decode('utf-8')
+        return res
     else:
-        return res.decode('utf-8'), outDf
+        return res, outDf
 
 def _test_simple():
     Rcmd = """ctl <- c(4.17,5.58,5.18,6.11,4.50,4.61,5.17,4.53,5.33,5.14)
