@@ -96,17 +96,21 @@ def bootstrap_twobytwo(pred, obs, alpha=0.05, n_samples=10000, method='bca'):
         Number needed to treat, to prevent one case.
         (assuming all predicted positives were "treated")"""
 
+    """Force numpy arrays"""
+    pred = np.asarray(pred)
+    obs = np.asarray(obs)
+
     alphas = np.array([alpha/2, 1-alpha/2])
     stat_d = bootstrap_twobytwo_jit(pred, obs, nstraps=n_samples)
+    # The value of the statistic function applied just to the actual data.
+    a, b, c, d = twobytwo_jit(pred, obs)
+    ostat_d = twobytwo_stats_jit(a, b, c, d)
 
     # Percentile Interval Method
     if method == 'pi':
         avals = {k:alphas for k in stat_d.keys()}
     # Bias-Corrected Accelerated Method
     elif method == 'bca':
-        # The value of the statistic function applied just to the actual data.
-        a, b, c, d = twobytwo_jit(pred, obs)
-        ostat_d = twobytwo_stats_jit(a, b, c, d)
         bca_accel_d = jackknife_twobytwo_jit(pred, obs)
 
         avals = dict()
@@ -200,7 +204,7 @@ def jackknife_twobytwo_roc_jit(pred_continuous, obs, thresholds):
                 print(k, 'jmean', jmean, 'a', bca_accel_d[k])"""
     return bca_accel_d
 
-def bootstrap_roc(pred_continuous, obs, n_thresholds=50, alpha=0.05, n_samples=10000, method='bca'):
+def bootstrap_roc(pred_continuous, obs, thresholds=50, alpha=0.05, n_samples=10000, method='bca'):
     """Compute ROC stats for a continuous predictor using n_thresholds
     from min(pred_continuous) to max(pred_continuous).
     
@@ -238,13 +242,21 @@ def bootstrap_roc(pred_continuous, obs, n_thresholds=50, alpha=0.05, n_samples=1
     nnt : float
         Number needed to treat, to prevent one case.
         (assuming all predicted positives were "treated")"""
-    mn, mx = np.min(pred_continuous), np.max(pred_continuous)
-    rng = mx - mn
-    delta = rng / n_thresholds
-    thresholds = np.linspace(mn + delta, mx - delta, n_thresholds - 1)
+
+    """Force numpy arrays"""
+    pred_continuous = np.asarray(pred_continuous)
+    obs = np.asarray(obs)
+
+    if np.isscalar(thresholds):
+        mn, mx = np.min(pred_continuous), np.max(pred_continuous)
+        rng = mx - mn
+        delta = rng / thresholds
+        thresholds = np.linspace(mn + delta, mx - delta, n_thresholds - 1)
 
     alphas = np.array([alpha/2, 1-alpha/2])
     stat_d = bootstrap_twobytwo_roc_jit(pred_continuous, obs, thresholds, nstraps=n_samples)
+    # The value of the statistic function applied just to the actual data.
+    ostat_d, _ = roc_stats_jit(np.asarray(pred_continuous), np.asarray(obs), thresholds)
 
     # Percentile Interval Method
     if method == 'pi':
@@ -252,7 +264,6 @@ def bootstrap_roc(pred_continuous, obs, n_thresholds=50, alpha=0.05, n_samples=1
     # Bias-Corrected Accelerated Method
     elif method == 'bca':
         # The value of the statistic function applied just to the actual data.
-        ostat_d, _ = roc_stats_jit(np.asarray(pred_continuous), np.asarray(obs), thresholds)
         bca_accel_d = jackknife_twobytwo_roc_jit(pred_continuous, obs, thresholds)
 
         avals = dict()
@@ -278,7 +289,7 @@ def bootstrap_roc(pred_continuous, obs, n_thresholds=50, alpha=0.05, n_samples=1
                 non_nan_ind = ~np.isnan(stat_d[k][threshi, :])
                 nvals = np.round((non_nan_ind.sum() - 1) * avals[k][threshi, :])
 
-                if np.any(np.isnan(nvals)):
+                if non_nan_ind.sum() == 0:
                     print('All nan samples for %s : %f, results are nan' % (k, thresholds[threshi]))
                     ci_d[k][threshi, :] = np.nan
                 else:    
@@ -340,8 +351,14 @@ def bootstrap_auc(pred_continuous, obs, alpha=0.05, n_samples=10000, method='bca
     ci : np.ndarray
         Lower and upper confidence limit obtained from the bootstrap samples."""
 
+    """Force numpy arrays"""
+    pred_continuous = np.asarray(pred_continuous)
+    obs = np.asarray(obs)
+
     alphas = np.array([alpha/2, 1-alpha/2])
     stat = bootstrap_auc_jit(pred_continuous, obs, nstraps=n_samples)
+    # The value of the statistic function applied just to the actual data.
+    ostat = roc_auc(obs, pred_continuous)
 
     # Percentile Interval Method
     if method == 'pi':
@@ -349,7 +366,6 @@ def bootstrap_auc(pred_continuous, obs, alpha=0.05, n_samples=10000, method='bca
     # Bias-Corrected Accelerated Method
     elif method == 'bca':
         # The value of the statistic function applied just to the actual data.
-        ostat = roc_auc(obs, pred_continuous)
         bca_accel = jackknife_auc_jit(pred_continuous, obs)
 
         """The bias correction value"""
