@@ -7,7 +7,11 @@ import itertools
 from hclusterplot import plotHCluster
 import re
 from myboxplot import myboxplot
-import networkx as nx
+
+try:
+    import networkx as nx
+except ImportError:
+    print('Could not import networkx.')
 import seaborn as sns
 
 sns.set(style='darkgrid', palette='muted', font_scale=1.5)
