@@ -2,6 +2,7 @@ import numba
 import numpy as np
 import pandas as pd
 import itertools
+from scipy import stats
 
 __all__ = ['crosscorr']
 
@@ -129,8 +130,6 @@ def crosscorr_scipy(data, left_cols=None, right_cols=None, method='spearman', mi
 
 def test():
     """Add CIs"""
-    from scipy import stats
-
     alphabet = np.array([a for a in 'ABCDEFGHIJKLMNOP'])
     np.random.seed(110820)
     dat = pd.DataFrame(np.random.rand(50, 20))
