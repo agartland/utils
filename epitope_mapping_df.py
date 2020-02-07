@@ -6,6 +6,7 @@ import argparse
 import multiprocessing
 import skbio
 
+from fg_shared import *
 import itertools
 import operator
 from functools import partial
@@ -36,11 +37,6 @@ epitope : pd.Series
 
 import sys
 from os.path import join as opj
-if sys.platform == 'win32':
-    GIT_PATH = 'A:/gitrepo'
-else:
-    GIT_PATH = '/home/agartlan/gitrepo'
-
 
 __all__ = [ 'hamming',
             'overlap',
@@ -711,7 +707,7 @@ def plotEpitopeMap(respDf, groupDf, uRespCol, groupCol, startCol, endCol, groupO
     if respDf.protein.str.lower().isin(['gp120', 'env', 'gp160']).all():
         keepRegions = ['Signal peptide', 'V1 loop', 'V2 loop',
                        'Loop D', 'V3 loop', 'V4 loop', 'V5 loop', 'gp41']
-        reg = pd.read_csv(opj(GIT_PATH, 'HIV_alignments', 'env_locations.csv'))
+        reg = pd.read_csv(opj(_git, 'HIV_alignments', 'env_locations.csv'))
         reg = reg.loc[reg.region.isin(keepRegions)]
         reg.loc[:, 'region'] = reg.region.str.replace(' loop', '').str.replace(' ', '\n')
         for i, (region, st, en) in reg.iterrows():
@@ -825,7 +821,7 @@ def plotEpitopeChiclets(respDf, groupDf, uRespCol, groupCol, startCol, endCol,
     if (respDf.protein.str.lower().isin(['env', 'gp120', 'gp160'])).all():
         keepRegions = ['Signal peptide', 'V1 loop', 'V2 loop',
                        'Loop D', 'V3 loop', 'V4 loop', 'V5 loop', 'gp41']
-        reg = pd.read_csv(opj(GIT_PATH, 'HIV_alignments', 'env_locations.csv'))
+        reg = pd.read_csv(opj(_git, 'HIV_alignments', 'env_locations.csv'))
         reg = reg.loc[reg.region.isin(keepRegions)]
         reg.loc[:, 'region'] = reg.region.str.replace(' loop', '').str.replace(' ', '\n')
         for i, (region, st, en) in reg.iterrows():
