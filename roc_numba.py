@@ -171,7 +171,9 @@ def predictor_stats(pred, obs):
 
     assert obs.shape[0] == pred.shape[0]
 
-    a, b, c, d = twobytwo_jit(np.asarray(pred), np.asarray(obs))
+    exclude = np.isnan(obs) | np.isnan(pred)
+
+    a, b, c, d = twobytwo_jit(np.asarray(pred[~exclude]), np.asarray(obs[~exclude]))
     out = twobytwo_stats_jit(a, b, c, d)
     return dict(out)
 
@@ -206,11 +208,13 @@ def roc_stats(pred_continuous, obs, n_thresholds=50):
 
     assert obs.shape[0] == pred.shape[0]
 
-    mn, mx = np.min(pred_continuous), np.max(pred_continuous)
+    exclude = np.isnan(obs) | np.isnan(pred_continuous)
+
+    mn, mx = np.nanmin(pred_continuous), np.nanmax(pred_continuous)
     rng = mx - mn
     delta = rng / n_thresholds
     thresholds = np.linspace(mn + delta, mx - delta, n_thresholds - 1)
-    out, auc = roc_stats_jit(np.asarray(pred_continuous), np.asarray(obs), thresholds)
+    out, auc = roc_stats_jit(np.asarray(pred_continuous[~exclude]), np.asarray(obs[~exclude]), thresholds)
 
     out = pd.DataFrame(dict(out), index=thresholds)
     return out, auc

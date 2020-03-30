@@ -272,7 +272,11 @@ def combocorrplot(data, method='spearman', axLimits='variable', axTicks=False, a
                              size=textSz)
     cbax = fh.add_axes([1.-cbwidth-border/2, border, cbwidth-border-0.02, 1.-2*border])
     cb = plt.colorbar(plth[0, 0], cax=cbax)
-    method = method[0].upper() + method[1:]
+    if method == 'spearman':
+        method = 'Rank-based'
+    else:
+        method = method[0].upper() + method[1:]
+
     plt.annotate('%s correlation' % (method),
                  [0.98, 0.5],
                  xycoords='figure fraction',
@@ -524,7 +528,10 @@ def corrheatmap(df, rowVars=None, colVars=None, adjust=[], annotation=None, cuto
                     plt.text(j+0.5, i+0.5, ann, **pvalueTxtProp)
 
     plt.colorbar(fraction=0.05)
-    method = method[0].upper() + method[1:]
+    if method == 'spearman':
+        method = 'Rank-based'
+    else:
+        method = method[0].upper() + method[1:]
     plt.annotate('%s correlation' % method, [0.98, 0.5], xycoords='figure fraction', ha='right', va='center', rotation='vertical')
     return rho, pvalue, qvalue
 
