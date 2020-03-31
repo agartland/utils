@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import svgwrite
 from svgwrite import cm, mm
+# import io
 # import matplotlib.pyplot as plt
 
 HW_RATIO = 0.5
@@ -30,7 +31,9 @@ def oneAA(dwg, aa, ul, lr, fontsize=2, units=cm, color='black'):
                             font_weight='normal'))
     return dwg
 
-def svg_logo(motif, filename, aa_colors='black', highlightAAs=None, highlightColor='red', convert=False):
+
+
+def svg_logo(motif, filename, aa_colors='black', highlightAAs=None, highlightColor='red', convert=False, return_str=False):
     """Sequence logo of the motif using SVG.
 
     Parameters
@@ -96,15 +99,18 @@ def svg_logo(motif, filename, aa_colors='black', highlightAAs=None, highlightCol
             
             #print(aa, x, y, score)
             negshift += score*fontsize
-    dwg.save()
+    if not return_str:
+        dwg.save()
 
-    if convert:
-        import subprocess
+        if convert:
+            import subprocess
 
-        cmd = ['convert', '-density 200', filename, filename.replace('.svg', '') + '.png']
-        subprocess.call(' '.join(cmd), shell=True)
-        filename = filename.replace('.svg', '') + '.png'
-    return filename
+            cmd = ['convert', '-density 200', filename, filename.replace('.svg', '') + '.png']
+            subprocess.call(' '.join(cmd), shell=True)
+            filename = filename.replace('.svg', '') + '.png'
+        return filename
+    else:
+        return str(dwg)
 
 if __name__ == '__main__':
     a = pd.DataFrame(np.array([[0.1, -0.2, 0, 0.5],[0, 0.3, -0.8, 0.1]]).T, columns=[0, 1], index=['C', 'R', 'W', 'I'])
