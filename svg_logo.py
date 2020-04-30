@@ -4,6 +4,8 @@ import svgwrite
 from svgwrite import cm, mm
 # import io
 # import matplotlib.pyplot as plt
+from svg_alphabet import add_letter
+import matplotlib as mpl
 
 HW_RATIO = 0.5
 
@@ -112,13 +114,121 @@ def svg_logo(motif, filename, aa_colors='black', highlightAAs=None, highlightCol
     else:
         return str(dwg)
 
+"""TODO
+ - Use letters from svg_alphabet (each is 100 x 100)
+ - Heights are just a scaling relative to 1.
+ - Do positives first, then negatives.
+ - Add them one at a time to a drawing with translation and scaling attributes
+ - Add axes and axes ticks with labels.
+ - Set viewBox to extent of columns and max height
+"""
+
+def new_svg_logo(motif, filename):
+    margin = 10
+    left_margin = 50
+    bottom_margin = 50
+    xpad = 4
+    HW = 100
+
+    """Scale height of 100px to absolute max value"""
+    mx_value = np.max(np.abs(motif.values))
+    hscale = HW / mx_value
+    wscale = 1
+
+    mx_pos = 0
+    mn_neg = 0
+    for j in range(motif.shape[1]):
+        tmp = motif.values[:, j]
+        tot = np.sum(tmp[tmp>0])
+        if tot > mx_pos:
+            mx_pos = tot
+        tot = np.sum(tmp[tmp<0])
+        if tot < mn_neg:
+            mn_neg = tot
+    
+    yticklabels = mpl.ticker.MaxNLocator(nbins=5, steps=[1, 2, 2.5, 5, 10]).tick_values(mn_neg, mx_pos)
+    yticks = [hscale * yt for yt in yticklabels]
+
+    mx_pos = hscale * mx_pos
+    mn_neg = hscale * mn_neg
+
+    mx_pos = np.max([mx_pos, yticks[-1]])
+    mn_neg = np.min([mn_neg, yticks[0]])
+
+    yzero = margin + mx_pos
+    xzero = left_margin
+
+    height = mx_pos + mn_neg + margin + bottom_margin
+    width = wscale * (HW + xpad) * motif.shape[1] + margin + left_margin + xpad
+
+    xticks = [xzero + (i + 1) * wscale * (HW + xpad) - wscale * HW / 2 for i in range(motif.shape[1])]
+    xticklabels = ['%d' % (i + 1) for i in range(motif.shape[1])]
+
+    dwg = svgwrite.Drawing(filename=filename, height=height, width=width)#, viewBox='0 0 100 100')# % int(a.shape[1]*1))
+
+    letter_groups = {}
+    for xi in range(motif.shape[1]):
+        xshift = xzero + xi*(HW + xpad) + xpad
+        scores = motif.iloc[:, xi]
+        pos_scores = scores[scores > 0].sort_values()
+        neg_scores = (-scores[scores < 0]).sort_values()
+        
+        posshift = 5
+        for yi, (aa, score) in enumerate(pos_scores.items()):
+            scaled_height = hscale * score
+            translate = (xshift, yzero - posshift - scaled_height)
+            transform = 'translate({xtrans} {ytrans}) scale({xscale} {yscale})'.format(xtrans=translate[0], ytrans=translate[1],
+                                                                                        xscale=wscale, yscale=score/mx_value)
+            letter_groups[(xi, aa)] = add_letter(dwg, aa, group_id='%d_%s' % (xi, aa), color=None, background='white', transform=transform)
+            #box = dwg.add(dwg.rect(insert=(x*cm, y*cm), size=(X*cm, score*fontsize*cm), fill='green', opacity=score))
+            #print(aa, x, y, score)
+            posshift += scaled_height
+
+        negshift = 5
+        for yi, (aa, score) in enumerate(neg_scores.items()):
+            scaled_height = hscale * score
+            translate = (xshift, yzero + negshift)
+            transform = 'translate({xtrans} {ytrans}) scale({xscale} {yscale})'.format(xtrans=translate[0], ytrans=translate[1],
+                                                                                        xscale=wscale, yscale=score/mx_value)
+            letter_groups[(xi, aa)] = add_letter(dwg, aa, group_id='%d_%s' % (xi, aa), color=None, background='white', transform=transform)
+            #box = dwg.add(dwg.rect(insert=(x*cm, y*cm), size=(X*cm, score*fontsize*cm), fill='green', opacity=score))
+            #print(aa, x, y, score)
+            negshift += scaled_height
+    
+    axes = dwg.add(dwg.g(id='axes', stroke_width=1.5, stroke='#000000'))
+    axes.add(dwg.path(d='M {xz} {yz} h {len}'.format(xz=xzero, yz=yzero, len=wscale * (HW + xpad) * motif.shape[1] + 2 * xpad)))
+    axes.add(dwg.path(d='M {xz} {yz} v {len}'.format(xz=xzero, yz=yzero - np.min(yticks), len=-(yticks[-1] - yticks[0]))))
+    for yt, ytl in zip(yticks, yticklabels):
+        axes.add(dwg.path(d='M {xz} {yz} h {len}'.format(xz=xzero, yz=yzero - yt, len=-(margin / 2))))
+        axes.add(dwg.text(ytl, (xzero - (margin/2) - xpad, yzero - yt),
+                          fill='#000000',
+                          font_size='10pt',
+                          font_family='sans-serif',
+                          font_weight='normal',
+                          text_anchor='end',
+                          dominant_baseline='middle'))
+    for xt, xtl in zip(xticks, xticklabels):
+        axes.add(dwg.text(xtl, (xt, yzero - yticks[0] + 10),
+                          fill='#000000',
+                          font_size='10pt',
+                          font_family='sans-serif',
+                          font_weight='normal',
+                          text_anchor='middle',
+                          dominant_baseline='hanging'))
+
+    dwg.save()
+
+
 if __name__ == '__main__':
-    a = pd.DataFrame(np.array([[0.1, -0.2, 0, 0.5],[0, 0.3, -0.8, 0.1]]).T, columns=[0, 1], index=['C', 'R', 'W', 'I'])
-    print(a)
-    svg_logo(a, 'test.svg')
+    # a = pd.DataFrame(np.array([[0.1, -0.2, 0, 0.5],[0, 0.3, -0.8, 0.1]]).T, columns=[0, 1], index=['C', 'R', 'W', 'S'])
+    # a = pd.DataFrame(np.array([[0.1, 0.2, 0, 0.5],[0, 0.3, 0.8, 0.1], [0.5, 0.1, 0.4, 0.]]).T, columns=[0, 1, 2], index=['C', 'R', 'W', 'S'])
+    a = pd.DataFrame(np.array([[0.1, 0.2, 0, 0.5],[0, 0.3, 0.8, 0.1], [0.5, 0.1, 0.4, 0.]]).T, columns=[0, 1, 2], index=['C', 'R', 'W', 'S'])
+    new_svg_logo(a, 'test.svg')
+    '''
     import subprocess
 
     cmd = ['convert', '-density 200', 'test.svg', 'test.png']
     subprocess.call(' '.join(cmd), shell=True)
+    '''
 
     

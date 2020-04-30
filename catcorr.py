@@ -1,8 +1,8 @@
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-import networkx as nx
 import itertools
+
 import palettable
 
 import pandas as pd
@@ -13,7 +13,12 @@ from myfisher import *
 from objhist import *
 from custom_legends import *
 
-from networkx.drawing.layout import spring_layout, spectral_layout
+try:
+    import networkx as nx
+    from networkx.drawing.layout import spring_layout, spectral_layout
+    NETWORKX = True
+except ImportError:
+    NETWORKX = False
 
 try:
     import plotly.plotly as py
@@ -25,22 +30,41 @@ except ImportError:
 
 __all__ = ['catcorr',
            'layouts',
-           'generateTestData',
-           'testEdge',
-           'cull_rows']
+           'generate_test_data',
+           'test_edge',
+           'cull_rows',
+           'compute_relations']
 
 layouts = ['twopi', 'fdp', 'circo', 'neato', 'dot', 'spring', 'spectral']
 
 color2str = lambda col: 'rgb'+str(tuple((np.array(col)*256).round().astype(int)))
 
-def computeRelations(df):
-    """Compute all OR neccessary for a catcorr graph"""
+def compute_relations(df, weight_col=None, min_n=10):
+    """Test for associations between categorical variables (columns)
+    in df by testing pairs of values within pairs of columns using
+    Fisher's exact test. This is not the best way to model associations
+    with multinomial distributed variables, but it will work as an initial screen.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Data contains columns of categorical variables.
+    min_n : int
+        Minimum number of counts required for testing.
+    counts_col : str
+        Column name indicating counts for each row. If None
+        will use one count per row.
+
+    Returns
+    -------
+    res : pd.DataFrame
+        Results, one row per test, with multiplicity adjustment"""
     res = []
     for col1, col2 in itertools.combinations(df.columns, 2):
         for val1, val2 in itertools.product(df[col1].unique(), df[col2].unique()):
             w = ((df[col1] == val1) & (df[col2] == val2)).sum()
-            if w > 0:
-                OR, pvalue = testEdge(df, (col1, val1), (col2, val2))
+            if w > min_n:
+                OR, pvalue = test_edge(df, (col1, val1), (col2, val2))
                 res.append({'OR':OR, 'pvalue':pvalue, col1:val1, col2:val2})
     resDf = pd.DataFrame(res)
     resDf.loc[:, 'qvalue'] = sm.stats.multipletests(resDf['pvalue'].values, method='fdr_bh')[1]
@@ -48,7 +72,7 @@ def computeRelations(df):
     return resDf
 
 
-def computeGraph(df):
+def compute_graph(df):
     """Compute odds-ratios, p-values and FDR-adjusted q-values for each edge"""
     edgeKeys = []
     pvalueArr = []
@@ -58,7 +82,7 @@ def computeGraph(df):
         for val1, val2 in itertools.product(df[col1].unique(), df[col2].unique()):
             w = ((df[col1] == val1) & (df[col2] == val2)).sum()
             if w > 0:
-                OR, pvalue = testEdge(df, (col1, val1), (col2, val2))
+                OR, pvalue = test_edge(df, (col1, val1), (col2, val2))
                 tested.append(True)
             else:
                 pvalue = 1.
@@ -134,7 +158,7 @@ def catcorr(df, layout='spring', mode='mpl', titleStr='', testSig=0.05, sRange=(
     
     >>> py.sign_in([username], [api_key])
 
-    >>> df = generateTestData()
+    >>> df = generate_test_data()
 
     >>> catcorr(df, layout = 'neato', mode = 'catcorr_example')
 
@@ -143,7 +167,7 @@ def catcorr(df, layout='spring', mode='mpl', titleStr='', testSig=0.05, sRange=(
     """
     
     """Compute odds-ratios, p-values and FDR-adjusted q-values for each edge"""
-    g = computeGraph(df)
+    g = compute_graph(df)
 
     """Compute attributes of edges and nodes"""
     edgewidth = np.array([d['weight'] for n1, n2, d in g.edges(data=True)])
@@ -248,7 +272,7 @@ def catcorr(df, layout='spring', mode='mpl', titleStr='', testSig=0.05, sRange=(
         fig = pygo.Figure(data=data, layout=layout)
         plot_url = py.plot(fig, filename='catcorr_'+mode)
 
-def generateTestData(nrows=100):
+def generate_test_data(nrows=100):
     """Generate a pd.DataFrame() with correlations that can be visualized by catcorr()"""
     testDf = pd.DataFrame(zeros((nrows, 3), dtype=object), columns = ['ColA', 'ColB', 'ColC'])
     """Use objhist to generate specific frequencies of (0,0,0), (1,0,0) etc. with values 1-4"""
@@ -312,7 +336,7 @@ def cull_rows(df, cols, freq):
         outDf = outDf.loc[outDf[c].map(lambda v: v in keepers[c])]
     return outDf
 
-def testEdge(df, node1, node2, verbose=False):
+def test_edge(df, node1, node2, weight_col=None, verbose=False):
     """Test if the occurence of nodeA paired with nodeB is more/less common than expected.
 
     Parameters
@@ -329,13 +353,18 @@ def testEdge(df, node1, node2, verbose=False):
     col1, val1 = node1
     col2, val2 = node2
     
-    tmp = df[[col1, col2]].dropna()
+    if weight_col is None:
+        tmp = df[[col1, col2]].dropna()
+        weight_col = 'weights'
+        tmp = tmp.assign(weights=np.ones(tmp.shape[0]))
+    else:
+        tmp = df[[col1, col2, weight_col]].dropna()
 
     tab = np.zeros((2, 2))
-    tab[0, 0] = ((tmp[col1]!=val1) & (tmp[col2]!=val2)).sum()
-    tab[0, 1] = ((tmp[col1]!=val1) & (tmp[col2]==val2)).sum()
-    tab[1, 0] = ((tmp[col1]==val1) & (tmp[col2]!=val2)).sum()
-    tab[1, 1] = ((tmp[col1]==val1) & (tmp[col2]==val2)).sum()
+    tab[0, 0] = (((tmp[col1]!=val1) & (tmp[col2]!=val2)) * tmp[weight_col]).sum()
+    tab[0, 1] = (((tmp[col1]!=val1) & (tmp[col2]==val2)) * tmp[weight_col]).sum()
+    tab[1, 0] = (((tmp[col1]==val1) & (tmp[col2]!=val2)) * tmp[weight_col]).sum()
+    tab[1, 1] = (((tmp[col1]==val1) & (tmp[col2]==val2)) * tmp[weight_col]).sum()
 
     """Add 1 to cells with zero"""
     if np.any(tab == 0):

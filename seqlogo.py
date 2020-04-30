@@ -71,7 +71,7 @@ def parseColor(aa, colorsDf):
         return arr
 
 
-def compute_motif(seqs, reference_freqs=None, weights=None, align_first=True, gap_reduce=None):
+def compute_motif(seqs, reference_freqs=None, weights=None, align_first=True, gap_reduce=None, alphabet=None):
     """Compute heights for a sequence logo
 
     Parameters
@@ -88,7 +88,8 @@ def compute_motif(seqs, reference_freqs=None, weights=None, align_first=True, ga
         Heights reflect the fraction of total entropy contributed
         by that AA within each column of the alignment."""
 
-    alphabet = sorted([aa for aa in skbio.sequence.Protein.alphabet if not aa in '*.'])
+    if alphabet is None:
+        alphabet = sorted([aa for aa in skbio.sequence.Protein.alphabet if not aa in '*.'])
 
     if weights is None:
         weights = np.ones(len(seqs))
