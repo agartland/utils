@@ -153,13 +153,19 @@ def mergeSamples(batchFolder, extractionFunc, extractionKwargs, matchStr='*.feat
     """Go through each feather file (sample) in a batch folder,
     apply the analysis function, and merge together."""
     mDf = pd.read_csv(opj(batchFolder, 'metadata.csv'))
+    print(batchFolder, matchStr)
     featherList = glob(opj(batchFolder, matchStr))
     featherLU = matchSamples(batchFolder, matchStr=matchStr, test=test)
     
     if not metaCols is None:
         if not 'sample_name' in metaCols:
             metaCols.append('sample_name')
-        mDf = mDf[metaCols]
+        try:
+            mDf = mDf[metaCols]
+        except KeyError:
+            print(metaCols)
+            print(mDf.head())
+            print(mDf.columns)
     
     mDf = mDf.set_index('sample_name')
     feathers = []

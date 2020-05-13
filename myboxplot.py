@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from numpy.random import permutation, seed
 import pandas as pd
 import seaborn as sns
+from itertools import cycle
 
 from vectools import untangle
 
@@ -297,7 +298,7 @@ def discrete_boxplot(x, y, hue, data, palette=None, order=None, hue_order=None, 
     if hue_order is None:
         hue_order = data[hue].unique()
     if palette is None:
-        palette = sns.color_palette('Set1', n_colors=len(hue_order))
+        palette = [c for i,c in zip(range(len(hue_order)), cycle(mpl.cm.Set1.colors))]
     
     plotx = 0
     xt = []
@@ -311,7 +312,7 @@ def discrete_boxplot(x, y, hue, data, palette=None, order=None, hue_order=None, 
             else:
                 if NUMBA:
                     """bootci_nb requires a 2D matrix and will operate along rows. statfunction needs to return a vector"""
-                    mu, lcl, ucl = bootci_nb(tmp.values[:, None], statfunction=_keepdims_mean, alpha=0.05, n_samples=10000, method='bca')
+                    mu, lcl, ucl = bootci_nb(tmp.values[:, None], statfunction=_keepdims_mean, alpha=0.05, n_samples=10000, method='bca').ravel()
                 else:
                     lcl, ucl = ci(tmp.values, statfunction=np.mean, n_samples=10000, method='bca')
                     mu = np.mean(tmp.values)

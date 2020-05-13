@@ -15,6 +15,9 @@ python /home/agartlan/gitrepo/utils/ics/mergeGatingSets.py --function cell_funct
 
 python /home/agartlan/gitrepo/utils/ics/mergeGatingSets.py --function sparse_functions --ncpus 3 --out sparse_functions_extract_23Aug2018.csv --testbatch --testsamples --feather --subsets /home/agartlan/gitrepo/utils/ics/subsets_CD4_gd_Tcells.csv
 
+python /home/agartlan/gitrepo/utils/ics/mergeGatingSets.py --function bool_functions --ncpus 6 --out bool_functions_extract_05May2020.csv --testbatch --testsamples --feather --subsets /home/agartlan/gitrepo/utils/ics/subsets_CD4_gd_Tcells.csv
+
+
 
 To delete all tmp files use:
 find . -name \merged_tmp*.feather -type f -delete
@@ -26,12 +29,13 @@ def mergeBatches(dataFolder, extractionFunc, extractionKwargs, ncpus, testsample
     batchList = [opj(dataFolder, bf) for bf in os.listdir(dataFolder) if os.path.isdir(opj(dataFolder, bf))]
     if testbatch:
         batchList = batchList[:1]
-
+    matchStr = 'gs_*.feather'
     if ncpus > 1 and _PARMAP:
         res = parmap.map(mergeSamples,
                              batchList,
                              extractionFunc,
                              extractionKwargs,
+                             matchStr,
                              testsamples,
                              metaCols,
                              filters,
@@ -42,6 +46,7 @@ def mergeBatches(dataFolder, extractionFunc, extractionKwargs, ncpus, testsample
                              batchList,
                              extractionFunc,
                              extractionKwargs,
+                             matchStr,
                              testsamples,
                              metaCols,
                              filters,
@@ -50,6 +55,7 @@ def mergeBatches(dataFolder, extractionFunc, extractionKwargs, ncpus, testsample
             func = partial(mergeSamples,
                            extractionFunc=extractionFunc,
                            extractionKwargs=extractionKwargs,
+                           matchStr=matchStr,
                            test=testsamples,
                            metaCols=metaCols,
                            filters=filters)
@@ -75,7 +81,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Extract features and merge batches into one CSV.')
     parser.add_argument('--folder', type=str,
                         help='Data folder containing all batch folders.',
-                        default='/fh/fast/gilbert_p/grp/compass_hvtn602_aw/tmpdata')
+                        default='/fh/fast/gilbert_p/grp/hvtn602_compass/tmpdata')
     parser.add_argument('--function', type=str,
                         help='Name of extraction to apply ("functions")',
                         default='functions')
@@ -130,6 +136,10 @@ if __name__ == '__main__':
         features = {'sparse_functions':(extractFunctionsGBY, dict(subsets=subsets,
                                                            functions=functions,
                                                            mincells=5)),
+                    'bool_functions':(extractFunctionsGBY, dict(subsets=subsets,
+                                                           functions=functions,
+                                                           mincells=0)),
+
                     'functions_markers':(extractFunctionsMarkersGBY, dict(subsets=subsets,
                                                                        functions=functions,
                                                                        markers=markers,
@@ -162,7 +172,7 @@ if __name__ == '__main__':
                           testbatch=args.testbatch,
                           outFile=outFile,
                           metaCols=['PTID', 'VISITNO', 'Global.Spec.Id', 'TESTDT', 'STIM'],
-                          filters={'STIM':['negctrl', 'TB WCL', 'BCG-Pasteur', 'Ag85B', 'TB 10.4'], 'VISITNO':[2, 10]},
+                          filters={'STIM':['negctrl', 'TB WCL', 'BCG-Pasteur', 'Ag85B', 'TB 10.4'], 'VISITNO':[2, 6, 7, 10, 11, 12]},
                           useFeather=int(args.feather),
                           ncpus=args.ncpus)
 
