@@ -2,17 +2,24 @@
 from functools import *
 import pandas as pd
 import itertools
-from Bio import SeqIO, pairwise2, Phylo
-import dendropy
-from dendropy import treecalc
+try:
+    from Bio import SeqIO, pairwise2, Phylo
+except ImportError:
+    pass
+try:
+    import dendropy
+    from dendropy import treecalc
+except ImportError:
+    pass
+
 from copy import deepcopy
 from HLAPredCache import *
 import subprocess
 import tempfile
 import os
-from aacolors import hydrophobicity, chemistry, taylor
+# from aacolors import hydrophobicity, chemistry, taylor
 from adjustwithin import adjustnonnan
-from sympy import binomial
+import scipy.special
 import sys
 import numpy as np
 import re
@@ -587,7 +594,7 @@ def _PD(alignA, alignB, subst, bySite, withinA):
 
     """Dist will be 1 where equal, 0 where not and nan if one is a gap"""
     if withinA:
-        dist = np.zeros((int(binomial(len(alignA), 2)), L))
+        dist = np.zeros((int(scipy.special.comb(len(alignA), 2)), L))
         allPairs = itertools.combinations(alignA, 2)
     else:
         dist = np.zeros((len(alignA)*len(alignB), L))
@@ -621,7 +628,7 @@ def _PD_hamming(alignA, alignB, subst, bySite, withinA, ignoreGaps=True):
 
     """Dist will be 1 where equal, 0 where not and nan if one is a gap"""
     if withinA:
-        dist=np.zeros((int(binomial(len(alignA), 2)), L))
+        dist=np.zeros((int(scipy.special.comb(len(alignA), 2)), L))
         allPairs = itertools.combinations(np.arange(len(alignA)), 2)
         for j, (seqi1, seqi2) in enumerate(allPairs):
             dist[j,:] = matA[seqi1,:]!=matA[seqi2,:]
