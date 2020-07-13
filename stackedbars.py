@@ -1,12 +1,12 @@
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
+import matplotlib as mpl
 import numpy as np
 import pandas as pd
-import seaborn as sns
 
 __all__ = ['stackedbars']
 
-def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=None, hueorder=None, facetorder=None, nhues=None, colors=None, handle=None, legend=True):
+def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=None, hueorder=None, facetorder=None, nhues=None, colors=None, handle=None, legend=True, yrange=None):
     """Create a stacked bar plot.
 
     Parameters
@@ -68,7 +68,7 @@ def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=N
         if not nhues is None:
             hueorder = hueorder[:nhues]
     if colors is None:
-        colors = sns.color_palette('Set3', n_colors=len(hueorder))
+        colors = mpl.cm.Set3.colors[:min(12, len(hueorder))]
     if not facetrow is None:
         if facetorder is None:
             facetorder = sorted(data[facetrow].unique())
@@ -90,6 +90,7 @@ def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=N
     else:
         gs = GridSpec(nrows=len(facetorder), ncols=1, right=0.9)
 
+    stack_labels = []
     axesHandles = []
     for rowi, row in enumerate(facetorder):
         if not facetrow is None:
@@ -124,6 +125,9 @@ def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=N
                                     color=colors[bari])
                             # print(curx, s, barl, bottom, plotDf.loc[s, barl])
                             bottom += plotDf.loc[s, barl]
+
+                    if xi == 0 and rowi == 0:
+                        stack_labels.append(((xcenters[curx] - len(sorder)/2) + stacki, s))
         
         curxl = plt.xlim()
         curyl = plt.ylim()
@@ -138,11 +142,11 @@ def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=N
             yl[1] = curyl[1]
 
         if rowi == len(facetorder) - 1:
-            plt.xlabel(stack)
+            plt.xlabel(x)
             """Applied this -0.5 fix to work for two stacks but not sure about more"""
-            plt.xticks(xcenters - 0.5, xorder)
+            plt.xticks(xcenters - 0.5*len(sorder)/2, xorder)
         else:
-            plt.xticks(xcenters, ['']*len(xcenters))
+            plt.xticks(xcenters - 0.5*len(sorder)/2, ['']*len(xcenters))
 
         if facetrow is None:
             plt.ylabel(y)
@@ -150,15 +154,17 @@ def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=N
             plt.ylabel(row)
 
         if rowi == 0 and legend:
-            plt.legend([plt.Rectangle((0,0), 1, 1, color=c) for c in colors],
-                        hueorder, 
+            plt.legend([plt.Rectangle((0,0), 1, 1, color=c) for c in colors][::-1],
+                        hueorder[::-1], 
                         loc='upper left',
                         bbox_to_anchor=(1, 1),
                         title=hue)
-
+    if not yrange is None:
+        yl = yrange
     for axh in axesHandles:
         axh.set_ylim(yl)
         axh.set_xlim(xl)
+        axh.yaxis.set_minor_locator(mpl.ticker.AutoMinorLocator())
 
     if facetrow is None:
         handle = axh
@@ -168,5 +174,14 @@ def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=N
                      xycoords='figure fraction',
                      horizontalalignment='center',
                      verticalalignment='center',
+                     rotation='vertical')
+    for x, s in stack_labels:
+        plt.sca(axesHandles[0])
+        plt.annotate(xy=(x, yl[1]), s=s,
+                     xycoords='data',
+                     textcoords='offset points',
+                     xytext=(0, 2),
+                     horizontalalignment='center',
+                     verticalalignment='bottom',
                      rotation='vertical')
     return handle
