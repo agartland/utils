@@ -191,3 +191,95 @@ def _non_generalized_simpsons_index(counts):
     p = counts / np.sum(counts)
     D = (p * p).sum()
     return 1 - D
+
+
+def fuzzy_diversity(counts, pwmat, order=2, threshold=1, nsamples=1000, force_sampling=False):
+    """Compute a "fuzzy" diversity index that takes into account the number of similar
+    members in a community, not just the ones that are identically matched.
+
+    Idea published as "TCRdiv" in Dash et al. (2017) in the area of T cell receptor
+    (TCR) analysis. The community is a TCR repertoire and the members are unique
+    TCR clones.
+
+    The diversity index is similar to Simpson's diversity index (SDI) in that it estimates
+    the chance of sampling m members from the community that are all more similar
+    to each other than some pre-specified threshold.
+
+    Fuzzy diversity is the sum of the probability of n members that match exactly,
+    plus the probability of m members matching within the threshold. Or it can be expressed
+    as 1 - probability of drawing m members that are not similar (distance > threshold).
+
+    For a confidence interval use some kind of bootstrap approach.
+
+    Parameters
+    ----------
+    counts : np.ndarray [n]
+        Number of observations of each member in the community
+    pwmat : np.ndarray [n x n]
+        Pairwise distances (not similarities) for all members in the community.
+        Consider using 1 to represent members that are not similar, and 0 for others,
+        or use the threshold parameter.
+    order : int
+        Order of the SDI, i.e. the number of members sampled to see if they are
+        similar to one another
+    threshold : float
+        A distance threshold that defines whether two members are similar to one
+        another: similar if distance < threshold
+    force_sampling : bool
+        Force use of the sampling approach, even for order=2
+        Only useful for checking the order=2 result.
+
+    Returns
+    -------
+    div : float
+        Estimate of fuzzy diversity"""
+
+    counts = np.asarray(counts)[:, None]
+
+    n = np.sum(counts)
+    
+    cts = counts * counts.T
+
+    assert cts.shape[0] == pwmat.shape[0]
+    assert cts.shape[0] == pwmat.shape[1]
+
+    up = np.triu_indices_from(cts, k=1)
+
+    if order == 2 and not force_sampling:
+        """The pwmat represents drawing two members and seeing if they are similar
+        so order = 2 is just a simple summary of the pairwise distance matrix:
+        the proportion of distance pairs that represent similar members"""
+        div = np.sum(cts[up] * (pwmat < threshold)[up]) / np.sum(cts)
+    else:
+        """Higher orders could be computed using a sampling approach
+        since its not scalable to compute all possible triplets, etc.
+        to see which are all similar. A triplet consists of 3 pairwise distances
+        that must all be within the threshold to be a similar triplet."""
+        dvec = (pwmat < threshold)[up]
+        prob = cts[up] / np.sum(cts[up])
+        samples = np.random.choice(dvec, size=(order, nsamples), replace=True, p=prob)
+        
+        div = np.mean(np.all(samples, axis=0))
+
+    return div
+
+
+def test_fuzzy_div():
+    from scipy.spatial.distance import squareform
+
+    n = 100
+    counts = np.random.randint(1, 20, size=n)
+    dvec = np.round(np.random.rand((n**2 - n) // 2))
+    pwmat = squareform(dvec)
+
+    two = fuzzy_diversity(counts, pwmat, order=2, threshold=1)
+    two_s = fuzzy_diversity(counts, pwmat, order=2, threshold=1, nsamples=10000, force_sampling=True)
+    three = fuzzy_diversity(counts, pwmat, order=3, threshold=1, nsamples=10000)
+    four = fuzzy_diversity(counts, pwmat, order=4, threshold=1, nsamples=10000)
+
+    print(two, two_s, three, four)
+
+
+
+
+
