@@ -4,7 +4,8 @@ from scipy import stats
 
 __all__ = ['generalized_simpsons_entropy',
            'simpsons_difference',
-           'effective_number']
+           'effective_number',
+           'fuzzy_diversity']
 
 def _calc_Z_base(counts, r_vec):
     """Python function for computing Z that is compatible with
