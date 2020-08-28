@@ -53,8 +53,8 @@ def plotROC(fprL, tprL, aucL=None, accL=None, labelL=None, outcomeVar=''):
     for i, (fpr, tpr, label) in enumerate(zip(fprL, tprL, labelL)):
         plt.plot(fpr, tpr, color=colors[i], lw=2, label=label)
     plt.plot([0, 1], [0, 1], '--', color='gray', label='Chance')
-    plt.xlim([-0.05, 1.05])
-    plt.ylim([-0.05, 1.05])
+    plt.xlim([0, 1])
+    plt.ylim([0, 1])
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
     if outcomeVar == '':

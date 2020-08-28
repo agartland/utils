@@ -206,7 +206,7 @@ def roc_stats(pred_continuous, obs, n_thresholds=50):
         Number needed to treat, to prevent one case.
         (assuming all predicted positives were "treated")"""
 
-    assert obs.shape[0] == pred.shape[0]
+    assert obs.shape[0] == pred_continuous.shape[0]
 
     exclude = np.isnan(obs) | np.isnan(pred_continuous)
 

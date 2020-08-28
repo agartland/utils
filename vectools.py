@@ -6,7 +6,8 @@ __all__ = ['unique_rows',
             'mnmx',
             'mnmxi',
             'argsort_rows',
-            'untangle']
+            'untangle',
+            'first_nonzero']
 
 def unique_rows(a, return_index=False, return_inverse=False, return_counts=False):
     """Performs np.unique on whole rows of matrix a using a "view".
@@ -87,3 +88,7 @@ def argsort_rows(a):
     sorti = np.argsort(a.view(a.dtype.descr * a.shape[1]), axis=0).flatten()
     return sorti
     
+
+def first_nonzero(mask, axis, invalid_val=-1):
+    """SO: https://stackoverflow.com/questions/47269390/numpy-how-to-find-first-non-zero-value-in-every-column-of-a-numpy-array"""
+    return np.where(mask.any(axis=axis), mask.argmax(axis=axis), invalid_val)

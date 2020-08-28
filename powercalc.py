@@ -19,7 +19,8 @@ __all_ = ['veEndpointsRequired',
           'sensitivityCI',
           'specificityCI',
           'rocStats',
-          'ccsize']
+          'ccsize',
+          'mean_shift_estimation']
 
 """NOTE: Many of these were hacked together in very short time, but they code may still be useful for next time."""
 
@@ -139,6 +140,40 @@ def magnitudePower(mu, N, sigma=None, CV=None, alpha=0.05, paired=False, iterati
     else:
         testFunc = stats.ttest_ind
     return powerBySim(dataFunc, testFunc, N, alpha=alpha, iterations=iterations, rseed=rseed)
+
+def mean_shift_estimation(mu, N, sigma=None, CV=None, alpha=0.05):
+    """Compute CI on the difference between two group means
+
+    Parameters
+    ----------
+    mu : list, 2
+        Means of two groups
+    N : list, 2
+        Number of observations in each group
+    sigma : list, 2
+        Standard deviation of the population for each group
+    CV : list, 2
+        Alternatively can provide a CV such that sigma changes with mu
+    alpha : float
+        Desired confidence level
+
+    Returns
+    -------
+    mu_diff, lcl, ucl"""
+
+    if sigma is None:
+        if CV is None:
+            print('Need to specify variability as sigma or CV!')
+            return
+        else:
+            sigma = [m*c for c, m in zip(CV, mu)]
+    dof = (N[0] - 1) + (N[1] - 1)
+    criticalz = -stats.t.ppf(alpha / 2, dof)
+    dmu = mu[1] - mu[0]
+    se = np.sqrt(sigma[0]**2 / N[0] + sigma[1]**2 / N[1])
+    lcl = dmu - criticalz * se
+    ucl = dmu + criticalz * se
+    return dmu, lcl, ucl
 
 def powerBySim(dataFunc, testFunc, N, alpha=0.05, iterations=1e3, PMagInds=(1, 0), rseed=820):
     """Calculate power for detecting difference in two groups,

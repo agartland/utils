@@ -62,6 +62,10 @@ def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=N
 
     xl = [None, None]
     yl = [None, None]
+    if hue is None:
+        data = data.assign(hue__=1)
+        hue = 'hue__'
+        hueorder = [1]
     if hueorder is None:
         h = data.groupby(hue)[y].agg(np.mean)
         hueorder = h.sort_values(ascending=False).index.tolist()
@@ -69,6 +73,10 @@ def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=N
             hueorder = hueorder[:nhues]
     if colors is None:
         colors = mpl.cm.Set3.colors[:min(12, len(hueorder))]
+    elif len(colors) >= len(hueorder):
+        colors = colors[:len(hueorder)]
+    else:
+        print('Not enough colors for hueorder')
     if not facetrow is None:
         if facetorder is None:
             facetorder = sorted(data[facetrow].unique())
@@ -86,9 +94,9 @@ def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=N
             
     if legend:
         """Leave room for the legend"""
-        gs = GridSpec(nrows=len(facetorder), ncols=1, right=0.6)
+        gs = GridSpec(nrows=len(facetorder), ncols=1, right=0.6, top=0.9, left=0.15)
     else:
-        gs = GridSpec(nrows=len(facetorder), ncols=1, right=0.9)
+        gs = GridSpec(nrows=len(facetorder), ncols=1, right=0.9, top=0.9, left=0.15)
 
     stack_labels = []
     axesHandles = []
@@ -184,4 +192,12 @@ def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=N
                      horizontalalignment='center',
                      verticalalignment='bottom',
                      rotation='vertical')
+    if len(stack_labels) > 0:
+        # x = np.median([x for x, s in stack_labels])
+        plt.annotate(xy=(0.15, 1), s=stack,
+                     xycoords='figure fraction',
+                     textcoords='offset points',
+                     xytext=(0, -2),
+                     horizontalalignment='left',
+                     verticalalignment='top')
     return handle

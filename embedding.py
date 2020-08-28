@@ -415,7 +415,8 @@ def clusteredScatter(xyDf,
     # axh.set_xticks(())
     # axh.set_yticks(())
     """Set a 3% padding around the edge of all the data"""
-    lim = lambda v,pad: [np.min(v) - pad*(np.max(v) - np.min(v)), np.max(v) + pad*(np.max(v) - np.min(v))]
+    lim = lambda v,pad: [np.min(v) - pad*np.abs(np.max(v) - np.min(v)),
+                         np.max(v) + pad*np.abs(np.max(v) - np.min(v))]
     axh.set_xlim(lim(xyDf[plotDims[0]], 0.03))
     axh.set_ylim(lim(xyDf[plotDims[1]], 0.03))
     return axh

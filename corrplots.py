@@ -10,7 +10,7 @@ from patsy import dmatrices, ModelDesc, Term, LookupFactor
 from copy import deepcopy
 import itertools
 import warnings
-import palettable
+# import palettable
 
 from adjustwithin import adjustnonnan
 
@@ -31,7 +31,8 @@ _cdict = {'green' : ((0, 1, 1), (0.5, 0, 0), (1, 0, 0)),
           'red':    ((0, 0, 0), (0.5, 0, 0), (1, 1, 1)),
           'blue' :  ((0, 0, 0), (1, 0, 0))}
 #_heatCmap = matplotlib.colors.LinearSegmentedColormap('my_colormap', _cdict, 1024)
-_heatCmap = palettable.colorbrewer.diverging.RdBu_11_r.mpl_colormap
+# _heatCmap = palettable.colorbrewer.diverging.RdBu_11_r.mpl_colormap
+_heatCmap = matplotlib.cm.RdBu_r
 
 
 def partialcorr(x, y, adjust=[], method='pearson', minN = None):
@@ -207,7 +208,7 @@ def combocorrplot(data, method='spearman', axLimits='variable', axTicks=False, a
     gs = GridSpec(n, n,
                   left=border,
                   bottom=border,
-                  right=1.-border-cbwidth,
+                  right=1.-2*border-cbwidth,
                   top=1.-border,
                   wspace=pad,
                   hspace=pad)
@@ -270,7 +271,7 @@ def combocorrplot(data, method='spearman', axLimits='variable', axTicks=False, a
                              color=txtcol,
                              weight='bold',
                              size=textSz)
-    cbax = fh.add_axes([1.-cbwidth-border/2, border, cbwidth-border-0.02, 1.-2*border])
+    cbax = fh.add_axes([1.-cbwidth-border, border, cbwidth-border-0.02, 1.-2*border])
     cb = plt.colorbar(plth[0, 0], cax=cbax)
     if method == 'spearman':
         method = 'Rank-based'

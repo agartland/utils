@@ -2,14 +2,15 @@ import numpy as np
 import pandas as pd
 from os.path import join as opj
 import sys
-
+import re
 from fg_shared import *
 
 sys.path.append(opj(_git, 'utils'))
 from quickr import *
 
 
-__all__ = ['partial_rank_correlation']
+__all__ = ['partial_rank_correlation',
+            'sanitize_columns']
 
 
 def partial_rank_correlation(data, formulas):
@@ -48,22 +49,22 @@ def partial_rank_correlation(data, formulas):
     rcmd = """
 formulas = c({formulas})
 results = lapply(formulas, function(frm) PResiduals::partial_Spearman(as.formula(frm), data=INPUTDF))
-purrr::map_df(results, ~.x$TS$TB) %>% readr::write_csv(OUTPUTFN)
+out <- purrr::map_df(results, ~.x$TS$TB)
+write.csv(out, OUTPUTFN0)
 """
 
-    pattern = r'[.|/$ \\@%\-+*]'
-    clean_formulas = [re.sub(pattern, '_', f) for f in formulas]
-    old_columns = data.columns
-    new_columns = [re.sub(pattern, '_', c) for c in old_columns]
-    data.columns = new_columns
-
-    try:
-        stdout, res = runRscript(rcmd.format(formulas=str(list(clean_formulas))[1:-1]),
-                                 inDf=data, outputFiles=1, removeTempFiles=None, Rpath=None)
-        print(stdout)
-    except:
-        data.columns = old_columns
-        raise
+    stdout, res = runRscript(rcmd.format(formulas=str(list(formulas))[1:-1]),
+                             inDf=data, outputFiles=1, removeTempFiles=None, Rpath=None)
     res = res.assign(formula=formulas)
+    
     return res
 
+def sanitize_columns(cols, sub='.'):
+    pattern = r'[./$ \\#@%\-]'
+    clean_columns = [re.sub(pattern, sub, f) for f in cols]
+    clean_columns = [re.sub(r'[\+]', '', f) for f in clean_columns]
+    return clean_columns
+
+"""#for (frm in formulas){
+#    res = PResiduals::partial_Spearman(as.formula(frm), data = INPUTDF)
+#}"""
