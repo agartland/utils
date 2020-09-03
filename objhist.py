@@ -4,7 +4,7 @@ from numpy.random import permutation, randint
 from scipy import stats, special
 
 try:
-    from matplotlib.pyplot import plot, xticks, is_numlike, bar
+    from matplotlib.pyplot import plot, xticks, bar
 except ImportError:
     print('Imported objhist without matplotlib.')
 
@@ -198,7 +198,7 @@ class countdict(dict):
         -------
         axh : matplotlib axes handle
         """
-        if all([is_numlike(k) for k in list(self.keys())]):
+        if all([np.isscalar(k) for k in list(self.keys())]):
             """If keys are numbers then use the x-axis scale"""
             if all([round(k)==k for k in list(self.keys())]):
                 xvec = [int(k) for k in sorted(self.keys())]

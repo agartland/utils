@@ -17,7 +17,7 @@ from scipy import stats
 import seaborn as sns
 from objhist import objhist
 
-from sklearn.preprocessing import Imputer
+from sklearn.impute import SimpleImputer
 
 sns.set(style='darkgrid', palette='muted', font_scale=1.75)
 
@@ -36,7 +36,7 @@ plotHierClust(dmatDf, Z, labels=labels, titleStr=None, vRange=None, tickSz='smal
 """
 
 def imputeNA(df, strategy='median', axis=0, copy=True):
-    imp = Imputer(strategy=strategy, axis=axis, copy=copy)
+    imp = SimpleImputer(strategy=strategy, axis=axis, copy=copy)
     return pd.DataFrame(imp.fit_transform(df.values), columns=df.columns, index=df.index)
 
 def corrTDmatFunc(df, *args, **kwargs):
