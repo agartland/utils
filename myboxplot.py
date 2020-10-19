@@ -289,7 +289,7 @@ def _yjitter(v, jitter=0.3):
     y = np.random.permutation(y)
     return y + v
 
-def discrete_boxplot(x, y, hue, data, palette=None, order=None, hue_order=None, IQR=True):
+def discrete_boxplot(x, y, hue, data, yjitter=0.3, palette=None, order=None, hue_order=None, IQR=True, mean_df=None, pvalue_df=None):
     if order is None:
         order = data[x].unique()
     if len(order) == 1:
@@ -301,33 +301,56 @@ def discrete_boxplot(x, y, hue, data, palette=None, order=None, hue_order=None, 
     if palette is None:
         palette = [c for i,c in zip(range(len(hue_order)), cycle(mpl.cm.Set1.colors))]
     
+    yl = (data[y].min() - 0.5, data[y].max() + 0.5) 
+
     plotx = 0
     xt = []
     xtl = []
     for xval in order:
         xcoords = []
+        xcoords_labels = {}
         for hueval, color in zip(hue_order, palette):
             tmp = data.loc[(data[hue] == hueval) & (data[x] == xval), y]
-            if IQR:
-                lcl, mu, ucl = np.percentile(tmp.values, [25, 50, 75])
-            else:
-                if NUMBA:
-                    """bootci_nb requires a 2D matrix and will operate along rows. statfunction needs to return a vector"""
-                    mu, lcl, ucl = bootci_nb(tmp.values[:, None], statfunction=_keepdims_mean, alpha=0.05, n_samples=10000, method='bca').ravel()
+            if mean_df is None:
+                if IQR:
+                    lcl, mu, ucl = np.percentile(tmp.values, [25, 50, 75])
                 else:
-                    lcl, ucl = ci(tmp.values, statfunction=np.mean, n_samples=10000, method='bca')
-                    mu = np.mean(tmp.values)
+                    if NUMBA:
+                        """bootci_nb requires a 2D matrix and will operate along rows. statfunction needs to return a vector"""
+                        mu, lcl, ucl = bootci_nb(tmp.values[:, None], statfunction=_keepdims_mean, alpha=0.05, n_samples=10000, method='bca').ravel()
+                    else:
+                        lcl, ucl = ci(tmp.values, statfunction=np.mean, n_samples=10000, method='bca')
+                        mu = np.mean(tmp.values)
+            else:
+                mu, lcl, ucl = mean_df.loc[(mean_df[hue] == hueval) & (mean_df[x] == xval)].iloc[0][['mean', 'lcl', 'ucl']]
+
             plt.errorbar(x=plotx,
                          y=mu,
                          yerr=np.array([mu - lcl, ucl - mu])[:, None],
                          fmt='s-',
                          color=color,
                          lw=2)
-            yvec = _yjitter(tmp.values)
+            if yjitter > 0:
+                yvec = _yjitter(tmp.values, jitter=yjitter)
+            else:
+                yvec = tmp.values
             xvec = _xspacing(tmp.values)
             plt.scatter(xvec + plotx, yvec, s=20, alpha=0.4, color=color, edgecolor='black', linewidth=1)
             xcoords.append(plotx)
+            xcoords_labels[hueval] = plotx
             plotx += xspacing
+        if not pvalue_df is None:
+            for ann_y, (_, r) in enumerate(pvalue_df.loc[pvalue_df[x] == xval].iterrows()):
+                if r['significant'] == 1:
+                    stl, enl = r[hue].split(' - ')
+                    stx, enx = xcoords_labels[stl], xcoords_labels[enl]
+                    plt.plot((stx, enx), (yl[1] + ann_y, yl[1] + ann_y), '-', color='k', lw=2)
+                    plt.plot((stx, stx), (yl[1] + ann_y, yl[1] + ann_y - 0.15), '-', color='k', lw=2)
+                    plt.plot((enx, enx), (yl[1] + ann_y, yl[1] + ann_y - 0.15), '-', color='k', lw=2)
+                    plt.annotate('p = %1.3f' % r['pvalue'],
+                                 xy=(np.min([enx, stx]) + np.abs(enx - stx)/2, yl[1] + ann_y),
+                                 va='bottom', ha='center', size=12,
+                                 textcoords='offset points', xytext=(0,1))
         xt.append(np.median(xcoords))
         xtl.append(xval)
         plotx += xspacing
@@ -339,6 +362,7 @@ def discrete_boxplot(x, y, hue, data, palette=None, order=None, hue_order=None, 
     else:
         plt.xticks(xcoords, hue_order, rotation=45)
     plt.xlim((-1, np.max(xcoords) + 1))
+    plt.ylim((yl[0], yl[1] + len(hue_order)))
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
     plt.legend([plt.Rectangle((0,0), 1, 1, color=c) for c in palette],

@@ -109,7 +109,7 @@ def _scipy_corr(v1, v2, method):
         rho, pvalue = stats.kendalltau(v1, v2)
     return rho, pvalue
 
-def crosscorr_scipy(data, left_cols=None, right_cols=None, method='spearman', min_n=5):
+def crosscorr_scipy(data, left_cols=None, right_cols=None, method='spearman', min_n=5, alpha=0.05):
     if left_cols is None:
         left_cols = data.columns
     if right_cols is None:
@@ -126,6 +126,13 @@ def crosscorr_scipy(data, left_cols=None, right_cols=None, method='spearman', mi
 
     results = pd.DataFrame(res, columns=['rho', 'pvalue', 'N'])
     results = results.assign(Left=column_pairs[:, 0], Right=column_pairs[:, 1])
+    if method == 'pearson':
+        r_z = np.arctanh(results['rho'])
+        se = 1 / np.sqrt(results['N'] - 3)
+        z = stats.norm.ppf(1 - alpha / 2)
+        lo_z, hi_z = r_z-z*se, r_z+z*se
+        lo, hi = np.tanh((lo_z, hi_z))
+        results = results.assign(LCL=lo, UCL=hi)
     return results
 
 def test():

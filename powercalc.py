@@ -37,7 +37,7 @@ try:
             return (OR, res.left_tail)
         elif alternative == 'greater':
             return (OR, res.right_tail)
-    print("Using Cython-powered Fisher's exact test")
+    #print("Using Cython-powered Fisher's exact test")
 except ImportError:
     print("Using scipy.stats Fisher's exact test (slow)")
     fisherTest = stats.fisher_exact

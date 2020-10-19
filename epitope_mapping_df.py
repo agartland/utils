@@ -723,7 +723,7 @@ def plotEpitopeMap(respDf, groupDf, uRespCol, groupCol, startCol, endCol, groupO
                          color='black')
 
     #plt.ylabel('Participants', fontsize=16)
-    plt.yticks(yt, ['' for i in range(nPTIDs)])
+    plt.yticks(yt, ['' for i in range(len(yt))])
     plt.ylim((-1, nPTIDs + 15))
 
     plt.xlabel('HIV %s HXB2 Position' % respDf.protein.unique()[0])
