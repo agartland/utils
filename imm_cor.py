@@ -214,7 +214,7 @@ def cumulative_contrast(treatment, T, event, add_times, weights, log_ratio=True,
         se_contrast = np.sqrt( (se_cumx[:, 1] / cumx[:, 1])**2 + (se_cumx[:, 0] / cumx[:, 0])**2 )
 
         """Replace NaN caused by zeros in above step"""
-        cumx0 = (cumx[:, 1] == 0) | (cumx[:, 0] == 0)  
+        cumx0 = (cumx[:, 1] == 0) & (cumx[:, 0] == 0)  
         contrast[cumx0] = np.nan
         se_contrast[cumx0] = np.nan
     else:
