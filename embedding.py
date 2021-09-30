@@ -111,7 +111,9 @@ def embedDistanceMatrix(dmatDf, method='kpca', n_components=2, **kwargs):
     xyDf = pd.DataFrame(xy[:, :n_components], index=dmatDf.index, columns=np.arange(n_components))
     if method == 'kpca':
         """Not sure how negative eigenvalues should be handled here, but they are usually
-        small so it shouldn't make a big difference"""
+        small so it shouldn't make a big difference. FRom this answer it seems negative eigenvalues should be zeroed
+        for PCoA/KPCA, but then could be used to report proportion variance explained:
+        https://stats.stackexchange.com/questions/68680/how-to-interpret-variation-explained-by-principal-coordinates"""
         setattr(xyDf, 'explained_variance_', pcaObj.lambdas_[:n_components]/pcaObj.lambdas_[pcaObj.lambdas_>0].sum())
     return xyDf
 

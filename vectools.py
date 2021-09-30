@@ -1,5 +1,6 @@
 import numpy as np
 from scipy import stats
+import pandas as pd
 
 __all__ = ['unique_rows',
             'argrank',
@@ -7,7 +8,34 @@ __all__ = ['unique_rows',
             'mnmxi',
             'argsort_rows',
             'untangle',
-            'first_nonzero']
+            'first_nonzero',
+            'complete_index']
+
+def complete_index(df, index_cols, fill_value):
+    """Complete the combinations of values in index_cols of df
+    so there is one row in df per combination of values across
+    index_cols. Missing combination values are filled with fill_value.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        A pandas.DataFrame, no special indexing required, though index
+        will be replaced in the copy.
+    index_cols : list
+        Columns in df that form a unique index, for expanding all
+        combinations.
+    fill_value : any value
+        Filled for all columns when
+        new rows are added with reindex
+
+    Returns
+    -------
+    out : pd.DataFrame
+        A possibly longer df with a complete combination 
+        of unique values across index columns, now as the index"""
+    new_index = pd.MultiIndex.from_product(iterables=[df[col].unique() for col in index_cols], names=index_cols)
+    out = df.reindex(new_index, fill_value=fill_value)
+    return out
 
 def unique_rows(a, return_index=False, return_inverse=False, return_counts=False):
     """Performs np.unique on whole rows of matrix a using a "view".

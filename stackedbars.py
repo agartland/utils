@@ -94,9 +94,9 @@ def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=N
             
     if legend:
         """Leave room for the legend"""
-        gs = GridSpec(nrows=len(facetorder), ncols=1, right=0.6, top=0.9, left=0.15)
+        gs = GridSpec(nrows=len(facetorder), ncols=1, right=0.6, top=0.9, left=0.20)
     else:
-        gs = GridSpec(nrows=len(facetorder), ncols=1, right=0.9, top=0.9, left=0.15)
+        gs = GridSpec(nrows=len(facetorder), ncols=1, right=0.9, top=0.9, left=0.20)
 
     stack_labels = []
     axesHandles = []
@@ -178,14 +178,14 @@ def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=N
         handle = axh
     else:
         handle = figh
-        plt.annotate(xy=(0.02, 0.5), s=y,
+        plt.annotate(xy=(0.02, 0.5), text=y,
                      xycoords='figure fraction',
                      horizontalalignment='center',
                      verticalalignment='center',
                      rotation='vertical')
     for x, s in stack_labels:
         plt.sca(axesHandles[0])
-        plt.annotate(xy=(x, yl[1]), s=s,
+        plt.annotate(xy=(x, yl[1]), text=s,
                      xycoords='data',
                      textcoords='offset points',
                      xytext=(0, 2),
@@ -194,7 +194,7 @@ def stackedbars(data, stack, x, y, hue, facetrow=None, stackorder=None, xorder=N
                      rotation='vertical')
     if len(stack_labels) > 0:
         # x = np.median([x for x, s in stack_labels])
-        plt.annotate(xy=(0.15, 1), s=stack,
+        plt.annotate(xy=(0.15, 1), text=stack,
                      xycoords='figure fraction',
                      textcoords='offset points',
                      xytext=(0, -2),

@@ -261,8 +261,8 @@ def swarmbox(x, y, data, hue=None, palette=None, order=None, hue_order=None, con
                 
                 """Merge the data from each hue, including the new detangled x coords,
                 based on what was plotted"""
-                tmpA.loc[:, '_untangi'] = untangle(tmpA[y].values, plottedA[:, 1])
-                tmpB.loc[:, '_untangi'] = untangle(tmpB[y].values, plottedB[:, 1])
+                tmpA.loc[:, '_untangi'] = untangle(tmpA[y].values.astype(float), plottedA[:, 1])
+                tmpB.loc[:, '_untangi'] = untangle(tmpB[y].values.astype(float), plottedB[:, 1])
                 tmpA.loc[:, '_newx'] = plottedA[:, 0][tmpA['_untangi'].values]
                 tmpB.loc[:, '_newx'] = plottedB[:, 0][tmpB['_untangi'].values]
                 """Using 'inner' drops the data points that are in one hue grouping and not the other"""
@@ -272,6 +272,35 @@ def swarmbox(x, y, data, hue=None, palette=None, order=None, hue_order=None, con
                     plt.plot(r[['_newx_A', '_newx_B']],
                              r[[y + '_A', y + '_B']],
                              '-', color='gray', linewidth=0.5)
+    elif connect and not order is None:
+        for i in range(len(order) - 1):
+            """Loop over pairs of hues (i.e. grouped boxes)"""
+            cur_orders = order[i:i+2]
+            """Pull out just the swarm collections that are needed"""
+            c_a = swarm.collections[i]
+            c_b = swarm.collections[i + 1]
+            ind_a = (data[x] == cur_orders[0])
+            ind_b = (data[x] == cur_orders[1])
+                
+            """Locate the data and match it up with the points plotted for each hue"""
+            tmp_a = data[[x, y] + connect_on].loc[ind_a].dropna()
+            tmp_b = data[[x, y] + connect_on].loc[ind_b].dropna()
+            plotted_a = swarm.collections[i].get_offsets() # shaped (n_elements x 2)
+            plotted_b = swarm.collections[i + 1].get_offsets()
+                
+            """Merge the data from each hue, including the new detangled x coords,
+            based on what was plotted"""
+            tmp_a.loc[:, '_untangi'] = untangle(tmp_a[y].values.astype(float), plotted_a[:, 1])
+            tmp_b.loc[:, '_untangi'] = untangle(tmp_b[y].values.astype(float), plotted_b[:, 1])
+            tmp_a.loc[:, '_newx'] = plotted_a[:, 0][tmp_a['_untangi'].values]
+            tmp_b.loc[:, '_newx'] = plotted_b[:, 0][tmp_b['_untangi'].values]
+            """Using 'inner' drops the data points that are in one hue grouping and not the other"""
+            tmp = pd.merge(tmp_a, tmp_b, left_on=connect_on, right_on=connect_on, suffixes=('_A', '_B'), how='inner')
+            """Plot them one by one"""
+            for rind, r in tmp.iterrows():
+                plt.plot(r[['_newx_A', '_newx_B']],
+                         r[[y + '_A', y + '_B']],
+                         '-', color='gray', linewidth=0.5)
     if not hue is None and not legend_loc is None:
         plt.legend([plt.Circle(1, color=c, alpha=1) for c in palette], hue_order, title=hue, loc=legend_loc, bbox_to_anchor=legend_bbox)
     if legend_loc is None:

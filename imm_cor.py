@@ -619,25 +619,25 @@ def scoreci(x, n, alpha=0.05):
 
     return np.array([lowlim, uplim])
 
-def unconditionalVE(nv,Nv, np, Np, alpha=0.025):
+def unconditionalVE(nv,Nv, n_p, Np, alpha=0.025):
     """VE point-estimate, CI and p-value, without conditioning on the total number of events"""
-    rr = (nv/(Nv)) / (np/(Np))
+    rr = (nv/(Nv)) / (n_p/(Np))
 
     ve = 1 - rr
-    se = sqrt((Nv-nv)/(nv*Nv) + (Np-np)/(np*Np))
+    se = np.sqrt((Nv-nv)/(nv*Nv) + (Np-n_p)/(n_p*Np))
 
     z = stats.norm.ppf(1 - alpha)
 
-    ci = 1 - exp(array([log(rr) + se*z, log(rr) - se*z]))
+    ci = 1 - np.exp(np.array([np.log(rr) + se*z, np.log(rr) - se*z]))
     
     """Wald CI"""
-    pvalue = stats.norm.cdf(log(rr)/se)
+    pvalue = stats.norm.cdf(np.log(rr)/se)
 
     return  pd.Series([ve, ci[0], ci[1], pvalue], index=['VE', 'LL', 'UL', 'p'])
 
-def AgrestiScoreVE(nv,Nv, np, Np, alpha=0.05):
+def AgrestiScoreVE(nv,Nv, n_p, Np, alpha=0.05):
     """Conditional test based on a fixed number of events,
-    n = nv + np
+    n = nv + n_p
     phat = nv/n"""
 
     def scoreci_binprop(pHat, n, alpha):
@@ -648,9 +648,9 @@ def AgrestiScoreVE(nv,Nv, np, Np, alpha=0.05):
         return lcl, ucl
 
     veFunc = lambda pvhat, Nv, Np: 1 - (Np/Nv)*(pvhat/(1-pvhat))
-    rr = (nv/Nv)/(np/Np)
+    rr = (nv/Nv)/(n_p/Np)
     ve = 1 - rr
-    n = nv + np
+    n = nv + n_p
     pvhat = nv/n
 
     ll, ul = scoreci_binprop(pvhat, n, alpha=alpha)
