@@ -5,7 +5,10 @@ import os
 
 __all__ = ['runRscript']
 
-def runRscript(Rcmd, inDf=None, outputFiles=0, removeTempFiles=None, Rpath=None):
+R_ENV = {'R_LIBS_SITE':'/app/software/fhR/4.1.1-foss-2020b'}
+R_PATH = '/app/software/R/4.1.1-foss-2020b/bin/Rscript'
+
+def runRscript(Rcmd, inDf=None, outputFiles=0, removeTempFiles=None, Rpath=None, env={}):
     """Runs an R cmd with option to provide a DataFrame as input and file
     as output.
 
@@ -77,7 +80,7 @@ def runRscript(Rcmd, inDf=None, outputFiles=0, removeTempFiles=None, Rpath=None)
             cmdList = ['Rscript', '--vanilla', scriptFn]
         else:
             cmdList = [Rpath, '--vanilla', scriptFn]
-        res = subprocess.check_output(cmdList, stderr=subprocess.STDOUT)
+        res = subprocess.check_output(cmdList, stderr=subprocess.STDOUT, env=dict(os.environ, **env))
         try:
             res = res.decode('utf-8')
         except AttributeError:

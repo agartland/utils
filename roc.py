@@ -8,6 +8,7 @@ import sklearn
 import sklearn.ensemble
 from sklearn.model_selection import StratifiedKFold, cross_val_score, LeaveOneOut, LeavePOut, GridSearchCV
 import sklearn.linear_model
+from sklearn.svm import l1_min_c
 import warnings
 
 sns.set(style='darkgrid', palette='muted', font_scale=1.5)
@@ -91,7 +92,7 @@ def plotProb(outcome, prob, **kwargs):
     plt.xlim(-1, tmp.shape[0])
     plt.show()
 
-def plotLogisticL1Paths(lo):
+def plotLogisticL1Paths(lo, figsize=(8, 8)):
     tmp = lo['paths'].mean(axis=0)
     
     if len(lo['Xvars']) == (tmp.shape[1] - 1):
@@ -99,46 +100,54 @@ def plotLogisticL1Paths(lo):
     else:
         predVars = np.array(lo['Xvars'])
     
-    plt.clf()
-    plt.plot(np.log10(lo['Cs']), tmp, '-')
+    figh = plt.figure(figsize=figsize)
+    axh = figh.add_axes([0.15, 0.15, 0.75, 0.75])
+    # plt.plot(np.log10(lo['Cs']), tmp, '-')
+    plt.step(np.log10(lo['Cs']), tmp, '-', where='pre')
     yl = plt.ylim()
     xl = plt.xlim()
-    plt.plot(np.log10([lo['optimalCs'].mean()]*2), yl, '--k')
+    plt.plot([np.log10(lo['finalResult'].C)]*2, yl, '--k')
+
     plt.ylabel('Coefficient')
     plt.xlabel('Regularization parameter ($log_{10} C$)\n(lower is more regularized)')
     
     topi = np.nonzero(lo['finalResult'].coef_.ravel() != 0)[0]
-    plt.annotate(s='$N_{vars}=%d$' % len(topi),
+    plt.annotate(text='$N_{vars}=%d$' % len(topi),
          xy=(np.log10(lo['finalResult'].C), yl[1]),
-         ha='left', va='top', size=10)
-
+         textcoords='offset points', xytext=(-3, -5),
+         ha='right', va='top', size=10)
+    plt.ylim(yl)
+    
     for i in topi:
         a = predVars[i]
         cInd = np.where(tmp[:, i] != 0)[0][0]
         
         y = tmp[cInd+2, i]
         x = np.log10(lo['Cs'][cInd+2])
-        plt.annotate(a, xy=(x, y), ha='left', va='center', size=7)
+        plt.annotate(text=a, xy=(x, y), ha='left', va='center', size=8)
 
         y = tmp[-1, i]
         x = np.log10(lo['Cs'][-1])
-        plt.annotate(a, xy=(x, y), ha='left', va='center', size=7)
+        plt.annotate(text=a, xy=(x, y), ha='left', va='center', size=8)
+    return figh
 
-    plt.show()
-
-def plotLogisticL1NestedTuning(lo):
-    plt.clf()
+def plotLogisticL1NestedTuning(lo, figsize=(8, 8)):
+    figh = plt.figure(figsize=figsize)
+    axh = figh.add_axes([0.15, 0.15, 0.75, 0.75])
     colors = sns.color_palette('Set1', n_colors=10)
     for outi in range(lo['scores'].shape[0]):
         sc = lo['scores'][outi, :, :].mean(axis=0)
         plt.plot(np.log10(lo['Cs']), sc, '-', color=colors[outi])
         mnmx = sc.min(), sc.max()
         plt.plot(np.log10([lo['optimalCs'][outi]]*2), mnmx, '--', color=colors[outi])
+    yl = plt.ylim()
+    plt.plot(np.log10([lo['finalResult'].C]*2), yl, '--k')
+    plt.ylim(yl)
     plt.xlim(np.log10(lo['Cs'][[0, -1]]))
-    plt.ylabel('Score (log-likelihood)')
+    plt.ylabel(f'Score (log-likelihood)')
     plt.xlabel('Regularization parameter ($log_{10} C$)\n(lower is more regularized)')
-    plt.title('Regularization tuning in nested CV')
-    plt.show()
+    # plt.title('Regularization tuning in nested CV')
+    return figh
 
 def plotLogisticL1Vars(lo):
     pctSelection = 100 * (lo['coefs'] != 0).mean(axis=0)
@@ -152,7 +161,7 @@ def plotLogisticL1Vars(lo):
     plt.xlabel('% times selected in 10-fold CV')
     plt.legend(loc=0, title='Final model?')
 
-def logisticL1NestedCV(df, outcomeVar, predVars, nFolds=10, LPO=None, Cs=10, n_jobs=1):
+def logisticL1NestedCV(df, outcomeVar, predVars, nFolds=10, LPO=None, Cs=10, n_jobs=1, scorer='log_loss'):
     """Apply logistic regression with L1-regularization (LASSO) to df.
     Uses nested cross-validation framework with inner folds to optimize C
     and outer test folds to evaluate performance.
@@ -198,7 +207,14 @@ def logisticL1NestedCV(df, outcomeVar, predVars, nFolds=10, LPO=None, Cs=10, n_j
         predVars = list(predVars)
     
     tmp = df[[outcomeVar] + predVars].dropna()
-    X,y = tmp[predVars].astype(float), tmp[outcomeVar].astype(float)
+    X, y = tmp[predVars].astype(float), tmp[outcomeVar].astype(float)
+
+    if np.isscalar(Cs):
+        """From sklearn example:
+        https://scikit-learn.org/stable/auto_examples/linear_model/plot_logistic_path.html"""
+        Cs = l1_min_c(X, y, loss='log') * np.logspace(0, 7, Cs)
+    elif Cs is None:
+        Cs = l1_min_c(X, y, loss='log') * np.logspace(0, 7, 10)
 
     if LPO is None:
         innerCV = StratifiedKFold(n_splits=nFolds, shuffle=True)
@@ -208,11 +224,11 @@ def logisticL1NestedCV(df, outcomeVar, predVars, nFolds=10, LPO=None, Cs=10, n_j
         outerCV = LeavePOut(LPO)
 
     scorerFunc = sklearn.metrics.make_scorer(sklearn.metrics.log_loss,
-                                             greater_is_better=False,
-                                             needs_proba=True,
-                                             needs_threshold=False,
-                                             labels=[0, 1])
-    
+                                                 greater_is_better=False,
+                                                 needs_proba=True,
+                                                 needs_threshold=False,
+                                                 labels=[0, 1])
+     
     fpr = np.linspace(0, 1, 100)
     tpr = np.nan * np.zeros((fpr.shape[0], nFolds))
     acc = np.nan * np.zeros(nFolds)
@@ -283,6 +299,7 @@ def logisticL1NestedCV(df, outcomeVar, predVars, nFolds=10, LPO=None, Cs=10, n_j
             'ACC':acc,                      # (outerFolds, ) accuracy across outer test folds
             'mACC':np.mean(acc),
             'scores': scores,               # (outerFolds, innerFolds, Cs) score for each C across inner and outer CV folds
+            'scorer': scorer,
             'optimalCs':optimalCs,          # (outerFolds, ) optimal C from each set of inner CV
             'C':meanC,
             'finalResult': result,          # final fitted model with predict() exposed

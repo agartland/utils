@@ -287,7 +287,8 @@ def clusteredScatter(xyDf,
                      linewidths=0,
                      edgecolors='gray',
                      vmin=None,
-                     vmax=None):
+                     vmax=None,
+                     axh=None):
     """Produce a scatter plot with axes, shaded by values in labels and with specified markers
 
     Parameters
@@ -333,15 +334,14 @@ def clusteredScatter(xyDf,
         if not colors is None:
             cmap = colors
         else:
-            cmap = palettable.colorbrewer.sequential.YlOrRd_9.mpl_colormap
+            cmap = mpl.cm.YlOrRd
     else:
         cmap = None
         oh = objhist(labels)
         uLabels = sorted(np.unique(labels), key=oh.get, reverse=True)
         
         if colors is None:
-            nColors = min(max(len(uLabels), 3), 9)
-            colors = palettable.colorbrewer.get_map('Set1', 'Qualitative', nColors).mpl_colors
+            colors = mpl.cm.Set1.colors
         elif isinstance(colors, pd.Series):
             colors = colors[uLabels].values
 
@@ -364,7 +364,8 @@ def clusteredScatter(xyDf,
     plt.clf()
     axh = figh.add_axes([0.05, 0.05, 0.9, 0.9])
     '''
-    axh = plt.gca()
+    if axh is None:
+    	axh = plt.gca()
     axh.patch.set_facecolor('white')
     # axh.axis('off')
     # figh.patch.set_facecolor('white')

@@ -36,7 +36,7 @@ plotHierClust(dmatDf, Z, labels=labels, titleStr=None, vRange=None, tickSz='smal
 """
 
 def imputeNA(df, strategy='median', axis=0, copy=True):
-    imp = SimpleImputer(strategy=strategy, axis=axis, copy=copy)
+    imp = SimpleImputer(strategy=strategy, copy=copy)
     return pd.DataFrame(imp.fit_transform(df.values), columns=df.columns, index=df.index)
 
 def corrTDmatFunc(df, *args, **kwargs):
