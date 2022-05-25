@@ -8,11 +8,8 @@ from matplotlib.ticker import MultipleLocator, AutoMinorLocator
 
 import altair as alt
 
-df = pd.DataFrame(dict(x=np.random.rand(20),
-                        y=np.random.normal(20),
-                        category=np.random.choice(['A','B', 'C'], size=20)))
 
-def altair_scatter(x, y, hue, data, tooltip=[], yscale='linear', xscale='linear', palette=None, size=60, stroke=2, fontsize=14, title=''):
+def altair_scatter(x, y, hue, data, tooltip=[], yscale='linear', xscale='linear', palette=None, size=60, stroke=2, fontsize=14, title='', reversex=False, reversey=False):
     # brush = alt.selection(type='single', resolve='global')
     # palette = {'Neither':'black', 'Y only':'gold', 'X only':'blue', 'Both':'red'}
     if palette is None and not hue is None:
@@ -23,22 +20,35 @@ def altair_scatter(x, y, hue, data, tooltip=[], yscale='linear', xscale='linear'
         col_dom = [c for c in palette]
         col_rng = [palette[c] for c in palette]
 
-    brush = alt.selection_single(resolve='global')
-    base = alt.Chart(data).add_selection(brush).mark_point(size=size, strokeWidth=stroke).interactive()
+    # brush = alt.selection_single(resolve='global')
+    # base = alt.Chart(data).add_selection(brush).mark_point(size=size, strokeWidth=stroke).interactive()
+    base = alt.Chart(data).mark_point(size=size, strokeWidth=stroke).interactive()
 
     if not palette is None:
-        tmp_color = alt.Color(field=hue, type='nominal', scale=alt.Scale(domain=col_dom, range=col_rng))
-        color_param = alt.condition(brush, tmp_color, alt.ColorValue('gray')),
+        color_param = alt.Color(field=hue, type='nominal', scale=alt.Scale(domain=col_dom, range=col_rng))
+        # color_param = alt.condition(brush, tmp_color, alt.ColorValue('gray')),
     else:
-        color_param = None
+        color_param = alt.Undefined
 
-    ch = base.encode(x=alt.Y(x, scale=alt.Scale(type=xscale)),
-                     y=alt.Y(y, scale=alt.Scale(type=yscale)),
+    ch = base.encode(x=alt.X(x, scale=alt.Scale(type=xscale, reverse=reversex)),
+                     y=alt.Y(y, scale=alt.Scale(type=yscale, reverse=reversey)),
                      tooltip=tooltip,
                      color=color_param).properties(title=title)
-    ch = ch.configure_title(fontSize=fontsize).configure_axis(labelFontSize=fontsize-2, titleFontSize=fontsize)
+    # ch = ch.configure_title(fontSize=fontsize).configure_axis(labelFontSize=fontsize-2, titleFontSize=fontsize)
     return ch
 
+
+def plot_volcano_altair(df, pvalue_col, or_col, hue_col, ann_cols=[], censor_or=None):
+    if not censor_or is None:
+        df = df.copy()
+        df.loc[df[or_col] < 1/censor_or, or_col] = 1/censor_or
+        df.loc[df[or_col] > censor_or, or_col] = censor_or
+
+    
+    tt = ann_cols + [c for c in [or_col, pvalue_col] if not c in ann_cols]
+
+    ch = altair_scatter(x=or_col, y=pvalue_col, hue=hue_col, data=df, tooltip=tt, xscale='log', yscale='log')
+    return ch
 
 
 def plot_volcano(df, pvalue_col, or_col, sig_col, ann_col=None, annotate=None, censor_or=None):
@@ -108,3 +118,9 @@ def plot_volcano(df, pvalue_col, or_col, sig_col, ann_col=None, annotate=None, c
     plt.xlabel(or_col)
     plt.xticks(xticks, xtick_labs)
     return figh
+
+def _test_data():
+    df = pd.DataFrame(dict(x=np.random.rand(20),
+                            y=np.random.normal(size=20),
+                            category=np.random.choice(['A','B', 'C'], size=20)))
+    return df
