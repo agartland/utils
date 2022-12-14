@@ -261,8 +261,8 @@ def swarmbox(x, y, data, hue=None, palette=None, order=None, hue_order=None, con
                 """Locate the data and match it up with the points plotted for each hue"""
                 tmpA = data[[x, hue, y] + connect_on].loc[indA].dropna()
                 tmpB = data[[x, hue, y] + connect_on].loc[indB].dropna()
-                plottedA = cA.get_offsets() # shaped (n_elements x 2)
-                plottedB = cB.get_offsets()
+                plottedA = pd.DataFrame(cA.get_offsets()).dropna().values # shaped (n_elements x 2)
+                plottedB = pd.DataFrame(cB.get_offsets()).dropna().values
                 
                 """Merge the data from each hue, including the new detangled x coords,
                 based on what was plotted"""
@@ -290,8 +290,8 @@ def swarmbox(x, y, data, hue=None, palette=None, order=None, hue_order=None, con
             """Locate the data and match it up with the points plotted for each hue"""
             tmp_a = data[[x, y] + connect_on].loc[ind_a].dropna()
             tmp_b = data[[x, y] + connect_on].loc[ind_b].dropna()
-            plotted_a = swarm.collections[i].get_offsets() # shaped (n_elements x 2)
-            plotted_b = swarm.collections[i + 1].get_offsets()
+            plotted_a = pd.DataFrame(swarm.collections[i].get_offsets()).dropna().values # shaped (n_elements x 2)
+            plotted_b = pd.DataFrame(swarm.collections[i + 1].get_offsets()).dropna().values
                 
             """Merge the data from each hue, including the new detangled x coords,
             based on what was plotted"""

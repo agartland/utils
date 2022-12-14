@@ -285,6 +285,19 @@ def twobytwo_stats(a, b, c, d):
         out = pd.DataFrame(out)
     return out
 
+def paired_roc_auc(left, right):
+    """Paired AUROC based on differences between pairs of datapoints
+    (e.g., pre vs. post-vaccine from the same participants)"""
+    assert left.shape[0] == right.shape[0]
+    n = left.shape[0]
+    diff_up = left - right
+    diff_down = right - left
+
+    auc = roc_auc_np(np.concatenate((np.zeros(n), np.ones(n))),
+                     np.concatenate((diff_up, diff_down)))
+    return auc
+
+
 def _test_2x2():
     n = int(1e7)
     pred = np.random.randint(2, size=n)
@@ -312,3 +325,5 @@ def _test_roc():
     print(auc, auc_np, auc_sk)
     """Also close, but not exactly"""
     auc_mwu = stats.mannwhitneyu(obs, pred_continuous).statistic / y.shape[0]**2
+
+

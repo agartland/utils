@@ -20,7 +20,8 @@ __all_ = ['veEndpointsRequired',
           'specificityCI',
           'rocStats',
           'ccsize',
-          'mean_shift_estimation']
+          'mean_shift_estimation',
+          'cont_2samp_power']
 
 """NOTE: Many of these were hacked together in very short time, but they code may still be useful for next time."""
 
@@ -41,6 +42,37 @@ try:
 except ImportError:
     print("Using scipy.stats Fisher's exact test (slow)")
     fisherTest = stats.fisher_exact
+
+def cont_2samp_power(alpha=None, difference=None, sigma=None, n=None, beta=None):
+    """Compute power or sample size for the comparison of two normally distributed variables
+    with shared variance.
+
+    OR JUST USE sm.stats.power.tt_ind_solve_power
+
+    If sample size is provided then power is calculated and if power is provided sample size
+    is calculated."""
+
+    crit_alpha = stats.norm.ppf(1-alpha/2)
+
+    if n is None:
+        crit_beta = stats.norm.ppf(beta)
+        ss = 2*(sigma**2 / difference**2)*(crit_alpha + crit_beta)**2 
+        return ss
+    elif beta is None:
+        effect_size = difference / sigma
+        if type(n) is tuple:
+            beta_z = effect_size / np.sqrt(1/n[0] + 1/n[1]) - stats.norm.ppf(1-alpha/2)
+        else:
+            beta_z = effect_size * np.sqrt(n/2) - stats.norm.ppf(1-alpha/2)
+            # beta_z = effect_size / np.sqrt(1/n + 1/n) - stats.norm.ppf(1-alpha/2)
+
+        power = stats.norm.cdf(beta_z)
+        return power
+
+#cont_2samp_power(alpha=0.05, difference=10, sigma=15, n=None, beta=0.8)
+#cont_2samp_power(alpha=0.05, difference=10, sigma=15, n=36, beta=None)
+
+
 
 def veEndpointsRequired(rr0=1, rralt=0.5, targetpow=0.9, K=1, alpha=0.025):
     """Minimum number of infection endpoints to achieve given power

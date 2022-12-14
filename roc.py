@@ -10,6 +10,9 @@ from sklearn.model_selection import StratifiedKFold, cross_val_score, LeaveOneOu
 import sklearn.linear_model
 from sklearn.svm import l1_min_c
 import warnings
+from scipy import stats
+
+from delong_auc import delong_roc_variance
 
 sns.set(style='darkgrid', palette='muted', font_scale=1.5)
 
@@ -27,7 +30,39 @@ __all__ = ['plotROC', 'plotROCObj',
            'rocStats',
            'compute2x2',
            'plotNestedCVParams',
-           'plotNestedCVScores']
+           'plotNestedCVScores',
+           'roc_auc_ci']
+
+def roc_auc_ci(obs, pred, alpha=0.05):
+    """Estimate upper and lower confidence bounds for AUC of an ROC curve.
+    Uses Delong's method (see delong_auc.py for reference)
+
+    Parameters
+    ----------
+    obs : np.ndarray
+        Vector of observed binary values
+    pred : np.ndarray
+        Vector of predicted continuous scores
+    alpha : float
+        Alpha for two-sided CI
+
+    Returns
+    -------
+    lb, ub, est : floats
+        Lower and upper bounds of the CI plus estimate of the AUC
+    """
+    auc, auc_cov = delong_roc_variance(obs, pred)
+    auc_std = np.sqrt(auc_cov)
+    
+    lower_upper_q = np.abs(np.array([0, 1]) - alpha / 2)
+
+    ci = stats.norm.ppf(lower_upper_q,
+                        loc=auc,
+                        scale=auc_std)
+
+    ci[ci > 1] = 1
+    ci[ci < 0] = 0
+    return ci[0], ci[1], auc
 
 def plotROCObj(**objD):
     fprL = [o['fpr'] for o in objD.values()]

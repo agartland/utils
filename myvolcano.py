@@ -9,12 +9,61 @@ from matplotlib.ticker import MultipleLocator, AutoMinorLocator
 import altair as alt
 
 
-def altair_scatter(x, y, hue, data, tooltip=[], yscale='linear', xscale='linear', palette=None, size=60, stroke=2, fontsize=14, title='', reversex=False, reversey=False):
+def altair_scatter(x, y, hue, data, shape=None, tooltip=[], yscale='linear', xscale='linear', palette=None, size=60, stroke=2, fontsize=14, title='', reversex=False, reversey=False):
+    # brush = alt.selection(type='single', resolve='global')
+    # palette = {'Neither':'black', 'Y only':'gold', 'X only':'blue', 'Both':'red'}
+    if palette is None and not hue is None:
+        palette = 'tableau10'
+        # tmp = sns.color_palette('Set2',  n_colors=data[hue].unique().shape[0])
+        """tmp = ['dodgerblue', 'tomato', 'black', 'green', 'eggplant']
+        palette = {h:c for h,c in zip(data[hue].unique(), tmp)}
+
+        col_dom = [c for c in palette]
+        col_rng = [palette[c] for c in palette]"""
+
+    # brush = alt.selection_single(resolve='global')
+    # base = alt.Chart(data).add_selection(brush).mark_point(size=size, strokeWidth=stroke).interactive()
+    base = alt.Chart(data).mark_point(size=size, strokeWidth=stroke).interactive()
+
+    if not palette is None:
+        #print(palette)
+        #color_param = alt.Color(field=hue, type='nominal', scale=alt.Scale(domain=col_dom, range=col_rng))
+        color_param = alt.Color(field=hue, type='nominal', scale=alt.Scale(scheme=palette), legend=alt.Legend(orient='right'))
+        #color_param = alt.Color(field=hue, type='nominal', scale=alt.Scale(scheme=palette))
+        # color_param = alt.condition(brush, tmp_color, alt.ColorValue('gray')),
+    else:
+        color_param = alt.Undefined
+
+    ch = base.encode(x=alt.X(x, scale=alt.Scale(type=xscale, reverse=reversex)),
+                     y=alt.Y(y, scale=alt.Scale(type=yscale, reverse=reversey)),
+                     tooltip=tooltip,
+                     color=color_param)
+    if not shape is None:
+        ch.encode(shape=shape)
+
+    ch = ch.properties(title=title)
+    # ch = ch.configure_title(fontSize=fontsize).configure_axis(labelFontSize=fontsize-2, titleFontSize=fontsize)
+    return ch
+
+def altair_scatter_select(selector, data, scatter_ch):
+    selection = alt.selection_multi(fields=[selector])
+    #color = alt.condition(selection, alt.Color(field=selector, type='nominal', scale=alt.Scale(scheme='dark2'), legend=None), alt.value('lightgray'))
+    color = alt.condition(selection, alt.value('black'), alt.value('lightgray'))
+    selector_ch = alt.Chart(data).mark_rect().encode(y=selector, color=color).add_selection(selection)
+
+    ch = scatter_ch.transform_filter(selection)
+
+    return alt.hconcat(selector_ch, ch).resolve_scale(color='independent')
+
+
+"""
+def altair_scatter_select(x, y, hue, data, selector, tooltip=[], yscale='linear', xscale='linear', palette=None, size=60, stroke=2, fontsize=14, title='', reversex=False, reversey=False):
     # brush = alt.selection(type='single', resolve='global')
     # palette = {'Neither':'black', 'Y only':'gold', 'X only':'blue', 'Both':'red'}
     if palette is None and not hue is None:
         # tmp = sns.color_palette('Set2',  n_colors=data[hue].unique().shape[0])
-        tmp = ['dodgerblue', 'tomato', 'black', 'green', 'eggplant']
+        # tmp = ['dodgerblue', 'tomato', 'black', 'green', 'eggplant']
+        tmp = list(mpl.cm.tab10.colors)
         palette = {h:c for h,c in zip(data[hue].unique(), tmp)}
 
         col_dom = [c for c in palette]
@@ -25,17 +74,26 @@ def altair_scatter(x, y, hue, data, tooltip=[], yscale='linear', xscale='linear'
     base = alt.Chart(data).mark_point(size=size, strokeWidth=stroke).interactive()
 
     if not palette is None:
-        color_param = alt.Color(field=hue, type='nominal', scale=alt.Scale(domain=col_dom, range=col_rng))
+        #color_param = alt.Color(field=hue, type='nominal', scale=alt.Scale(domain=col_dom, range=col_rng))
+        color_param = alt.Color(field=hue, type='nominal', scale=alt.Scale(scheme='dark2'), legend=alt.Legend(orient='right'))
         # color_param = alt.condition(brush, tmp_color, alt.ColorValue('gray')),
     else:
         color_param = alt.Undefined
 
+    selection = alt.selection_multi(fields=[selector])
+    #color = alt.condition(selection, alt.Color(field=selector, type='nominal', scale=alt.Scale(scheme='dark2'), legend=None), alt.value('lightgray'))
+    color = alt.condition(selection, alt.value('black'), alt.value('lightgray'))
+    selector_ch = alt.Chart(data).mark_rect().encode(y=selector, color=color).add_selection(selection)
+
+    #color_param = alt.Color(field=hue, type='nominal', legend=alt.Legend(orient='right'), scale=alt.Scale(scheme='tab10'))
+
     ch = base.encode(x=alt.X(x, scale=alt.Scale(type=xscale, reverse=reversex)),
                      y=alt.Y(y, scale=alt.Scale(type=yscale, reverse=reversey)),
                      tooltip=tooltip,
-                     color=color_param).properties(title=title)
+                     color=color_param).properties(title=title).transform_filter(selection)
     # ch = ch.configure_title(fontSize=fontsize).configure_axis(labelFontSize=fontsize-2, titleFontSize=fontsize)
-    return ch
+
+    return alt.hconcat(selector_ch, ch).resolve_scale(color='independent')"""
 
 
 def plot_volcano_altair(df, pvalue_col, or_col, hue_col, ann_cols=[], censor_or=None):

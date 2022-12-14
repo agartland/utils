@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import itertools
 import networkx as nx
+import altair as alt
 
 def _make_edge_dataframe(G, pos):
     edge_list = []
@@ -29,6 +30,7 @@ def plot_network(adj_mat, data=None,
                  remove_isolates=True,
                  node_hue=None, # a categorical variable (TODO: accept continuous variable)
                  node_size=40, # can be a column name or float or vector
+                 node_symbol=None, #only implented in altair wth categorical var
                  edge_linewidth=1,
                  edge_color='gray',
                  node_linewidth=0.5,
@@ -49,6 +51,8 @@ def plot_network(adj_mat, data=None,
         G = nx.convert_node_labels_to_integers(G)
         if not data is None:
             data = data.iloc[np.array([i for i in range(data.shape[0]) if not i in ind])]
+        if data.shape[0] == 0:
+            return None
 
     pos = nx.nx_agraph.graphviz_layout(G, prog=layout)
 
@@ -99,7 +103,6 @@ def plot_network(adj_mat, data=None,
         axh.xaxis.set_visible(False)
         axh.yaxis.set_visible(False)
         axh.set_frame_on(False)
-        axh.set_title(title)
         return axh
     elif backend == 'altair':
         if palette is None and not node_hue is None:
@@ -113,6 +116,10 @@ def plot_network(adj_mat, data=None,
             color_param = alt.Color(node_hue, scale=alt.Scale(scheme=palette))
         else:
             color_param = alt.Undefined
+        if node_symbol is None or not node_symbol in plotdf:
+            symbol_param = None
+        else:
+            symbol_param = node_symbol
 
         edge_df = _make_edge_dataframe(G, pos)
         marker_attrs = {}
@@ -127,8 +134,10 @@ def plot_network(adj_mat, data=None,
                 detail='edge')
         ch_nodes = alt.Chart(plotdf.reset_index(drop=True)).mark_circle(size=node_size)#.interactive()
         ch_nodes = ch_nodes.encode(x=alt.X('_X'),
-                        y=alt.Y('_Y'),
-                        tooltip=tooltip,
-                        color=color_param)
+                                    y=alt.Y('_Y'),
+                                    tooltip=tooltip,
+                                    color=color_param)
+        if not symbol_param is None:
+            ch_nodes.encode(shape=symbol_param)
         ch = alt.layer(ch_edges, ch_nodes)
         return ch
