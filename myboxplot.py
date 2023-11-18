@@ -210,11 +210,13 @@ def manyboxplots(df, cols=None, axh=None, colLabels=None,annotation='N',horizont
     plt.xticks(np.arange(x+1))
     xlabelsL = axh.set_xticklabels(colLabels, fontsize='large', rotation=xRot, fontname='Consolas')
 
-def swarmbox(x, y, data, hue=None, palette=None, order=None, hue_order=None, connect=False, connect_on=[], legend_loc=0, legend_bbox=None, swarm_alpha=1, swarm_size=5, box_alpha=1, box_edgecolor='k', box_facewhite=False, axh=None):
+def swarmbox(x, y, data, hue=None, box_palette=None, swarm_color=None, order=None, hue_order=None, connect=False, connect_on=[], legend_loc=0, legend_bbox=None, swarm_alpha=1, swarm_size=5, box_alpha=1, box_edgecolor='k', box_facewhite=False, axh=None, palette=None):
     """Based on seaborn boxplots and swarmplots.
     Adds the option to connect dots by joining on an identifier columns"""
-    if palette is None and not hue is None:
-        palette = sns.color_palette('Set2',  n_colors=data[hue].unique().shape[0])
+    if not palette is None:
+        box_palette = palette
+    if box_palette is None and not hue is None:
+        box_palette = sns.color_palette('Set2',  n_colors=data[hue].unique().shape[0])
     if hue_order is None and not hue is None:
         hue_order = sorted(data[hue].unique())
     if order is None:
@@ -227,17 +229,35 @@ def swarmbox(x, y, data, hue=None, palette=None, order=None, hue_order=None, con
     box_axh = sns.boxplot(**params,
                             fliersize=0,
                             linewidth=1,
-                            palette=palette,
+                            palette=box_palette,
                             ax=axh)
     for patch in box_axh.artists:
         patch.set_edgecolor((0, 0, 0, 1))
         r, g, b, a = patch.get_facecolor()
         if box_facewhite:
-            patch.set_facecolor((1, 1, 1, 1))
+            patch.set_facecolor((0, 0, 0, 1))
         else:
             patch.set_facecolor((r, g, b, box_alpha))
     for line in box_axh.lines:
         line.set_color(box_edgecolor)
+
+    if hue is None:
+        """Issue that if hue is not specified then swarm_palette needs to be passed as "color" 
+        sns.boxplot will automatically pick different colors for X even if no hue specified
+        whereas sns.swarmplot defaults to one color and doesn't like palette if no hue specified.
+
+        FYI symptom was an issue with the shape of swarm.collections when drawing connected dots!"""
+        if swarm_color is None:
+            swarm_color = 'k'
+        
+        params['palette'] = None
+        params['color'] = swarm_color
+    elif swarm_color is None:
+        params['palette'] = box_palette
+        params['color'] = None
+    else:
+        params['palette'] = None
+        params['color'] = swarm_color
 
     swarm = sns.swarmplot(**params,
                             linewidth=0.5,
@@ -245,7 +265,6 @@ def swarmbox(x, y, data, hue=None, palette=None, order=None, hue_order=None, con
                             dodge=True,
                             alpha=swarm_alpha,
                             size=swarm_size,
-                            palette=palette,
                             ax=axh)
     if connect and not hue is None:
         for i in range(len(hue_order) - 1):
@@ -292,6 +311,8 @@ def swarmbox(x, y, data, hue=None, palette=None, order=None, hue_order=None, con
             tmp_b = data[[x, y] + connect_on].loc[ind_b].dropna()
             plotted_a = pd.DataFrame(swarm.collections[i].get_offsets()).dropna().values # shaped (n_elements x 2)
             plotted_b = pd.DataFrame(swarm.collections[i + 1].get_offsets()).dropna().values
+            #plotted_a = pd.DataFrame(swarm.collections[0].get_offsets()).dropna().values # shaped (n_elements x 2)
+            #plotted_b = pd.DataFrame(swarm.collections[0].get_offsets()).dropna().values
                 
             """Merge the data from each hue, including the new detangled x coords,
             based on what was plotted"""
@@ -307,10 +328,10 @@ def swarmbox(x, y, data, hue=None, palette=None, order=None, hue_order=None, con
                          r[[y + '_A', y + '_B']],
                          '-', color='gray', linewidth=0.5)
     if not hue is None and not legend_loc is None:
-        if type(palette) is dict:
-            plt.legend([plt.Circle(1, color=palette[c], alpha=1) for c in hue_order], hue_order, title=hue, loc=legend_loc, bbox_to_anchor=legend_bbox)
+        if type(box_palette) is dict:
+            plt.legend([plt.Circle(1, color=box_palette[c], alpha=1) for c in hue_order], hue_order, title=hue, loc=legend_loc, bbox_to_anchor=legend_bbox)
         else:
-            plt.legend([plt.Circle(1, color=c, alpha=1) for c in palette], hue_order, title=hue, loc=legend_loc, bbox_to_anchor=legend_bbox)
+            plt.legend([plt.Circle(1, color=c, alpha=1) for c in box_palette], hue_order, title=hue, loc=legend_loc, bbox_to_anchor=legend_bbox)
     if legend_loc is None:
         plt.gca().legend_.remove()
 
