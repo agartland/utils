@@ -108,7 +108,12 @@ def embedDistanceMatrix(dmatDf, method='kpca', n_components=2, **kwargs):
         return
 
     assert xy.shape[0] == dmatDf.shape[0]
-    xyDf = pd.DataFrame(xy[:, :n_components], index=dmatDf.index, columns=np.arange(n_components))
+    
+    if isinstance(dmatDF, pd.DataFrame):
+        xyDf = pd.DataFrame(xy[:, :n_components], index=dmatDf.index, columns=np.arange(n_components))
+    else:
+        xyDf = pd.DataFrame(xy[:, :n_components], columns=np.arange(n_components))
+        
     if method == 'kpca':
         """Not sure how negative eigenvalues should be handled here, but they are usually
         small so it shouldn't make a big difference. FRom this answer it seems negative eigenvalues should be zeroed
