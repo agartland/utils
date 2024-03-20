@@ -109,8 +109,34 @@ def plot_volcano_altair(df, pvalue_col, or_col, hue_col, ann_cols=[], censor_or=
     return ch
 
 
-def plot_volcano(df, pvalue_col, or_col, sig_col, ann_col=None, annotate=None, censor_or=None):
-    
+def plot_volcano(df, pvalue_col, or_col, sig_col, ann_col=None, annotate=None, censor_or=None, figsize=(7,5), fontsize=7):
+    """Volcano scatter plot of effect size vs. p-value on log-scales.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+    pvalue_col : str
+    	Colum in df containing p-values
+    or_col : str
+    	Colum in df containing odds-ratio or effect size (e.g., fold-change, not log-FC)
+    sig_col : str
+    	Colum in df containing bool indicator of significance
+    ann_col : str
+    	Column in df containing strings for annotation
+    annotate : None or int
+    	Number of points to annotate, ranked by abs(OR) and p-value (annotates top N from each)
+    censor_or : float
+    	Limit for effect size (OR) column; will censor values and then plot.
+    figsize : tuple (float, float)
+    	Provide figsize to matplotlib
+    fontsize : float
+    	Font size for annotation
+
+    Returns
+    -------
+    figh : handle
+    	Matplotlib figure handle
+    """
     if not censor_or is None:
         df = df.copy()
         df.loc[df[or_col] < 1/censor_or, or_col] = 1/censor_or
@@ -123,7 +149,7 @@ def plot_volcano(df, pvalue_col, or_col, sig_col, ann_col=None, annotate=None, c
     p_func = lambda p: -10*np.log10(p)
     sig_ind = df[sig_col]
     
-    figh = plt.figure(figsize=(7, 5))
+    figh = plt.figure(figsize=figsize)
     axh = figh.add_axes([0.15, 0.15, 0.7, 0.7], xscale='log', yscale='log')
     axh.set_axisbelow(True)
     plt.grid(True, linewidth=1)
@@ -162,7 +188,7 @@ def plot_volcano(df, pvalue_col, or_col, sig_col, ann_col=None, annotate=None, c
             plt.annotate(i,
                          xy=xy,
                          textcoords='offset points',
-                         size=6,
+                         size=fontsize,
                          **p)
 
     if censor_or is None:

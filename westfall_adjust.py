@@ -1,3 +1,10 @@
+
+"""Version in kyotil used in correlates analysis:
+https://github.com/youyifong/kyotil/blob/master/R/P.adj.perm.R
+"""
+
+
+
 ###############################################################################
 ###  Compute p-values on permuted data to adjust for family-wise error rate (FWER) or false discovery rate(FDR)
 ###  Created by Sue Li,  10-17-2014; modified by Paul T Edlefsen 11-14-2014
@@ -208,3 +215,50 @@ save(p.b,file="FcRsnps_p_169match.b")
 
 
 
+"""From Bing 3-23-2023"""
+import numpy as np
+from scipy.stats import norm
+
+def westfall_young(p_values, num_permutations=10000):
+    """
+    Westfall and Young (1993) permutation-based multiplicity adjustment algorithm.
+    
+    Parameters
+    ----------
+    p_values : array_like
+        Array of p-values to be adjusted.
+    num_permutations : int, optional
+        Number of permutations to perform. Default is 10000.
+        
+    Returns
+    -------
+    adjusted_p_values : ndarray
+        Array of adjusted p-values.
+    """
+    p_values = np.asarray(p_values)
+    num_tests = len(p_values)
+    
+    # Initialize array to store adjusted p-values
+    adjusted_p_values = np.zeros(num_tests)
+    
+    # Compute the maximum statistic for the observed data
+    max_statistic = -norm.ppf(p_values).max()
+    
+    # Initialize counter for number of times the maximum statistic is exceeded
+    num_exceeds = np.zeros(num_tests)
+    
+    # Perform permutations
+    for i in range(num_permutations):
+        # Generate random normal deviates for each test
+        random_deviates = norm.rvs(size=num_tests)
+        
+        # Compute the maximum statistic for this permutation
+        max_statistic_permutation = np.abs(random_deviates).max()
+        
+        # Update the counter for number of times the maximum statistic is exceeded
+        num_exceeds += (max_statistic_permutation >= max_statistic)
+        
+    # Compute adjusted p-values
+    adjusted_p_values = (num_exceeds + 1) / (num_permutations + 1)
+    
+    return adjusted_p_values
