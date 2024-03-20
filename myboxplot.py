@@ -405,3 +405,15 @@ def discrete_boxplot(x, y, hue, data, yjitter=0.3, palette=None, order=None, hue
     plt.legend([plt.Rectangle((0,0), 1, 1, color=c) for c in palette],
                hue_order,
                loc='upper left', bbox_to_anchor=(1,1))
+
+def _test_swarmbox():
+    from os.path import join as opj
+    import sys
+    sys.path.append(opj('A:/gitrepo/utils'))
+
+    tmp = []
+    for lett, num, pid in itertools.product(['A', 'B', 'C'], ['one', 'two', 'three'], ['P1', 'P2', 'P3', 'P4', 'P5','P6', 'P7']):
+        tmp.append({'letter':lett, 'word':num, 'pid':pid, 'value':np.random.rand()})
+    df = pd.DataFrame(tmp)
+
+    swarmbox(x='word', y='value', hue='letter', connect=True, connect_on=['pid'], data=df)
